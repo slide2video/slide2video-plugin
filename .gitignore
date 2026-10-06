@@ -1,0 +1,8 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+.DS_Store
+# never commit keys or class material
+*.env
+lesson-videos/**/build/

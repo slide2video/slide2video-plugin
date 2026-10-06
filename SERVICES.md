@@ -1,15 +1,10 @@
 # External services
 
-Every external service, API, or paid account this repo depends on.
-
-> **Update rule:** any change that adds, removes, or re-keys an external
-> service must update this file in the same commit/PR.
-
-| Service | What for | Credentials / env | Console / billing notes |
+| Service | Used by | Key | Who pays |
 |---|---|---|---|
-| — none yet — | | | |
+| ElevenLabs text-to-speech (`api.elevenlabs.io`) | `lv/narrate.py`, `lv/keys.py` | `ELEVENLABS_API_KEY`, supplied by each user in `~/.lesson-videos/keys.env` | the user |
+| Gemini API: Veo 3.1 Lite, Lyria 3.5 (`generativelanguage.googleapis.com`) | `lv/clips.py`, `lv/music.py`, `lv/keys.py` | `GEMINI_API_KEY`, optional, same file | the user |
+| GitHub Actions | `.github/workflows/ci.yml` | none | free (public repo) |
+| Downloads at first run: astral.sh (uv), PyPI, Playwright browser CDN, github.com (static-ffmpeg binaries) | `skills/setup`, `lv/tools.py` | none | free |
 
-## Notes
-
-- No secret values in this file — only service identities and where the
-  credentials live (Bitwarden item, `.env` name, Actions secret, …).
+The repo itself holds no keys.
