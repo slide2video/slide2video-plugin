@@ -28,6 +28,14 @@ def build_parser() -> argparse.ArgumentParser:
     i = sub.add_parser("ingest", help="read a .pptx/.pdf deck into lesson-videos/_work/deck/")
     i.add_argument("deck", type=Path)
     i.add_argument("--work", type=Path)
+    e = sub.add_parser("estimate", help="estimated ElevenLabs characters and Gemini dollars")
+    e.add_argument("work", type=Path)
+    e.add_argument("--chapters", type=int, help="plan stage: number of chapters (else count the written scripts)")
+    e.add_argument("--minutes", type=float, default=5)
+    e.add_argument("--clips", type=int, default=0)
+    e.add_argument("--music", action="store_true")
+    st = sub.add_parser("status", help="which chapters are done and what each needs next")
+    st.add_argument("work", type=Path)
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -67,6 +75,14 @@ def dispatch(args) -> int:
     from . import ingest
     if args.cmd == "ingest":
         ingest.ingest(args.deck, args.work or ingest.default_work(args.deck))
+        return 0
+    from . import estimate, status
+    if args.cmd == "estimate":
+        chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
+        print(estimate.report(chars, args.clips, args.music))
+        return 0
+    if args.cmd == "status":
+        print(status.report(args.work.resolve()))
         return 0
     from . import narrate, render
     if args.cmd == "narrate":
