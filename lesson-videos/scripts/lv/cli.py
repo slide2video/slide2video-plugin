@@ -25,6 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--workers", type=int)
     r.add_argument("--fps", type=int, default=30)
     r.add_argument("--out", type=Path)
+    i = sub.add_parser("ingest", help="read a .pptx/.pdf deck into lesson-videos/_work/deck/")
+    i.add_argument("deck", type=Path)
+    i.add_argument("--work", type=Path)
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -60,6 +63,10 @@ def dispatch(args) -> int:
         f = keys.ensure_file()
         keys.open_in_editor(f)
         print(f"Opened {f}. Paste the keys after the = signs, save, close the editor, then run `keys check`.")
+        return 0
+    from . import ingest
+    if args.cmd == "ingest":
+        ingest.ingest(args.deck, args.work or ingest.default_work(args.deck))
         return 0
     from . import narrate, render
     if args.cmd == "narrate":
