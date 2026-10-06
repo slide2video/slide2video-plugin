@@ -11,7 +11,9 @@ from .util import UserError
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="lesson-videos", description="Turn a slide deck into narrated study videos.")
     p.add_argument("--version", action="version", version=f"lesson-videos {__version__}")
-    p.add_subparsers(dest="cmd", required=True, metavar="command")
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
+    k = sub.add_parser("keys", help="open the keys file; `keys check` tests the keys")
+    k.add_argument("action", nargs="?", choices=["open", "check"], default="open")
     return p
 
 
@@ -32,4 +34,15 @@ def main(argv=None) -> int:
 
 
 def dispatch(args) -> int:
+    from . import keys
+    if args.cmd == "keys":
+        if args.action == "check":
+            rows = keys.check()
+            for name, good, msg in rows:
+                print(f"{'✓' if good else '✗'} {name}: {msg}")
+            return 0 if all(good for _, good, _ in rows) else 1
+        f = keys.ensure_file()
+        keys.open_in_editor(f)
+        print(f"Opened {f}. Paste the keys after the = signs, save, close the editor, then run `keys check`.")
+        return 0
     raise UserError(f"unknown command {args.cmd}")
