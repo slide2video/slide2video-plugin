@@ -54,3 +54,17 @@ def make_chapter(tmp_path):
             write_text(ch / "scenes.js", scenes_js)
         return ch
     return make
+
+
+@pytest.fixture(scope="session")
+def browser_ok():
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            p.chromium.launch().close()
+    except Exception as e:  # noqa: BLE001
+        pytest.skip(f"Chromium not installed for this environment ({e}); run `uv run python -m playwright install chromium`")
+    return True
+
+
+HELLO_JS = "scene('hello', (g, t, s) => Engine.titleCard(g, t, s, { kicker: 'Test', title: 'Héllo *world*', emojis: ['🌊'] }), { bug: false, sfx: [[0.3, 'pop0', -12]] });\n"
