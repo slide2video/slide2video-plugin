@@ -13,6 +13,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="lesson-videos", description="Turn a slide deck into narrated study videos.")
     p.add_argument("--version", action="version", version=f"lesson-videos {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
+    d = sub.add_parser("doctor", help="install and check everything, then render a 3-second test video")
+    d.add_argument("--no-keys", action="store_true", help="skip the API key checks (for CI)")
     k = sub.add_parser("keys", help="open the keys file; `keys check` tests the keys")
     k.add_argument("action", nargs="?", choices=["open", "check"], default="open")
     n = sub.add_parser("narrate", help="record narration for a chapter (cached; only changed scenes cost credits)")
@@ -75,6 +77,9 @@ def main(argv=None) -> int:
 
 def dispatch(args) -> int:
     from . import keys
+    if args.cmd == "doctor":
+        from . import doctor
+        return doctor.run_doctor(args.no_keys)
     if args.cmd == "keys":
         if args.action == "check":
             rows = keys.check()
