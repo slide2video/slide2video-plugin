@@ -71,6 +71,12 @@ def main(argv=None) -> int:
     except UserError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
+    except Exception as e:  # noqa: BLE001
+        from . import net
+        if isinstance(e, net.ApiError):
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        raise
     except KeyboardInterrupt:
         return 130
 
