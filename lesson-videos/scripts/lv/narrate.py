@@ -57,11 +57,26 @@ def build_timing(spec: dict, takes: dict) -> dict:
     return {"chapter": spec.get("chapter", ""), "title": spec.get("title", ""), "duration": round(t, 3), "scenes": out}
 
 
+def _service_message(detail: str) -> str:
+    """ElevenLabs' own explanation (e.g. "You have 12 credits remaining"), if the error body has one."""
+    try:
+        d = json.loads(detail).get("detail")
+    except (ValueError, AttributeError):
+        return ""
+    return str(d.get("message", "")).strip() if isinstance(d, dict) else str(d or "").strip()
+
+
 def narration_error(e: net.ApiError, done: int, total: int) -> str:
     msg = (f"Narration stopped after {done} of {total} new scenes ({e.host} said {e.status}). "
            "Finished scenes are saved and won't be paid for again.")
+    said = _service_message(e.detail)
+    if said:
+        msg += f" ElevenLabs says: {said[:240]}"
     d = e.detail.lower()
-    if "quota" in d or e.status == 402:
+    if "missing_permissions" in d or "permission" in d:
+        msg += (" The key can't use Text to Speech: edit it at https://elevenlabs.io/app/settings/api-keys, turn on "
+                "Text to Speech, then run `narrate` again.")
+    elif "quota" in d or e.status == 402:
         msg += (" Your ElevenLabs credits for this month are used up: run `keys check` to see what's left, "
                 "or upgrade the plan, then run `narrate` again.")
     elif e.status == 401:
@@ -90,14 +105,18 @@ def narrate(ch: Path, speak_fn=speak, workers: int = config.NARRATION_WORKERS) -
     if jobs and speak_fn is speak:
         keys.get("ELEVENLABS_API_KEY")  # fail early with the friendly message
     done = 0
+    ex = cf.ThreadPoolExecutor(workers)
     try:
-        with cf.ThreadPoolExecutor(workers) as ex:
-            for fu in cf.as_completed([ex.submit(speak_fn, say, voice, f) for say, f in jobs]):
-                fu.result()
-                done += 1
-                print(f"  voiced {done}/{len(jobs)}", flush=True)
+        for fu in cf.as_completed([ex.submit(speak_fn, say, voice, f) for say, f in jobs]):
+            fu.result()
+            done += 1
+            print(f"  voiced {done}/{len(jobs)}", flush=True)
     except net.ApiError as e:
-        raise UserError(narration_error(e, done, len(jobs))) from None
+        ex.shutdown(wait=True, cancel_futures=True)  # don't keep spending on scenes still in the queue
+        saved = sum(1 for _, f in jobs if f.exists())
+        raise UserError(narration_error(e, saved, len(jobs))) from None
+    finally:
+        ex.shutdown(wait=True)
     takes = {sid: (tools.duration(f), words_from(read_json(f.with_suffix(".json"))), f.relative_to(ch).as_posix())
              for sid, f in files.items()}
     T = build_timing(spec, takes)

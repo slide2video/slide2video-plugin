@@ -57,3 +57,28 @@ def test_quota_error_keeps_finished_scenes(make_chapter, fake_speak):
     msg = str(e.value)
     assert "credits" in msg and "keys check" in msg and "saved" in msg
     assert len(list((ch / "build/voice").glob("*.mp3"))) == 3
+
+
+def test_first_failure_stops_queued_requests(make_chapter, fake_speak):
+    ch = make_chapter([{"id": f"s{i}", "say": f"Scene number {i}."} for i in range(10)])
+    calls = []
+    detail = '{"detail": {"status": "quota_exceeded", "message": "This request exceeds your quota. You have 12 credits remaining."}}'
+    def flaky(text, voice, out):
+        calls.append(text)
+        if len(calls) == 1:
+            raise net.ApiError(401, detail, "https://api.elevenlabs.io/v1/x")
+        fake_speak(text, voice, out)
+    with pytest.raises(UserError) as e:
+        narrate.narrate(ch, speak_fn=flaky, workers=2)
+    saved = len(list((ch / "build/voice").glob("*.mp3")))
+    assert len(calls) <= 4
+    assert f"{saved} of 10" in str(e.value) and "12 credits remaining" in str(e.value)
+
+
+def test_missing_tts_permission_says_how_to_fix(make_chapter):
+    ch = make_chapter([{"id": "a", "say": "Hi."}])
+    def denied(text, voice, out):
+        raise net.ApiError(401, '{"detail": {"status": "missing_permissions", "message": "The API key you used is missing the permission text_to_speech"}}', "https://api.elevenlabs.io/v1/x")
+    with pytest.raises(UserError) as e:
+        narrate.narrate(ch, speak_fn=denied)
+    assert "Text to Speech" in str(e.value) and "elevenlabs.io/app/settings/api-keys" in str(e.value)
