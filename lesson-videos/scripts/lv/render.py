@@ -103,7 +103,7 @@ def stills(ch: Path, times: list[float], cols: int = 3) -> Path:
             f.write_bytes(grab(pg, t, 0.9))
             files.append(f)
         fail_on_errors(logs)
-        warnings = [l for l in logs if l.startswith("warning")]
+        notes = [l for l in logs if l.startswith(("warning", "error"))]
     tw, th = 640, 360
     sheet = Image.new("RGB", (cols * tw, math.ceil(len(files) / cols) * th), "white")
     d = ImageDraw.Draw(sheet)
@@ -113,8 +113,8 @@ def stills(ch: Path, times: list[float], cols: int = 3) -> Path:
         d.text(((i % cols) * tw + 8, (i // cols) * th + 8), f.stem, fill="yellow")
     p = ch / "build" / "stills.jpg"
     sheet.save(p, quality=85)
-    for w in warnings[:20]:
-        print(w)
+    for line in notes[:20]:
+        print(line)
     return p
 
 

@@ -127,7 +127,11 @@
     if (o.r || o.fit === 'cover') { rr(ctx, o.fit === 'cover' ? x : dx, o.fit === 'cover' ? y : dy, o.fit === 'cover' ? w : dw, o.fit === 'cover' ? h : dh, o.r); ctx.clip(); }
     ctx.drawImage(im, dx, dy, dw, dh); ctx.restore();
   }
-  function img(ctx, key, x, y, w, h, o) { drawImg(ctx, imgs[key], x, y, w, h, o); }
+  const warned = new Set();
+  function img(ctx, key, x, y, w, h, o) {
+    if (!(key in imgs) && !warned.has(key)) { warned.add(key); console.error(`asset failed: no Engine.assets() entry for "${key}"`); }
+    drawImg(ctx, imgs[key], x, y, w, h, o);
+  }
   // Video clip as a JPEG frame sequence: dir/0001.jpg..; loaded lazily, renderer waits for pending loads.
   function clip(ctx, dir, n, t, x, y, w, h, o = {}) {
     const fps = o.fps || 24; let f = Math.floor(Math.max(0, t) * fps); f = o.loop ? f % n : Math.min(n - 1, f);
@@ -135,7 +139,7 @@
     let im = frameCache.get(src);
     if (!im) {
       im = new Image(); frameCache.set(src, im); pending++;
-      im.onload = im.onerror = () => { pending--; if (!pending) { waiters.forEach(r => r()); waiters = []; } };
+      im.onload = im.onerror = e => { if (e.type === 'error') console.error('asset failed: ' + src); pending--; if (!pending) { waiters.forEach(r => r()); waiters = []; } };
       im.src = src;
       if (frameCache.size > 120) { const k = frameCache.keys().next().value; frameCache.delete(k); }
     }
@@ -392,6 +396,7 @@
     return out;
   };
   Promise.all([`700 40px "Patrick Hand"`, `600 40px "Nunito"`, `800 40px "Nunito"`].map(f => document.fonts.load(f))).catch(() => {}).then(() => Promise.all(loads)).then(() => document.fonts.ready).then(() => {
+    T.scenes.forEach(ts => { if (!scenes[ts.id]) console.error(`asset failed: no scene() for "${ts.id}" in scenes.js`); });
     window.__ready = true;
     if (!/export=1/.test(location.search)) {
       // interactive preview: play in real time with narration audio, click to scrub

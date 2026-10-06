@@ -56,3 +56,16 @@ def test_wander_spreads_particles(make_chapter, fake_speak, browser_ok):
     with render.page_for(ch) as (pg, logs):
         xs = pg.evaluate("[...Array(20)].map((_, i) => Engine.wander(i, 0, {x: 0, y: 0, w: 1000, h: 1000}, 3)[0])")
     assert max(xs) - min(xs) > 600, xs
+
+
+@pytest.mark.parametrize("js,needle", [
+    ("scene('hello', (g, t, s) => { Engine.clip(g, 'assets/clip_nope', 192, t, 0, 0, 640, 360); });\n", "assets/clip_nope/"),
+    ("scene('hello', (g, t, s) => { Engine.img(g, 'nokey', 0, 0, 640, 360); });\n", '"nokey"'),
+    ("scene('other', (g, t, s) => {});\n", 'no scene() for "hello"'),
+])
+def test_render_reports_silent_gray(make_chapter, fake_speak, browser_ok, js, needle):
+    ch = make_chapter([{"id": "hello", "min": 1}], js)
+    narrate.narrate(ch, speak_fn=fake_speak)
+    with pytest.raises(UserError) as e:
+        render.stills(ch, [0.5])
+    assert needle in str(e.value)
