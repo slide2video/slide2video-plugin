@@ -76,7 +76,7 @@ It opens a small text file in TextEdit (Mac) or Notepad (Windows). Tell the teac
 ```
 LV keys check
 ```
-Read the result to them in plain words. ✓ ElevenLabs shows how many characters are left this month. If ElevenLabs says the key can't read the account, send them back to the key's permissions (User → Read). Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
+Read the result to them in plain words. ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and allow User → Read. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
 
 ## 7. Done
 

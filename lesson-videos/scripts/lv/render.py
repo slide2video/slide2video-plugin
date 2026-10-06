@@ -137,6 +137,20 @@ def video_part(ch: Path, out: Path, fps: int, f0: int, f1: int) -> None:
         raise UserError(f"ffmpeg failed while encoding {out.name} (exit {code}).")
 
 
+def final_sheet(video: Path, sheet: Path) -> Path:
+    """Four frames (15/40/65/90%) of the finished MP4, side by side in a 2x2 grid."""
+    dur = tools.duration(video)
+    picks = [sheet.with_name(f"final-{k}.jpg") for k in range(4)]
+    for k, f in enumerate(picks):
+        run(tools.ffmpeg(), "-v", "error", "-y", "-ss", f"{dur * (0.15 + 0.25 * k):.2f}", "-i", video,
+            "-frames:v", "1", "-vf", "scale=960:-2", f)
+    run(tools.ffmpeg(), "-v", "error", "-y", *[a for f in picks for a in ("-i", f)],
+        "-filter_complex", "[0][1]hstack[t];[2][3]hstack[b];[t][b]vstack", sheet)
+    for f in picks:
+        f.unlink(missing_ok=True)
+    return sheet
+
+
 def default_workers() -> int:
     return max(1, min(4, (os.cpu_count() or 2) // 2))
 
@@ -171,5 +185,6 @@ def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir:
     write_text(out.with_suffix(".vtt"), captions.vtt(T))
     for p in parts:
         p.unlink(missing_ok=True)
-    print(f"wrote {out} ({tools.duration(out):.1f}s)")
+    print(f"wrote {out} ({tools.duration(out):.1f}s; narration {T['duration']:.1f}s)")
+    print(f"frames from the finished video: {final_sheet(out, b / 'final.jpg')}")
     return out

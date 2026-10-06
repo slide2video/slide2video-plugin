@@ -51,7 +51,7 @@ Write `WORK/brief.md`. Per chapter: the essential question if the deck has one; 
 
 ## 4. Plan and approval gate
 
-Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (hook, 6–12 content scenes, 3-question quiz, recap), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (only living things or landscapes that benefit from motion; never diagrams with text, never photos of students). Then run:
+Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (hook, 6–12 content scenes, a 3-question quiz, recap for 4–6 minutes; for shorter videos scale down, e.g. one scene per key idea and a 1-question quiz), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (real photos of living things or landscapes that benefit from motion; not drawings or clip-art, which Veo turns into realistic footage partway through; never diagrams with text, never photos of students). Then run:
 
 ```
 LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music]
@@ -69,11 +69,11 @@ Show the teacher the outline in brief and the estimate, and **ask for approval**
 Follow the workflow in `guide.md` for chapter 1 in `WORK/ch1/`:
 1. Write `script.json` (narration per scene; `"music": "../music/bed.mp3"` only if music exists).
 2. `LV narrate "WORK/ch1"`.
-3. Copy the images you use from `WORK/deck/media/` into `WORK/ch1/assets/` (downscale to at most 1600 px wide with Pillow); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]`.
+3. Copy the images you use from `WORK/deck/media/` into `WORK/ch1/assets/` (downscale to at most 1600 px wide, e.g. `uv run --with pillow python -c "from PIL import Image; im = Image.open('<in>'); im.thumbnail((1600, 1600)); im.save('<out>')"`); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]`.
 4. Write `scenes.js`.
 5. `LV stills "WORK/ch1" <one time per scene>` and look at `WORK/ch1/build/stills.jpg`. Fix overlaps, text running off cards, things hidden behind captions, empty-looking scenes, and every `cue miss` warning. Repeat until clean (2–3 rounds is normal).
 6. `LV render "WORK/ch1"`.
-7. Verify: the printed duration matches the narration length; pull 3–4 frames with `ffmpeg -ss <t> -i "<video>" -frames:v 1 <file>.png` and look at them.
+7. Verify: `render` prints the video length next to the narration length (they should match), and saves four frames of the finished video to `WORK/ch1/build/final.jpg`; look at them.
 
 Then **stop**. Tell the teacher where the video is (`<folder>/lesson-videos/Chapter 1 - ….mp4`) and ask about tone, pace, reading level, voice and look. Apply their feedback to chapter 1 (re-narrating only changed scenes is cheap) before moving on, and write the agreed style notes at the top of `plan.md` so later chapters (and later sessions) follow them.
 

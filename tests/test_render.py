@@ -22,6 +22,7 @@ def test_stills_and_render(make_chapter, fake_speak, browser_ok):
     assert abs(tools.duration(out) - narrate.read_timing(ch)["duration"]) < 0.2
     assert {"video", "audio"} <= tools.streams(out)
     assert read_text(out.with_suffix(".vtt")).startswith("WEBVTT")
+    assert (ch / "build" / "final.jpg").exists()  # frames from the finished MP4, for the last visual check
 
 
 def test_render_reports_page_error(make_chapter, fake_speak, browser_ok):

@@ -85,4 +85,5 @@ def test_check_missing_permission(monkeypatch):
     def fake(url, headers=None, timeout=None, **kw):
         raise net.ApiError(401, '{"detail": {"status": "missing_permissions", "message": "user_read"}}', url)
     rows = keys.check(request=fake)
-    assert "User" in rows[0][2] and "read" in rows[0][2]
+    assert rows[0][1] is True  # authenticated: narration still works, only the credit count is hidden
+    assert "User → Read" in rows[0][2] and "credits" in rows[0][2]

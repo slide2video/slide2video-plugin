@@ -115,13 +115,12 @@ def check(request=None) -> list[tuple[str, bool, str]]:
             rows.append(("ElevenLabs", True, f"{mask(el)}; {left:,} characters left this month ({sub.get('tier', '?')} plan)"))
         except net.ApiError as e:
             d = e.detail.lower()
-            if "permission" in d:
-                hint = "the key works but can't read your account: edit the key at elevenlabs.io and allow User → Read"
-            elif e.status == 401:
-                hint = "the key was rejected: create a new one and paste it again"
+            if "permission" in d:  # the key authenticated; it just can't read the account
+                rows.append(("ElevenLabs", True, f"{mask(el)}; key works, but can't show your remaining credits "
+                                                 "(to see them, edit the key at elevenlabs.io and allow User → Read)"))
             else:
-                hint = str(e)
-            rows.append(("ElevenLabs", False, f"{mask(el)}; {hint}"))
+                hint = "the key was rejected: create a new one and paste it again" if e.status == 401 else str(e)
+                rows.append(("ElevenLabs", False, f"{mask(el)}; {hint}"))
     gm = get("GEMINI_API_KEY", required=False)
     if not gm:
         rows.append(("Gemini", True, "not set (optional): no music, no AI clips"))
