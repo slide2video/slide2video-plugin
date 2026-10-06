@@ -1,0 +1,16 @@
+# Rename to ci.yml and fill in the test job to activate CI (Tier A repos).
+# Keep the job name `test` — bootstrap.sh registers it as the required check.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # - run: <your test gate here>
+      - run: echo "replace with the repo's test gate"
