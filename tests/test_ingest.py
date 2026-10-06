@@ -83,3 +83,63 @@ def test_contact_sheet_survives_unreadable_image(tmp_path):
     Image.new("RGB", (50, 50), "red").save(tmp_path / "b.png")
     sheets = ingest.contact_sheets(sorted(tmp_path.iterdir()), tmp_path)
     assert len(sheets) == 1 and sheets[0].exists()
+
+
+def _replace_media(pptx, member_suffix, data):
+    import zipfile
+    src = zipfile.ZipFile(pptx)
+    items = [(i, src.read(i.filename)) for i in src.infolist()]
+    src.close()
+    with zipfile.ZipFile(pptx, "w", zipfile.ZIP_DEFLATED) as z:
+        for info, blob in items:
+            z.writestr(info, data if info.filename.startswith("ppt/media/") and info.filename.endswith(member_suffix) else blob)
+
+
+def test_ingest_survives_corrupt_and_mpo_images(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Inches
+    jpg = io.BytesIO()
+    Image.new("RGB", (300, 200), "green").save(jpg, "JPEG")
+    jpg.seek(0)
+    prs = Presentation()
+    s = prs.slides.add_slide(prs.slide_layouts[5])
+    s.shapes.title.text = "Phone photos"
+    s.shapes.add_picture(png("red"), Inches(1), Inches(2))
+    s.shapes.add_picture(jpg, Inches(5), Inches(2))
+    deck = tmp_path / "deck.pptx"
+    prs.save(str(deck))
+    mpo = io.BytesIO()
+    Image.new("RGB", (300, 200), "blue").save(mpo, "MPO", save_all=True, append_images=[Image.new("RGB", (300, 200), "navy")])
+    _replace_media(deck, ".png", b"\x00not an image")
+    _replace_media(deck, ".jpg", mpo.getvalue())
+    out = ingest.ingest(deck, tmp_path / "work")
+    md = read_text(out / "slides.md")
+    assert "Images: s001-1.png, s001-2.jpg" in md
+    assert (out / "contact-01.jpg").exists()
+
+
+def test_ingest_reads_chart_and_marks_it(tmp_path):
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Inches
+    prs = Presentation()
+    s = prs.slides.add_slide(prs.slide_layouts[5])
+    s.shapes.title.text = "Potato mass"
+    data = CategoryChartData()
+    data.categories = ["Before", "After"]
+    data.add_series("Salt water", (39, 43))
+    s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(2), Inches(6), Inches(4), data)
+    deck = tmp_path / "deck.pptx"
+    prs.save(str(deck))
+    md = read_text(ingest.ingest(deck, tmp_path / "work") / "slides.md")
+    assert "[Chart]" in md and "Salt water" in md and "Before" in md
+
+
+def test_smartart_text_from_data_part():
+    xml = (b'<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" '
+           b'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><dgm:ptLst>'
+           b'<dgm:pt><dgm:t><a:p><a:r><a:t>Evaporation</a:t></a:r></a:p></dgm:t></dgm:pt>'
+           b'<dgm:pt><dgm:t><a:p><a:r><a:t>Condensation</a:t></a:r></a:p></dgm:t></dgm:pt>'
+           b'</dgm:ptLst></dgm:dataModel>')
+    assert ingest._smartart_text(xml) == "Evaporation / Condensation"

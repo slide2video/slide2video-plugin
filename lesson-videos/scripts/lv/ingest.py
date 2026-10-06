@@ -49,11 +49,47 @@ def _walk(shapes):
 
 
 def _image_blob(sh):
+    """(bytes, extension) of a picture shape, taken from the package part itself.
+
+    python-pptx's `Image.ext` opens the bytes with Pillow and rejects anything it can't identify
+    (corrupt files, MPO phone photos, WebP), so it is never used here.
+    """
     try:
-        im = sh.image
-    except (AttributeError, ValueError, KeyError):
+        part = sh.part.related_part(sh._element.blip_rId)
+        return part.blob, (part.partname.ext or "bin").lower()
+    except Exception:  # noqa: BLE001  not a picture, or a broken relationship
         return None
-    return im.blob, (im.ext or "bin").lower()
+
+
+_A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+
+def _smartart_text(xml: bytes) -> str:
+    """All text runs of a SmartArt data part, in order."""
+    import xml.etree.ElementTree as ET
+    return " / ".join(t.text.strip() for t in ET.fromstring(xml).iter(f"{_A}t") if t.text and t.text.strip())
+
+
+def _graphic_text(sh) -> str | None:
+    """Text of a chart or SmartArt graphic frame, which python-pptx doesn't expose as text."""
+    if getattr(sh, "has_chart", False) and sh.has_chart:
+        try:
+            ch = sh.chart
+            bits = [ch.chart_title.text_frame.text.strip()] if ch.has_title else []
+            bits += [f"series: {', '.join(str(x.name) for x in ch.series)}",
+                     f"categories: {', '.join(str(c) for c in ch.plots[0].categories)}"]
+            return "[Chart] " + "; ".join(b for b in bits if b)
+        except Exception:  # noqa: BLE001
+            return "[Chart not read: ask the teacher what it shows, or ingest a PDF export of the deck]"
+    data = sh._element.xpath(".//*[local-name()='relIds']")
+    if data:
+        try:
+            text = _smartart_text(sh.part.related_part(data[0].get(f"{_R}dm")).blob)
+            return f"[SmartArt] {text}" if text else None
+        except Exception:  # noqa: BLE001
+            return "[SmartArt not read: ask the teacher what it says, or ingest a PDF export of the deck]"
+    return None
 
 
 def _pptx(deck: Path, media: Path) -> list[dict]:
@@ -73,6 +109,9 @@ def _pptx(deck: Path, media: Path) -> list[dict]:
             if getattr(sh, "has_table", False) and sh.has_table:
                 for row in sh.table.rows:
                     texts.append(" | ".join(c.text.strip() for c in row.cells))
+            graphic = _graphic_text(sh)
+            if graphic:
+                texts.append(graphic)
             blob = _image_blob(sh)
             if blob:
                 data, ext = blob
