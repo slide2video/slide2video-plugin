@@ -1,6 +1,6 @@
 # Chapter video guide
 
-How to build one chapter video with the lesson-videos engine. **LV** = `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/lesson-videos.py"`. A chapter is a folder `WORK/chN/` with `script.json`, `scenes.js` and `assets/`. Copy the idioms in `sample/` (next to this file).
+How to build one chapter video with the lesson-videos engine. **LV** = the full `uv run "…/scripts/lesson-videos.py"` command line given to you by the make skill (or by whoever handed you this chapter). A chapter is a folder `WORK/chN/` with `script.json`, `scenes.js` and `assets/`. Copy the idioms in `sample/` (next to this file).
 
 ## Workflow
 1. Write `script.json`. Top level: `chapter` (small top-right label, e.g. `"CHAPTER 2 · OSMOSIS"`), `title`, `out` (e.g. `"Chapter 2 - Osmosis and the Salty Potato Lab.mp4"`), optional `"music": "../music/bed.mp3"`, optional `"voice"` (ElevenLabs voice ID). `scenes`: one object per scene with `id`, `say` (narration), optional `lead` (s before speech, default 0.5), `tail` (s after, default 0.7), `hold` (extra silent s, used for quiz countdowns), `min` (minimum s).
@@ -31,7 +31,7 @@ How to build one chapter video with the lesson-videos engine. **LV** = `uv run "
 - Palette: `C.navy, C.sea, C.teal, C.aqua, C.foam, C.coral, C.sun, C.leaf, C.purple, C.pink, C.ink, C.grey, C.water`.
 
 ## Assets
-Copy the deck images you use from `WORK/deck/media/` into `WORK/chN/assets/`, downscaled to at most 1600 px wide (`from PIL import Image`; Pillow is available through `uv run --with pillow python`). Use the contact sheets to pick them. Never use images of students.
+Copy each deck image you use with `LV asset "WORK/deck/media/<file>" "WORK/chN/assets/<name>.jpg"` (straightened, at most 1600 px, transparent PNGs flattened; use a `.png` target to keep transparency). Use the contact sheets to pick them. A missing asset, clip frame or scene stops `stills` and `render` with an error naming it. Never use images of students.
 
 ## Narration style
 - Talk to "you", a student at the grade level from the interview, preparing for a test. Warm, upbeat, a little funny, never cringe or babyish. Short sentences. Contractions.

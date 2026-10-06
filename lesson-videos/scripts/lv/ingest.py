@@ -194,3 +194,29 @@ def contact_sheets(files: list[Path], out: Path, cols: int = 5, rows: int = 4) -
         sheet.save(p, quality=85)
         sheets.append(p)
     return sheets
+
+
+def prepare_asset(src: Path, dst: Path, max_px: int = 1600) -> Path:
+    """Copy a deck image into a chapter's assets: upright, at most max_px on its long side, JPEG-safe."""
+    from PIL import Image, ImageOps
+    src, dst = Path(src), Path(dst)
+    try:
+        with Image.open(src) as im:
+            im = ImageOps.exif_transpose(im)
+            im.thumbnail((max_px, max_px))
+            if dst.suffix.lower() in (".jpg", ".jpeg"):
+                if im.mode in ("RGBA", "LA", "P"):
+                    im = im.convert("RGBA")
+                    flat = Image.new("RGB", im.size, "white")
+                    flat.paste(im, mask=im.getchannel("A"))
+                    im = flat
+                else:
+                    im = im.convert("RGB")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            im.save(dst, quality=90) if dst.suffix.lower() in (".jpg", ".jpeg") else im.save(dst)
+    except (OSError, ValueError) as e:
+        raise UserError(f"{src.name} can't be converted here ({e.__class__.__name__}). Ask the teacher to open the "
+                        "deck, right-click the picture, save it as PNG, and give you that file; or use the page "
+                        "image from a PDF export.") from None
+    return dst
+

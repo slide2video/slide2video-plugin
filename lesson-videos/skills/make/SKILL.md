@@ -69,17 +69,17 @@ Show the teacher the outline in brief and the estimate, and **ask for approval**
 Follow the workflow in `guide.md` for chapter 1 in `WORK/ch1/`:
 1. Write `script.json` (narration per scene; `"music": "../music/bed.mp3"` only if music exists).
 2. `LV narrate "WORK/ch1"`.
-3. Copy the images you use from `WORK/deck/media/` into `WORK/ch1/assets/` (downscale to at most 1600 px wide, e.g. `uv run --with pillow python -c "from PIL import Image; im = Image.open('<in>'); im.thumbnail((1600, 1600)); im.save('<out>')"`); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]`.
+3. Copy each image you use with `LV asset "WORK/deck/media/<file>" "WORK/ch1/assets/<name>.jpg"` (it straightens, downscales to 1600 px and converts transparent PNGs; use `.png` as the target to keep transparency); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]`.
 4. Write `scenes.js`.
 5. `LV stills "WORK/ch1" <one time per scene>` and look at `WORK/ch1/build/stills.jpg`. Fix overlaps, text running off cards, things hidden behind captions, empty-looking scenes, and every `cue miss` warning. Repeat until clean (2–3 rounds is normal).
-6. `LV render "WORK/ch1"`.
+6. `LV render "WORK/ch1"`. Rendering takes about a minute per minute of video on a fast computer and several on a slow laptop: use the Bash tool's longest timeout (10 minutes), and for long chapters on slow machines run it in the background and check its output.
 7. Verify: `render` prints the video length next to the narration length (they should match), and saves four frames of the finished video to `WORK/ch1/build/final.jpg`; look at them.
 
 Then **stop**. Tell the teacher where the video is (`<folder>/lesson-videos/Chapter 1 - ….mp4`) and ask about tone, pace, reading level, voice and look. Apply their feedback to chapter 1 (re-narrating only changed scenes is cheap) before moving on, and write the agreed style notes at the top of `plan.md` so later chapters (and later sessions) follow them.
 
 ## 7. Remaining chapters
 
-Default: one chapter at a time, same steps as 6.1–6.7, checking in briefly after each. If the teacher asks for speed, you may hand chapters to parallel helper agents; give each the paths to `guide.md`, `brief.md`, `plan.md` (with the style notes), its own `WORK/chN/` folder, and the finished `WORK/ch1/` as the reference. Tell the teacher this uses much more of their Claude plan.
+Default: one chapter at a time, same steps as 6.1–6.7, checking in briefly after each. If the teacher asks for speed, you may hand chapters to parallel helper agents; give each the exact **LV** command line (with the real plugin path, since helpers don't get it substituted), the paths to `guide.md`, `brief.md`, `plan.md` (with the style notes), its own `WORK/chN/` folder, and the finished `WORK/ch1/` as the reference. Tell the teacher this uses much more of their Claude plan.
 
 Between chapters, `LV status "WORK"` shows what's left. If the session ends, the next `/lesson-videos:make` resumes from step 0.
 

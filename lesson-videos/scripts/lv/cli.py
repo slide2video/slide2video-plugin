@@ -27,6 +27,12 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--workers", type=int)
     r.add_argument("--fps", type=int, default=30)
     r.add_argument("--out", type=Path)
+    o = sub.add_parser("open", help="open a web page in the default browser")
+    o.add_argument("url")
+    a = sub.add_parser("asset", help="copy a deck image into a chapter's assets (upright, <=1600 px, JPEG-safe)")
+    a.add_argument("src", type=Path)
+    a.add_argument("dst", type=Path)
+    a.add_argument("--max", type=int, default=1600)
     i = sub.add_parser("ingest", help="read a .pptx/.pdf deck into lesson-videos/_work/deck/")
     i.add_argument("deck", type=Path)
     i.add_argument("--work", type=Path)
@@ -96,7 +102,15 @@ def dispatch(args) -> int:
         keys.open_in_editor(f)
         print(f"Opened {f}. Paste the keys after the = signs, save, close the editor, then run `keys check`.")
         return 0
+    if args.cmd == "open":
+        import webbrowser
+        webbrowser.open(args.url)
+        print(f"Opened {args.url} in the browser.")
+        return 0
     from . import ingest
+    if args.cmd == "asset":
+        print(ingest.prepare_asset(args.src, args.dst, args.max))
+        return 0
     if args.cmd == "ingest":
         ingest.ingest(args.deck, args.work or ingest.default_work(args.deck))
         return 0

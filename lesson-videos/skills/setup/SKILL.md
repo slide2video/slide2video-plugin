@@ -17,7 +17,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/scripts/lesson-videos.py"
 
 ## 1. uv
 
-Check whether `uv` works: run `uv --version`. If that fails, also try `~/.local/bin/uv --version` (Windows: `$HOME\.local\bin\uv.exe --version`); if that works, use that full path in place of `uv` for the rest of this session.
+Check whether `uv` works: run `uv --version`. If that fails, try the per-user install location: `~/.local/bin/uv --version` (macOS, and Git Bash on Windows) or `& "$HOME\.local\bin\uv.exe" --version` (PowerShell). If one works, use that path, quoted, in place of `uv` for the rest of this session.
 
 If uv is missing, tell the teacher you're installing uv, a small free tool that downloads everything else (no administrator password needed), then run:
 - macOS: `curl -LsSf https://astral.sh/uv/install.sh | sh`
@@ -27,7 +27,7 @@ Then use the full path above (the current window won't see uv on its PATH until 
 
 ## 2. Doctor
 
-Tell the teacher the first run downloads about 300 MB (Python libraries, a headless Chrome for drawing frames, ffmpeg) and can take a few minutes. Run:
+Tell the teacher the first run downloads about 500 MB (Python libraries, a headless Chrome for drawing frames, ffmpeg) and can take several minutes. Run it with the Bash tool's longest timeout (10 minutes); if it still times out, simply run it again, since finished downloads are kept. Run:
 
 ```
 LV doctor --no-keys
@@ -44,7 +44,7 @@ Explain the choice in plain words before they sign up:
 - **Starter plan**: $6/month for 30,000 characters (about four videos, enough for most units) and a commercial licence. They can cancel after the unit is done.
 - One thing to read themselves: ElevenLabs' use policy (elevenlabs.io/use-policy) restricts use by government entities without authorization. A public school may count; a teacher using it personally is their own call. Don't decide for them.
 
-Then open the keys page in their browser (macOS: `open URL`; Windows: `start "" URL`): `https://elevenlabs.io/app/settings/api-keys`. Guide them:
+Then open the keys page in their browser with `LV open https://elevenlabs.io/app/settings/api-keys` and guide them:
 1. Sign up or log in.
 2. Click **Create API Key**. Name it `lesson-videos`.
 3. Under permissions, turn on **Text to Speech** (access) and **User** (read). Leave the rest off.
@@ -57,11 +57,11 @@ Ask whether they want background music and a few short AI-animated clips made fr
 
 If yes, explain: this needs a Google account with billing turned on (Google has no free tier for these), a minimum $5 prepayment, and costs about $0.40 per clip and $0.08 per music track, roughly $2–3 for a whole unit. Use a **personal** Google account: school accounts often have AI Studio turned off.
 
-Open `https://aistudio.google.com/api-keys` and guide them:
+Run `LV open https://aistudio.google.com/api-keys` and guide them:
 1. Sign in, accept the terms.
 2. Click **Create API key** (let it create a project if asked) and **copy** the key.
-3. Open `https://aistudio.google.com/billing` (or follow the "Set up billing" link) to link a billing account and add the $5 prepayment.
-4. Open `https://aistudio.google.com/spend` and set a **monthly spend cap**, for example $10.
+3. `LV open https://aistudio.google.com/billing` (or follow the "Set up billing" link) to link a billing account and add the $5 prepayment.
+4. `LV open https://aistudio.google.com/spend` and set a **monthly spend cap**, for example $10.
 
 ## 5. Paste the keys into the keys file
 

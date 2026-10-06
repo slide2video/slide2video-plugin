@@ -32,3 +32,11 @@ def test_cli_prints_unicode_on_cp1252(tmp_path):
            "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}
     r = subprocess.run([sys.executable, str(PLUGIN / "scripts/lesson-videos.py"), "keys", "check"], capture_output=True, env=env)
     assert r.returncode == 1 and "✗".encode("utf-8") in r.stdout
+
+
+def test_open_uses_the_default_browser(monkeypatch, capsys):
+    import webbrowser
+    opened = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened.append(url) or True)
+    assert cli.main(["open", "https://elevenlabs.io/app/settings/api-keys"]) == 0
+    assert opened == ["https://elevenlabs.io/app/settings/api-keys"]

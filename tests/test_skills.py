@@ -49,3 +49,26 @@ def test_sample_chapter_renders(tmp_path, fake_speak, browser_ok, capsys):
 
 def test_sample_deck_exists():
     assert (REPO / "examples/water-cycle.pptx").exists()
+
+
+def test_skills_avoid_shell_specific_syntax():
+    for s in SKILLS:
+        _, text = frontmatter(s)
+        assert 'start ""' not in text and "`open URL`" not in text
+        assert "$HOME\\.local\\bin\\uv.exe --version" not in text
+        assert "uv run --with pillow" not in text and "python -c" not in text
+    _, setup = frontmatter("setup")
+    assert "LV open" in setup
+
+
+def test_references_need_no_substitution():
+    for f in (PLUGIN / "skills/make/references").rglob("*.md"):
+        assert "${CLAUDE_PLUGIN_ROOT}" not in f.read_text(encoding="utf-8"), f
+    _, make = frontmatter("make")
+    assert "exact **LV** command" in make and "LV asset" in make
+
+
+def test_skills_mention_bash_timeout():
+    for s in SKILLS:
+        _, text = frontmatter(s)
+        assert "timeout" in text
