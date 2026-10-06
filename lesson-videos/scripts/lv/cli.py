@@ -36,6 +36,19 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--music", action="store_true")
     st = sub.add_parser("status", help="which chapters are done and what each needs next")
     st.add_argument("work", type=Path)
+    m = sub.add_parser("music", help="one Lyria music bed (~$0.08) into _work/music/bed.mp3")
+    m.add_argument("work", type=Path)
+    m.add_argument("--prompt", required=True)
+    c = sub.add_parser("clip", help="one Veo clip (~$0.40) from a photo into _work/clips/")
+    c.add_argument("image", type=Path)
+    c.add_argument("--work", type=Path, required=True)
+    c.add_argument("--name", required=True)
+    c.add_argument("--prompt", required=True)
+    c.add_argument("--frac", type=float, default=0.5)
+    f = sub.add_parser("frames", help="turn a clip into JPEG frames for clip() in scenes.js")
+    f.add_argument("clip", type=Path)
+    f.add_argument("dest", type=Path)
+    f.add_argument("--max", type=int)
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -83,6 +96,16 @@ def dispatch(args) -> int:
         return 0
     if args.cmd == "status":
         print(status.report(args.work.resolve()))
+        return 0
+    from . import clips, music
+    if args.cmd == "music":
+        print(music.make_bed(args.work.resolve(), args.prompt))
+        return 0
+    if args.cmd == "clip":
+        clips.make_clip(args.image, args.prompt, args.name, args.work.resolve(), args.frac)
+        return 0
+    if args.cmd == "frames":
+        print(f"{clips.frames(args.clip, args.dest, args.max)} frames → {args.dest}")
         return 0
     from . import narrate, render
     if args.cmd == "narrate":
