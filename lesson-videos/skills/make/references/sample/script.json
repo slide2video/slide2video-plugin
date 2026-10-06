@@ -1,0 +1,14 @@
+{
+  "chapter": "SAMPLE · THE WATER CYCLE",
+  "title": "The Water Cycle",
+  "out": "Sample - The Water Cycle.mp4",
+  "scenes": [
+    {"id": "hook", "lead": 0.8, "say": "Hey! The water in your glass might have fallen as rain on a dinosaur. Let's find out how water travels around the planet."},
+    {"id": "evaporation", "say": "Step one is evaporation. The sun heats water in oceans and lakes, and it turns into an invisible gas called water vapor. Remember: evaporation means liquid to gas."},
+    {"id": "condensation", "say": "Step two is condensation. High up, the air is cold, so the vapor cools and turns back into tiny droplets. Millions of droplets together make a cloud. Watch out for this trap: clouds are liquid droplets, not gas."},
+    {"id": "precipitation", "say": "Step three is precipitation. When the droplets get heavy, they fall as rain, snow, sleet or hail. Then the water collects in oceans, lakes and the ground, and the cycle starts again."},
+    {"id": "q1", "hold": 4.5, "say": "Quiz time! Pause if you need more time. A puddle disappears on a sunny afternoon. Which step is that?"},
+    {"id": "a1", "say": "Evaporation! The sun turned the liquid water into water vapor."},
+    {"id": "outro", "tail": 1.5, "say": "So, the water cycle in three words: evaporation, condensation, precipitation. Liquid to gas, gas to droplets, droplets fall. You've got this!"}
+  ]
+}

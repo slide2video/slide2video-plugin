@@ -215,7 +215,7 @@
   }
   // Molecule field: n dots wander inside box {x,y,w,h}; drift(t) shifts their x (for flow animations).
   function wander(i, t, box, seed = 1, sp = 0.6) {
-    const r = rng(seed * 1000 + i); const bx = r(), by = r(), ph = r() * 50;
+    const r = rng(Math.imul(seed * 1000 + i + 1, 2654435761)); const bx = r(), by = r(), ph = r() * 50;  // hashed seed: neighbouring i must not share a position
     const x = box.x + (bx + 0.08 * noise(i, t * sp + ph, 1)) * box.w, y = box.y + (by + 0.08 * noise(i + 99, t * sp + ph, 1.1)) * box.h;
     return [clamp(x, box.x + 10, box.x + box.w - 10), clamp(y, box.y + 10, box.y + box.h - 10)];
   }

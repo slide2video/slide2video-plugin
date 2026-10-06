@@ -46,3 +46,12 @@ def test_render_needs_narration_first(make_chapter):
     with pytest.raises(UserError) as e:
         render.render(ch)
     assert "narrate" in str(e.value)
+
+
+def test_wander_spreads_particles(make_chapter, fake_speak, browser_ok):
+    ch = make_chapter([{"id": "hello", "min": 1}], HELLO_JS)
+    narrate.narrate(ch, speak_fn=fake_speak)
+    page.ensure_page(ch)
+    with render.page_for(ch) as (pg, logs):
+        xs = pg.evaluate("[...Array(20)].map((_, i) => Engine.wander(i, 0, {x: 0, y: 0, w: 1000, h: 1000}, 3)[0])")
+    assert max(xs) - min(xs) > 600, xs
