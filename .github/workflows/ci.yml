@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: doctor (installs Chromium + ffmpeg, renders a test video)
+        run: uv run lesson-videos/scripts/lesson-videos.py doctor --no-keys
+      - name: browser for the test environment
+        run: uv run python -m playwright install chromium
+      - name: tests
+        run: uv run pytest -q
