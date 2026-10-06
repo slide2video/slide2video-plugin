@@ -11,14 +11,14 @@ from . import config
 from .util import UserError, read_text, write_text
 
 VARS = {
-    "ELEVENLABS_API_KEY": "ElevenLabs (narration, required)",
+    "ELEVENLABS_API_KEY": "ElevenLabs (most natural narration, optional)",
     "GEMINI_API_KEY": "Gemini (music and AI clips, optional)",
 }
 TEMPLATE = """# lesson-videos API keys
 # Paste each key right after the = sign (no spaces, no quotes), then save and close.
 # Keep this file private. To replace a key, paste the new one over the old one.
 
-# ElevenLabs (required, narration): https://elevenlabs.io/app/settings/api-keys
+# ElevenLabs (optional, most natural narration; without it a free voice is used): https://elevenlabs.io/app/settings/api-keys
 ELEVENLABS_API_KEY=
 
 # Gemini (optional, music and AI video clips): https://aistudio.google.com/api-keys
@@ -107,7 +107,7 @@ def check(request=None) -> list[tuple[str, bool, str]]:
     rows = []
     el = get("ELEVENLABS_API_KEY", required=False)
     if not el:
-        rows.append(("ElevenLabs", False, "missing (required): run `keys` and paste it"))
+        rows.append(("ElevenLabs", True, "not set (optional): the free voice will be used"))
     else:
         try:
             sub = request(f"{config.ELEVEN_ROOT}/user/subscription", headers={"xi-api-key": el}, timeout=30)

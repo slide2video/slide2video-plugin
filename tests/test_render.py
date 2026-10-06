@@ -69,3 +69,11 @@ def test_render_reports_silent_gray(make_chapter, fake_speak, browser_ok, js, ne
     with pytest.raises(UserError) as e:
         render.stills(ch, [0.5])
     assert needle in str(e.value)
+
+
+def test_render_builds_sound_effects_when_missing(make_chapter, fake_speak, browser_ok, capsys, lv_home):
+    assert not (lv_home / "sfx").exists()
+    ch = make_chapter([{"id": "hello", "min": 1}], HELLO_JS)
+    narrate.narrate(ch, speak_fn=fake_speak)
+    render.render(ch, workers=1)
+    assert "unknown sound effects skipped" not in capsys.readouterr().out

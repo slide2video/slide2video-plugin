@@ -117,7 +117,7 @@ def dispatch(args) -> int:
     from . import estimate, status
     if args.cmd == "estimate":
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
-        print(estimate.report(chars, args.clips, args.music))
+        print(estimate.report(chars, args.clips, args.music, paid_voice=bool(keys.get("ELEVENLABS_API_KEY", required=False))))
         return 0
     if args.cmd == "status":
         print(status.report(args.work.resolve()))

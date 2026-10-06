@@ -10,6 +10,8 @@ def test_plan_estimate():
     assert estimate.gemini_usd(2, True) == 0.88
     r = estimate.report(22500, 2, True)
     assert "22,500" in r and "$0.88" in r and "20%" in r
+    free = estimate.report(22500, 0, False, paid_voice=False)
+    assert "free voice" in free and "$0.00" in free
 
 
 def test_chars_in_scripts(tmp_path):

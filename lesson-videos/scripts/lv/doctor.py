@@ -5,7 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import config, keys, narrate, render, sfx, tools
+from . import config, keys, narrate, render, sfx, tools, voices
 from .util import UserError, write_json, write_text
 
 TEST_SCENES = ("scene('hello', (g, t, s) => Engine.titleCard(g, t, s, { kicker: 'lesson-videos', title: 'It *works*!', "
@@ -24,6 +24,19 @@ def test_render() -> float:
         if abs(dur - 3) > 0.3 or not {"video", "audio"} <= kinds:
             raise UserError(f"the test video came out wrong ({dur:.1f}s, streams {sorted(kinds)})")
         return dur
+
+
+def narration_summary() -> str:
+    """Which voices work right now. Never a failure: captions-only always works."""
+    parts = ["ElevenLabs (key set)"] if keys.get("ELEVENLABS_API_KEY", required=False) else []
+    for provider, works, fails in (("edge", "free Microsoft voice works", "free Microsoft voice unavailable right now"),
+                                   ("system", "computer's own voice works", "no computer voice")):
+        try:
+            voices.probe(provider)
+            parts.append(works)
+        except voices.VoiceUnavailable:
+            parts.append(fails)
+    return "; ".join(parts) + "; captions-only always works"
 
 
 def run_doctor(no_keys: bool = False, install: bool = True) -> int:
@@ -57,6 +70,7 @@ def run_doctor(no_keys: bool = False, install: bool = True) -> int:
     if not no_keys:
         for name, good, msg in keys.check():
             (ok if good else bad)(f"{name} key", msg)
+    ok("Narration", narration_summary())
     for mark, name, msg in rows:
         print(f"{mark} {name}: {msg}")
     return 0 if all(r[0] == "✓" for r in rows) else 1

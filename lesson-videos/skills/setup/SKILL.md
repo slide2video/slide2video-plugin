@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use once per computer before making lesson videos, or whenever lesson-videos says a tool or key is missing. Installs uv, the renderer and ffmpeg, then walks the teacher through creating ElevenLabs (required) and Gemini (optional) API keys and checks them without ever showing them in chat.
+description: Use once per computer before making lesson videos, or whenever lesson-videos says a tool or key is missing. Installs uv, the renderer and ffmpeg, then helps the teacher choose a narrator voice (a free one needs no account) and optionally create ElevenLabs and Gemini API keys, checking them without ever showing them in chat.
 ---
 
 # lesson-videos setup
@@ -37,9 +37,13 @@ Every line should start with ✓. For each ✗, do what the message says. Common
 - **Chromium / downloads blocked**: school networks sometimes block downloads. Suggest a home network, or ask IT to allow astral.sh, pypi.org, files.pythonhosted.org, github.com and Playwright's browser downloads (cdn.playwright.dev).
 - **ffmpeg can't write H.264**: macOS `brew install ffmpeg`; Windows `winget install Gyan.FFmpeg`; then run doctor again.
 
-## 3. ElevenLabs key (required: the narrator's voice)
+## 3. Narrator voice: free, or ElevenLabs
 
-Explain the choice in plain words before they sign up:
+Videos work with **no accounts and no keys at all**. Explain the two choices in plain words:
+- **Free Microsoft voice** (default): a natural-sounding voice from Microsoft Edge's Read Aloud feature. No account and no cost. It is an unofficial Microsoft service, fine for classroom use but not for commercial videos, and the narration text is sent to Microsoft. If it's ever unavailable, the computer's own voice is used instead (offline, more robotic), and if even that fails the video is made with captions only, so something is always produced.
+- **ElevenLabs** (optional): the most natural voice, and the one used for the example videos. It needs an account and a key.
+
+If they choose the free voice, skip to step 4. If they choose ElevenLabs, explain its plans before they sign up:
 - **Free plan**: 10,000 characters a month, about one 5-minute video. Free-plan audio is for non-commercial use only and, if a video is published, its title must include "elevenlabs.io". The free plan must use a personal email address.
 - **Starter plan**: $6/month for 30,000 characters (about four videos, enough for most units) and a commercial licence. They can cancel after the unit is done.
 - One thing to read themselves: ElevenLabs' use policy (elevenlabs.io/use-policy) restricts use by government entities without authorization. A public school may count; a teacher using it personally is their own call. Don't decide for them.
@@ -53,7 +57,7 @@ Then open the keys page in their browser with `LV open https://elevenlabs.io/app
 
 ## 4. Gemini key (optional: music and AI video clips)
 
-Ask whether they want background music and a few short AI-animated clips made from their photos. If not, skip to step 5; videos still work.
+Ask whether they want background music and a few short AI-animated clips made from their photos. If not, and they chose the free voice in step 3, skip to step 7: there are no keys to enter. Videos still work.
 
 If yes, explain: this needs a Google account with billing turned on (Google has no free tier for these), a minimum $5 prepayment, and costs about $0.40 per clip and $0.08 per music track, roughly $2–3 for a whole unit. Use a **personal** Google account: school accounts often have AI Studio turned off.
 
@@ -76,8 +80,8 @@ It opens a small text file in TextEdit (Mac) or Notepad (Windows). Tell the teac
 ```
 LV keys check
 ```
-Read the result to them in plain words. ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and allow User → Read. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
+Read the result to them in plain words. "ElevenLabs: not set" is fine: the free Microsoft voice will be used. With a key, ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and allow User → Read. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
 
 ## 7. Done
 
-Summarize: what's ready, what was skipped, and the cost per video (about 5,000–6,000 ElevenLabs characters; Gemini about $0.40 per clip plus $0.08 for music). Tell them the next step: open Claude Code in the folder that holds their slide deck and run `/lesson-videos:make`.
+Summarize: what's ready, which narrator voice will be used (the free Microsoft voice unless they added an ElevenLabs key; `doctor`'s Narration line says which voices work right now), what was skipped, and the cost per video ($0 with the free voice; with ElevenLabs about 5,000–6,000 characters; Gemini about $0.40 per clip plus $0.08 for music). Tell them the next step: open Claude Code in the folder that holds their slide deck and run `/lesson-videos:make`.
