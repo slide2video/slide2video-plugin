@@ -185,4 +185,4 @@ SPEAKERS = {"edge": speak_edge, "system": speak_system}
 def probe(provider: str) -> None:
     """Raise VoiceUnavailable if this voice can't speak a test sentence right now."""
     with tempfile.TemporaryDirectory() as d:
-        SPEAKERS[provider]("Testing.", voice_for(provider, {}), Path(d) / "probe.mp3")
+        SPEAKERS[provider]("Testing the narrator voice for lesson videos.", voice_for(provider, {}), Path(d) / "probe.mp3")
