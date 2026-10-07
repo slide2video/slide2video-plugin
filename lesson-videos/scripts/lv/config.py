@@ -22,6 +22,7 @@ ELEVEN_FORMAT = "mp3_44100_128"            # 192 kbps needs a paid plan
 VOICE_SETTINGS = {"stability": 0.45, "similarity_boost": 0.8, "style": 0.3, "use_speaker_boost": True}
 DEFAULT_VOICE = "cgSgspJ2msm6clMCkdW9"     # Jessica: playful, bright, warm (premade voice)
 NARRATION_WORKERS = 2                      # the ElevenLabs free plan allows 2 concurrent requests
+EDGE_VOICE = "en-US-AvaMultilingualNeural"  # free Microsoft voice used when there is no ElevenLabs key
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 VEO_MODEL = "veo-3.1-lite-generate-preview"
@@ -33,4 +34,4 @@ LYRIA_PRICE = 0.08                         # USD per track
 CHARS_PER_MINUTE = 900                     # narration characters per video minute (~150 wpm)
 FPS = 30
 W, H = 1920, 1080
-USER_AGENT = "lesson-videos/0.1 (+https://github.com/DanielLandi/plugins)"
+USER_AGENT = "lesson-videos/0.2 (+https://github.com/DanielLandi/plugins)"

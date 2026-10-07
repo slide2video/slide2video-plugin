@@ -72,3 +72,14 @@ def test_skills_mention_bash_timeout():
     for s in SKILLS:
         _, text = frontmatter(s)
         assert "timeout" in text
+
+
+def test_docs_say_videos_work_without_any_keys():
+    _, setup = frontmatter("setup")
+    _, make = frontmatter("make")
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
+    assert "required" not in setup.split("## 3.")[1].split("\n")[0]  # the voice step is a choice, not a requirement
+    assert "free Microsoft voice" in setup and "free Microsoft voice" in make and "free Microsoft voice" in readme
+    assert '"narrator"' in guide and '"narrator"' in make
+    assert "unofficial" in setup and "unofficial" in readme

@@ -8,6 +8,9 @@ def test_doctor_without_keys(browser_ok, capsys):
         assert f"✓ {item}" in out
 
 
-def test_doctor_reports_missing_key(browser_ok, capsys):
-    assert doctor.run_doctor(no_keys=False, install=False) == 1
-    assert "✗ ElevenLabs key" in capsys.readouterr().out
+def test_doctor_passes_with_no_keys_at_all(browser_ok, capsys, monkeypatch):
+    from lv import voices
+    monkeypatch.setitem(voices.SPEAKERS, "edge", lambda *a: (_ for _ in ()).throw(voices.VoiceUnavailable("offline")))
+    assert doctor.run_doctor(no_keys=False, install=False) == 0
+    out = capsys.readouterr().out
+    assert "✓ ElevenLabs key: not set (optional)" in out and "✓ Narration:" in out and "captions" in out

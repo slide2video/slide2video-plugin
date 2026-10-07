@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "edge-tts>=7.2.8",
 #   "numpy>=1.26",
 #   "pillow>=10.0",
 #   "playwright>=1.45",

@@ -42,7 +42,7 @@ Read `WORK/deck/slides.md` in full and look at every `WORK/deck/contact-*.jpg` (
 - Grade level of the students.
 - Chapters: propose a split from the deck's sections or titles (for example one video per unit/entry/lesson) and ask them to confirm or adjust.
 - Length per video: default 4–6 minutes.
-- Voice: default Jessica (warm, upbeat young American). They can pick another premade ElevenLabs voice by name.
+- Voice: with an ElevenLabs key (`LV keys check`), Jessica (warm, upbeat young American); without one, the free Microsoft voice (Ava), which needs no account. They can also ask for the computer's own voice (offline, more robotic) or captions only; record the choice as `"narrator"` in each `script.json` (see `guide.md`).
 - Music and AI clips: only if a Gemini key is set (`LV keys check`).
 
 ## 3. Content brief
@@ -68,7 +68,7 @@ Show the teacher the outline in brief and the estimate, and **ask for approval**
 
 Follow the workflow in `guide.md` for chapter 1 in `WORK/ch1/`:
 1. Write `script.json` (narration per scene; `"music": "../music/bed.mp3"` only if music exists).
-2. `LV narrate "WORK/ch1"`.
+2. `LV narrate "WORK/ch1"`. It prints which voice it used. If it had to fall back (for example the free Microsoft voice was unavailable, or ElevenLabs credits ran out), tell the teacher in one line; running `narrate` again later switches back, and finished takes are kept.
 3. Copy each image you use with `LV asset "WORK/deck/media/<file>" "WORK/ch1/assets/<name>.jpg"` (it straightens, downscales to 1600 px and converts transparent PNGs; use `.png` as the target to keep transparency); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]`.
 4. Write `scenes.js`.
 5. `LV stills "WORK/ch1" <one time per scene>` and look at `WORK/ch1/build/stills.jpg`. Fix overlaps, text running off cards, things hidden behind captions, empty-looking scenes, and every `cue miss` warning. Repeat until clean (2–3 rounds is normal).
@@ -86,9 +86,9 @@ Between chapters, `LV status "WORK"` shows what's left. If the session ends, the
 ## 8. Wrap up
 
 Write `<folder>/lesson-videos/README.md`: a table of the videos with their lengths, one line on what each covers, and these notes:
-- Narration is an AI voice (ElevenLabs); music and clips, if any, are AI-generated (Google).
+- Narration: say which voice was used: an AI voice from ElevenLabs, the free Microsoft Edge voice (an unofficial Microsoft service; for classroom, non-commercial use), the computer's built-in voice, or captions only. Music and clips, if any, are AI-generated (Google).
 - If the deck contains photos or diagrams from other sources, check their licences before posting the videos publicly; keeping them unlisted or sharing the files directly is safer.
-- On the ElevenLabs free plan, a published video's title must include "elevenlabs.io".
+- If ElevenLabs' free plan was used, a published video's title must include "elevenlabs.io".
 - Each `.vtt` file holds the captions (they are also burned into the video).
 
 Tell the teacher the videos are done and where they are.

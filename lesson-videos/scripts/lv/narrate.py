@@ -5,9 +5,10 @@ import base64
 import concurrent.futures as cf
 import hashlib
 import json
+import os
 from pathlib import Path
 
-from . import config, keys, net, tools
+from . import config, keys, net, tools, voices
 from .util import UserError, read_json, read_text, run, write_json, write_text
 
 
@@ -88,40 +89,83 @@ def narration_error(e: net.ApiError, done: int, total: int) -> str:
     return msg
 
 
-def narrate(ch: Path, speak_fn=speak, workers: int = config.NARRATION_WORKERS) -> dict:
+def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS) -> dict:
+    """Voice every scene with the first voice in the chain that works for the whole chapter."""
     spec = read_json(ch / "script.json")
-    voice = spec.get("voice", config.DEFAULT_VOICE)
+    if speak_fn is not None:  # a single, caller-supplied voice (tests, tools)
+        return _narrate(ch, spec, "elevenlabs", speak_fn, workers)
+    order = voices.chain(spec)
+    for k, provider in enumerate(order):
+        try:
+            return _narrate(ch, spec, provider, None, workers)
+        except (voices.VoiceUnavailable, UserError) as e:
+            if k == len(order) - 1:
+                raise
+            print(f"note: {voices.LABELS[provider]} didn't work for this chapter: {e}\n"
+                  f"      Using {voices.LABELS[order[k + 1]]} instead.", flush=True)
+    raise UserError("no narration voice worked")  # unreachable: the chain ends with captions only
+
+
+def _take(provider: str, say: str, voice: str, f: Path) -> None:
+    """One scene's take: f (mp3, the cache marker, written last) plus f.json with its word timings."""
+    if provider == "elevenlabs":
+        speak(say, voice, f)
+        return
+    part = f.with_name(f.stem + ".part.mp3")
+    words = voices.SPEAKERS[provider](say, voice, part)
+    write_json(f.with_suffix(".json"), {"words": words})
+    os.replace(part, f)
+
+
+def _words(f: Path) -> list[dict]:
+    d = read_json(f.with_suffix(".json"))
+    return d["words"] if "words" in d else words_from(d)
+
+
+def _narrate(ch: Path, spec: dict, provider: str, speak_fn, workers: int) -> dict:
+    voice = voices.voice_for(provider, spec)
     vd = ch / "build" / "voice"
     vd.mkdir(parents=True, exist_ok=True)
-    files, jobs = {}, []
+    files, jobs, silent = {}, [], {}
     for sc in spec["scenes"]:
         say = sc.get("say", "").strip()
         if not say:
             continue
-        f = vd / f"{sc['id']}-{cache_key(voice, say)}.mp3"
+        if provider == "none":
+            silent[sc["id"]] = say
+            continue
+        key = cache_key(voice, say) if provider == "elevenlabs" else voices.cache_key(provider, voice, say)
+        f = vd / f"{sc['id']}-{key}.mp3"
         files[sc["id"]] = f
         if not f.exists():
             jobs.append((say, f))
-    if jobs and speak_fn is speak:
+    if jobs and provider == "elevenlabs" and speak_fn is None:
         keys.get("ELEVENLABS_API_KEY")  # fail early with the friendly message
+    fn = speak_fn or (lambda say, v, f: _take(provider, say, v, f))
     done = 0
-    ex = cf.ThreadPoolExecutor(workers)
+    ex = cf.ThreadPoolExecutor(workers if provider == "elevenlabs" else 1)  # the free voices dislike parallel calls
     try:
-        for fu in cf.as_completed([ex.submit(speak_fn, say, voice, f) for say, f in jobs]):
+        for fu in cf.as_completed([ex.submit(fn, say, voice, f) for say, f in jobs]):
             fu.result()
             done += 1
             print(f"  voiced {done}/{len(jobs)}", flush=True)
-    except net.ApiError as e:
+    except (net.ApiError, voices.VoiceUnavailable) as e:
         ex.shutdown(wait=True, cancel_futures=True)  # don't keep spending on scenes still in the queue
+        if isinstance(e, voices.VoiceUnavailable):
+            raise
         saved = sum(1 for _, f in jobs if f.exists())
         raise UserError(narration_error(e, saved, len(jobs))) from None
     finally:
         ex.shutdown(wait=True)
-    takes = {sid: (tools.duration(f), words_from(read_json(f.with_suffix(".json"))), f.relative_to(ch).as_posix())
-             for sid, f in files.items()}
+    takes = {sid: (tools.duration(f), _words(f), f.relative_to(ch).as_posix()) for sid, f in files.items()}
+    for sid, say in silent.items():
+        dur = voices.reading_time(say)
+        takes[sid] = (dur, voices.estimate_words(say, dur), None)
     T = build_timing(spec, takes)
+    T["narrator"] = provider
     write_text(ch / "build" / "timing.js", "window.TIMING = " + json.dumps(T) + ";\n")
     narration_track(ch, T)
+    print(f"voice: {voices.LABELS[provider]}", flush=True)
     return T
 
 

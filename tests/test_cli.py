@@ -7,8 +7,8 @@ from lv import cli, net
 
 
 def test_keys_check_without_keys(capsys):
-    assert cli.main(["keys", "check"]) == 1
-    assert "✗ ElevenLabs: missing (required)" in capsys.readouterr().out
+    assert cli.main(["keys", "check"]) == 0
+    assert "✓ ElevenLabs: not set (optional): the free voice will be used" in capsys.readouterr().out
 
 
 def test_unsupported_deck_no_traceback(tmp_path, capsys):
@@ -31,7 +31,7 @@ def test_cli_prints_unicode_on_cp1252(tmp_path):
     env = {"PYTHONIOENCODING": "cp1252", "LESSON_VIDEOS_HOME": str(tmp_path), "PATH": __import__("os").environ["PATH"],
            "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}
     r = subprocess.run([sys.executable, str(PLUGIN / "scripts/lesson-videos.py"), "keys", "check"], capture_output=True, env=env)
-    assert r.returncode == 1 and "✗".encode("utf-8") in r.stdout
+    assert r.returncode == 0 and "✓".encode("utf-8") in r.stdout
 
 
 def test_open_uses_the_default_browser(monkeypatch, capsys):
