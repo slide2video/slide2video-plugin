@@ -54,6 +54,11 @@ def reading_time(say: str) -> float:
     return max(1.5, len(say.split()) / WORDS_PER_SECOND)
 
 
+def plausible_take(seconds: float, text: str) -> bool:
+    """False for audio far too short to hold the text (e.g. a machine with no speech voices installed)."""
+    return seconds >= max(0.3, 0.12 * len(text.split()))
+
+
 def _norm(s: str) -> str:
     return re.sub(r"\W+", "", s.lower())
 
@@ -124,7 +129,10 @@ def speak_edge(text: str, voice: str, out: Path) -> list[dict]:
             audio, events = asyncio.run(go())
             if audio:
                 out.write_bytes(audio)
-                return align_events(text, events) or estimate_words(text, tools.duration(out))
+                seconds = tools.duration(out)
+                if plausible_take(seconds, text):
+                    return align_events(text, events) or estimate_words(text, seconds)
+                last = f"only {seconds:.2f}s of audio came back"
             last = "no audio received"
         except Exception as e:  # noqa: BLE001  blocked network, service change, rate limit
             last = f"{e.__class__.__name__}: {str(e)[:160]}"
@@ -165,7 +173,10 @@ def speak_system(text: str, voice: str, out: Path) -> list[dict]:
         if r.returncode or not raw.exists() or raw.stat().st_size < 1000:
             raise VoiceUnavailable(f"this computer's voice failed ({(r.stderr or r.stdout).strip()[:160]})")
         run(tools.ffmpeg(), "-v", "error", "-y", "-i", raw, "-ac", "1", "-b:a", "128k", out)
-    return estimate_words(text, tools.duration(out))
+    seconds = tools.duration(out)
+    if not plausible_take(seconds, text):
+        raise VoiceUnavailable(f"this computer's voice produced only {seconds:.2f}s of audio (no speech voice installed?)")
+    return estimate_words(text, seconds)
 
 
 SPEAKERS = {"edge": speak_edge, "system": speak_system}

@@ -83,9 +83,19 @@ def test_captions_only_when_no_voice_works_still_renders(make_chapter, monkeypat
     assert {"video", "audio"} <= tools.streams(out) and abs(tools.duration(out) - T["duration"]) < 0.2
 
 
+def test_implausibly_short_take_is_rejected():
+    assert not voices.plausible_take(0.078, "Water follows salt.")
+    assert voices.plausible_take(1.2, "Water follows salt.")
+
+
 @pytest.mark.skipif(sys.platform not in ("darwin", "win32"), reason="built-in voice tested on macOS and Windows")
 def test_system_voice_live(tmp_path):
-    words = voices.SPEAKERS["system"]("Water follows salt.", "", tmp_path / "take.mp3")
+    try:
+        words = voices.SPEAKERS["system"]("Water follows salt.", "", tmp_path / "take.mp3")
+    except voices.VoiceUnavailable as e:
+        if os.environ.get("CI"):
+            pytest.skip(f"no built-in voice on this CI runner ({e})")
+        raise
     assert tools.duration(tmp_path / "take.mp3") > 0.5 and [w["w"] for w in words] == ["Water", "follows", "salt."]
 
 
