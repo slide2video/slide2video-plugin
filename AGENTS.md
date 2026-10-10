@@ -1,8 +1,7 @@
 # plugins
 
-Public Claude Code marketplace `daniellandi`. Today it holds one plugin,
-`lesson-videos`: teachers install it to turn a slide deck into narrated,
-animated study videos. Users install with
+Public Claude Code marketplace `daniellandi`. It holds `lesson-videos` (narrated study videos) and `batatais`
+(a Blender reconstruction workflow, also usable in Codex). Users install with
 `/plugin marketplace add DanielLandi/plugins` then
 `/plugin install lesson-videos@daniellandi`.
 

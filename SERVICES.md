@@ -9,3 +9,9 @@
 | Downloads at first run: astral.sh (uv), PyPI, Playwright browser CDN, github.com (static-ffmpeg binaries) | `skills/setup`, `lv/tools.py` | none | free |
 
 The repo itself holds no keys.
+
+`batatais` is an instruction-only plugin with no runtime service or API key. Its
+workflow recommends public OpenStreetMap/Overpass queries and photographic research
+(including Street View), and optional licensed textures from sources such as Poly
+Haven. The user's agent makes those requests during a reconstruction; installation
+only downloads the plugin from GitHub and does not contact those services.
