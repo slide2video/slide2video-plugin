@@ -18,7 +18,7 @@
       "name": "batatais",
       "source": "./batatais",
       "description": "Reconstruct Batatais in Blender from maps and photographic evidence using reproducible Python scripts.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "category": "productivity"
     }
   ]

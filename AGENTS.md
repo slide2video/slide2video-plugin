@@ -56,3 +56,9 @@ service dependency is added, removed, or re-keyed.
 
 Anything under `docs/archive/` or any file with an `⚠️ ARCHIVED` banner is
 historical reference only — never a source of truth for current behavior.
+
+## Batatais ownership
+
+`batatais/` is the canonical public package. Keep its skill and compatibility
+installer here; do not maintain recipe copies in Blender or HAIK. Bump both
+Batatais manifests and its marketplace version together when the package changes.
