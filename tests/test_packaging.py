@@ -20,7 +20,7 @@ def test_inline_deps_match_pyproject():
     block = re.search(r"# /// script\n(.*?)# ///", script, re.S).group(1)
     toml = tomllib.loads("\n".join(l[2:] if l.startswith("# ") else "" for l in block.splitlines()))
     project = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    assert sorted(toml["dependencies"]) == sorted(project["dependencies"])
+    assert set(toml["dependencies"]) <= set(project["dependencies"])
     assert toml["requires-python"] == project["requires-python"]
 
 

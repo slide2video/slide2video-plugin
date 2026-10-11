@@ -1,7 +1,8 @@
 # plugins
 
-Public Claude Code marketplace `daniellandi`. It holds `lesson-videos` (narrated study videos) and `batatais`
-(a Blender reconstruction workflow, also usable in Codex). Users install with
+Public Claude Code marketplace `daniellandi`. It holds `lesson-videos` (narrated study videos), `music-video`
+(theme → Suno song → code-rendered music video) and `batatais` (a Blender reconstruction workflow, also usable in
+Codex). Users install with
 `/plugin marketplace add DanielLandi/plugins` then
 `/plugin install lesson-videos@daniellandi`.
 
@@ -62,3 +63,19 @@ historical reference only — never a source of truth for current behavior.
 `batatais/` is the canonical public package. Keep its skill and compatibility
 installer here; do not maintain recipe copies in Blender or HAIK. Bump both
 Batatais manifests and its marketplace version together when the package changes.
+
+## music-video
+
+- **macOS-first.** The published commands avoid bash-only syntax so Windows can follow, but only macOS is tested.
+  Skills call only `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/music-video.py" <command>`.
+- **Version bump:** `music-video/.claude-plugin/plugin.json`, its `.claude-plugin/marketplace.json` entry and
+  `music-video/scripts/musicvideo/__init__.py` agree; `tests/test_mv_packaging.py` checks them.
+- **Privacy:** the plugin and its tests (`tests/test_mv_*.py`, `tests/mv_fixtures.py`) contain nothing personal and
+  no seasonal-holiday references. `tests/test_mv_privacy.py` scans them with the local, gitignored
+  `.private-terms.txt` (rebuilt from the maintainer's private source repo) plus generic checks for home paths,
+  emails and tokens. A publish runs `MV_PUBLISH=1 uv run pytest -q`, which fails without the denylist.
+- **Vendored code:** `music-video/studio/transitions/` is MIT code from remotion-transitions. Never edit it;
+  re-vendor with `music-video/studio/tools/vendor-transitions.sh`.
+- **The engine's own gate** (needs the engine installed once):
+  `uv run music-video/scripts/music-video.py doctor`, then `npm test` in the runtime folder it prints, and
+  `uv run pytest -m studio -q` (a fresh workspace renders a still). The plain `uv run pytest -q` skips it.

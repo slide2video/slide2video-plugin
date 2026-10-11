@@ -6,3 +6,6 @@ __pycache__/
 # never commit keys or class material
 *.env
 lesson-videos/**/build/
+
+# music-video denylist (local only, built by the private source repo)
+.private-terms.txt

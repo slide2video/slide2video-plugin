@@ -20,6 +20,13 @@
       "description": "Reconstruct Batatais in Blender from maps and photographic evidence using reproducible Python scripts.",
       "version": "1.0.1",
       "category": "productivity"
+    },
+    {
+      "name": "music-video",
+      "source": "./music-video",
+      "description": "Turn a theme into a music video: lyrics, a song from your own Suno account, word timings, and a code-rendered 2D/3D video.",
+      "version": "0.1.0",
+      "category": "productivity"
     }
   ]
 }
