@@ -72,7 +72,7 @@ Batatais manifests and its marketplace version together when the package changes
   `music-video/scripts/musicvideo/__init__.py` agree; `tests/test_mv_packaging.py` checks them.
 - **Privacy:** the plugin and its tests (`tests/test_mv_*.py`, `tests/mv_fixtures.py`) contain nothing personal and
   no seasonal-holiday references. `tests/test_mv_privacy.py` scans them with the local, gitignored
-  `.private-terms.txt` (rebuilt from the maintainer's private source repo) plus generic checks for home paths,
+  `.private-terms.txt` (kept by the maintainer, never committed) plus generic checks for home paths,
   emails and tokens. A publish runs `MV_PUBLISH=1 uv run pytest -q`, which fails without the denylist.
 - **Vendored code:** `music-video/studio/transitions/` is MIT code from remotion-transitions. Never edit it;
   re-vendor with `music-video/studio/tools/vendor-transitions.sh`.
