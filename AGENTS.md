@@ -76,6 +76,9 @@ Batatais manifests and its marketplace version together when the package changes
   emails and tokens. A publish runs `MV_PUBLISH=1 uv run pytest -q`, which fails without the denylist.
 - **Vendored code:** `music-video/studio/transitions/` is MIT code from remotion-transitions. Never edit it;
   re-vendor with `music-video/studio/tools/vendor-transitions.sh`.
+- **Folders:** project (specs, albums, video code), install (`~/Library/Application Support/music-video/`: the
+  engine and models), work (`~/Library/Caches/music-video/work/`), results (`results_dir`). Nothing is written into
+  the plugin folder.
 - **The engine's own gate** (needs the engine installed once):
-  `uv run music-video/scripts/music-video.py doctor`, then `npm test` in the runtime folder it prints, and
+  `uv run music-video/scripts/music-video.py doctor`, then `npm test` in the engine folder it prints, and
   `uv run pytest -m studio -q` (a fresh workspace renders a still). The plain `uv run pytest -q` skips it.
