@@ -12,12 +12,28 @@ PLUGIN = REPO / "lesson-videos"
 
 @pytest.fixture(autouse=True)
 def lv_home(tmp_path, monkeypatch):
-    """Every test gets its own ~/.lesson-videos (with a space in the path) and no real keys."""
+    """Every test gets its own ~/.lesson-videos (with a space in the path), no real keys and no registered project."""
     home = tmp_path / "home with space"
     monkeypatch.setenv("LESSON_VIDEOS_HOME", str(home))
+    monkeypatch.setenv("LESSON_VIDEOS_SETTINGS", str(tmp_path / "prefs" / "settings.json"))
+    monkeypatch.delenv("LESSON_VIDEOS_PROJECT", raising=False)
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     return home
+
+
+@pytest.fixture
+def lv_project(tmp_path, monkeypatch):
+    """A registered project folder; results and work live outside it, all in paths with spaces."""
+    from lv import project
+    from lv.util import write_text
+    home = tmp_path / "My Media" / "projects"
+    results = tmp_path / "My Movies"
+    work = tmp_path / "cache dir" / "work"
+    write_text(home / "config.yaml", f"artist: Someone\nlessons_dir: lessons\nresults_dir: {results.as_posix()}\n"
+                                     f"work_dir: {work.as_posix()}\n")
+    monkeypatch.setenv("LESSON_VIDEOS_PROJECT", str(home))
+    return project.load_project()
 
 
 import subprocess

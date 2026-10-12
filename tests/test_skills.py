@@ -83,3 +83,8 @@ def test_docs_say_videos_work_without_any_keys():
     assert "free Microsoft voice" in setup and "free Microsoft voice" in make and "free Microsoft voice" in readme
     assert '"narrator"' in guide and '"narrator"' in make
     assert "unofficial" in setup and "unofficial" in readme
+
+
+def test_make_skill_explains_both_layouts():
+    _, text = frontmatter("make")
+    assert "LV where" in text and "next to the deck" in text and "_source" not in text

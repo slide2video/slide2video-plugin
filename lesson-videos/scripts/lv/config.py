@@ -34,4 +34,4 @@ LYRIA_PRICE = 0.08                         # USD per track
 CHARS_PER_MINUTE = 900                     # narration characters per video minute (~150 wpm)
 FPS = 30
 W, H = 1920, 1080
-USER_AGENT = "lesson-videos/0.2 (+https://github.com/DanielLandi/plugins)"
+USER_AGENT = "lesson-videos/0.3 (+https://github.com/DanielLandi/plugins)"

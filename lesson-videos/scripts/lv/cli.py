@@ -17,8 +17,15 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--no-keys", action="store_true", help="skip the API key checks (for CI)")
     k = sub.add_parser("keys", help="open the keys file; `keys check` tests the keys")
     k.add_argument("action", nargs="?", choices=["open", "check"], default="open")
+    ini = sub.add_parser("init", help="optional: keep lessons in a project folder (text there, videos and paid media "
+                                      "in a results folder)")
+    ini.add_argument("--path", type=Path, required=True)
+    wh = sub.add_parser("where", help="where a lesson's (or chapter's) files go")
+    wh.add_argument("path", type=Path, nargs="?", default=Path("."))
     n = sub.add_parser("narrate", help="record narration for a chapter (cached; only changed scenes cost credits)")
     n.add_argument("chapter", type=Path)
+    n.add_argument("--cached-only", action="store_true", help="never record a new take; fail and name the scenes "
+                                                               "that need one")
     s = sub.add_parser("stills", help="contact sheet of frames at the given seconds")
     s.add_argument("chapter", type=Path)
     s.add_argument("times", type=float, nargs="+")
@@ -107,6 +114,17 @@ def dispatch(args) -> int:
         webbrowser.open(args.url)
         print(f"Opened {args.url} in the browser.")
         return 0
+    if args.cmd == "init":
+        from . import project
+        p, created = project.init_project(args.path)
+        print(f"{'created' if created else 'kept'} {p.home / project.CONFIG}")
+        if not created and "lessons_dir" not in project._config(p.home):
+            print("note: it has no lessons_dir line; lessons go in lessons/ (add `lessons_dir: lessons` to make it explicit)")
+        print(f"lessons: {p.lessons_dir}\nvideos:  {p.results_dir / 'lessons'}\nwork:    {p.work_dir / 'lessons'}")
+        return 0
+    if args.cmd == "where":
+        print(where(args.path))
+        return 0
     from . import ingest
     if args.cmd == "asset":
         print(ingest.prepare_asset(args.src, args.dst, args.max))
@@ -134,7 +152,7 @@ def dispatch(args) -> int:
         return 0
     from . import narrate, render
     if args.cmd == "narrate":
-        T = narrate.narrate(args.chapter.resolve())
+        T = narrate.narrate(args.chapter.resolve(), cached_only=args.cached_only)
         print(f"narration {T['duration']:.1f}s, {len(T['scenes'])} scenes")
         for s in T["scenes"]:
             print(f"  {s['id']:<16} start {s['start']:7.2f}  dur {s['dur']:6.2f}")
@@ -149,3 +167,36 @@ def dispatch(args) -> int:
         render.video_part(args.chapter, args.out, args.fps, args.f0, args.f1)
         return 0
     raise UserError(f"unknown command {args.cmd}")
+
+
+def where(path: Path) -> str:
+    from . import paths, project
+    proj = project.load_project()
+    lines = []
+    if proj is None:
+        lines.append("No project folder registered: everything goes next to the deck, in lesson-videos/.")
+    elif not proj.exists:
+        lines.append(f"The registered project folder {proj.home} doesn't exist; run `init --path` again. "
+                     "Until then everything goes next to the deck.")
+    path = Path(path).resolve()
+    if (path / "script.json").exists():
+        c = paths.chapter(path)
+        if c.project:
+            lines.append(f"lesson:  {c.lesson_id}")
+        lines += [f"chapter: {c.code}", f"assets:  {c.assets}", f"voice:   {c.voice}", f"build:   {c.build}",
+                  f"videos:  {c.out}"]
+        return "\n".join(lines)
+    if proj is not None and proj.exists and paths._below(path, proj.home) is not None \
+            and paths._below(path, proj.lessons_dir.resolve()) in (None, Path(".")):
+        lines += [f"project: {proj.home}", f"lessons: {proj.lessons_dir}  (one folder per lesson: <course>/<unit>)",
+                  f"videos:  {proj.results_dir / 'lessons'}", f"work:    {proj.work_dir / 'lessons'}",
+                  "Run `where` on a lesson folder (lessons/<course>/<unit>) to see where its files go."]
+        return "\n".join(lines)
+    les = paths.lesson(path)
+    if les.project:
+        lines += [f"lesson:  {les.lesson_id}", f"text:    {les.code}", f"sources: {les.sources}",
+                  f"work:    {les.work}", f"videos:  {les.out}"]
+    elif proj is not None and proj.exists:
+        lines.append(f"{path} is not inside the project's lessons folder ({proj.lessons_dir}): everything goes next "
+                     "to the deck, in lesson-videos/.")
+    return "\n".join(lines)

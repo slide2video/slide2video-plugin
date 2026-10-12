@@ -8,13 +8,17 @@ import json
 import os
 from pathlib import Path
 
-from . import config, keys, net, tools, voices
+from . import config, keys, net, paths, tools, voices
 from .util import UserError, read_json, read_text, run, write_json, write_text
 
 
 def cache_key(voice: str, say: str) -> str:
     raw = f"{voice}|{config.ELEVEN_MODEL}|{json.dumps(config.VOICE_SETTINGS)}|{say}"
     return hashlib.sha1(raw.encode()).hexdigest()[:12]
+
+
+class NeedsNewTakes(UserError):
+    """--cached-only found scenes without a recorded take: nothing is recorded, no other voice is tried."""
 
 
 def words_from(al: dict) -> list[dict]:
@@ -89,15 +93,18 @@ def narration_error(e: net.ApiError, done: int, total: int) -> str:
     return msg
 
 
-def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS) -> dict:
+def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, cached_only: bool = False) -> dict:
     """Voice every scene with the first voice in the chain that works for the whole chapter."""
-    spec = read_json(ch / "script.json")
+    p = paths.chapter(ch)
+    spec = read_json(p.code / "script.json")
     if speak_fn is not None:  # a single, caller-supplied voice (tests, tools)
-        return _narrate(ch, spec, "elevenlabs", speak_fn, workers)
+        return _narrate(p, spec, "elevenlabs", speak_fn, workers, cached_only)
     order = voices.chain(spec)
     for k, provider in enumerate(order):
         try:
-            return _narrate(ch, spec, provider, None, workers)
+            return _narrate(p, spec, provider, None, workers, cached_only)
+        except NeedsNewTakes:
+            raise
         except (voices.VoiceUnavailable, UserError) as e:
             if k == len(order) - 1:
                 raise
@@ -122,9 +129,9 @@ def _words(f: Path) -> list[dict]:
     return d["words"] if "words" in d else words_from(d)
 
 
-def _narrate(ch: Path, spec: dict, provider: str, speak_fn, workers: int) -> dict:
+def _narrate(p: paths.ChapterPaths, spec: dict, provider: str, speak_fn, workers: int, cached_only: bool = False) -> dict:
     voice = voices.voice_for(provider, spec)
-    vd = ch / "build" / "voice"
+    vd = p.voice
     vd.mkdir(parents=True, exist_ok=True)
     files, jobs, silent = {}, [], {}
     for sc in spec["scenes"]:
@@ -139,6 +146,10 @@ def _narrate(ch: Path, spec: dict, provider: str, speak_fn, workers: int) -> dic
         files[sc["id"]] = f
         if not f.exists():
             jobs.append((say, f))
+    if jobs and cached_only:
+        need = [f.name.rsplit("-", 1)[0] for _, f in jobs]
+        raise NeedsNewTakes(f"{p.name}: {len(jobs)} scene(s) have no recorded take with {voices.LABELS[provider]}: "
+                            f"{', '.join(need)}. Nothing was recorded; run `narrate` without --cached-only to record them.")
     if jobs and provider == "elevenlabs" and speak_fn is None:
         keys.get("ELEVENLABS_API_KEY")  # fail early with the friendly message
     fn = speak_fn or (lambda say, v, f: _take(provider, say, v, f))
@@ -157,27 +168,29 @@ def _narrate(ch: Path, spec: dict, provider: str, speak_fn, workers: int) -> dic
         raise UserError(narration_error(e, saved, len(jobs))) from None
     finally:
         ex.shutdown(wait=True)
-    takes = {sid: (tools.duration(f), _words(f), f.relative_to(ch).as_posix()) for sid, f in files.items()}
+    takes = {sid: (tools.duration(f), _words(f), f.name) for sid, f in files.items()}
     for sid, say in silent.items():
         dur = voices.reading_time(say)
         takes[sid] = (dur, voices.estimate_words(say, dur), None)
     T = build_timing(spec, takes)
     T["narrator"] = provider
-    write_text(ch / "build" / "timing.js", "window.TIMING = " + json.dumps(T) + ";\n")
-    narration_track(ch, T)
+    write_text(p.build / "timing.js", "window.TIMING = " + json.dumps(T) + ";\n")
+    narration_track(p.code, T)
     print(f"voice: {voices.LABELS[provider]}", flush=True)
     return T
 
 
 def read_timing(ch: Path) -> dict:
-    f = ch / "build" / "timing.js"
+    p = paths.chapter(ch)
+    f = p.build / "timing.js"
     if not f.exists():
-        raise UserError(f"{ch.name}: no narration yet. Run `narrate` first.")
+        raise UserError(f"{p.name}: no narration yet. Run `narrate` first.")
     return json.loads(read_text(f).split("=", 1)[1].strip().rstrip(";"))
 
 
 def narration_track(ch: Path, T: dict) -> Path:
-    out = ch / "build" / "narration.mp3"
+    p = paths.chapter(ch)
+    out = p.build / "narration.mp3"
     total = T["duration"]
     voiced = [s for s in T["scenes"] if s["audio"]]
     if not voiced:
@@ -185,7 +198,7 @@ def narration_track(ch: Path, T: dict) -> Path:
         return out
     ins, flt = [], []
     for i, s in enumerate(voiced):
-        ins += ["-i", str(ch / s["audio"])]
+        ins += ["-i", str(p.voice / Path(s["audio"]).name)]
         ms = int((s["start"] + s["lead"]) * 1000)
         flt.append(f"[{i}:a]adelay={ms}|{ms},aformat=channel_layouts=stereo[a{i}]")
     flt.append("".join(f"[a{i}]" for i in range(len(voiced))) + f"amix=inputs={len(voiced)}:normalize=0,apad=whole_dur={total}[out]")
