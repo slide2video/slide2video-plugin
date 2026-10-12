@@ -6,7 +6,7 @@ import io
 import time
 from pathlib import Path
 
-from . import config, keys, net, tools
+from . import config, keys, net, paths, tools
 from .util import UserError, run, write_text
 
 
@@ -69,7 +69,7 @@ def veo(image_png: bytes, prompt: str, request=None, sleep=time.sleep, max_polls
 
 def make_clip(image: Path, prompt: str, name: str, work: Path, frac: float = 0.5, request=None, sleep=time.sleep,
               strip: bool = True) -> Path:
-    out = Path(work) / "clips" / f"{name}.mp4"
+    out = paths.lesson(work).sources / "clips" / f"{name}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(veo(prep(image, frac), prompt, request=request, sleep=sleep))
     write_text(out.with_suffix(".txt"), f"source: {Path(image).name}\nprompt: {prompt}\n")

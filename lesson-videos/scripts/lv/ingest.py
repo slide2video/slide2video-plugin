@@ -5,6 +5,7 @@ import hashlib
 import math
 from pathlib import Path
 
+from . import paths
 from .util import UserError, write_text
 
 EXPORT_HELP = ("export it as PowerPoint (.pptx) first. Keynote: File → Export To → PowerPoint. "
@@ -24,7 +25,7 @@ def ingest(deck: Path, work: Path) -> Path:
         raise UserError(f"{deck.name}: only .pptx and .pdf decks are supported; {EXPORT_HELP}")
     if not deck.exists():
         raise UserError(f"Can't find {deck}.")
-    out = Path(work) / "deck"
+    out = paths.lesson(work).work / "deck"
     media = out / "media"
     media.mkdir(parents=True, exist_ok=True)
     slides = _pptx(deck, media) if ext == ".pptx" else _pdf(deck, out)

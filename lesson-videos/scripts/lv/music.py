@@ -4,7 +4,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from . import config, keys, net
+from . import config, keys, net, paths
 from .util import UserError, write_text
 
 
@@ -20,7 +20,7 @@ def make_bed(work: Path, prompt: str, request=None) -> Path:
     for step in d.get("steps") or []:
         for block in step.get("content") or []:
             if block.get("type") == "audio" and block.get("data"):
-                out = Path(work) / "music" / "bed.mp3"
+                out = paths.lesson(work).sources / "music" / "bed.mp3"
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(base64.b64decode(block["data"]))
                 write_text(out.with_suffix(".txt"), prompt)
