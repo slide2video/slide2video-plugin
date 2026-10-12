@@ -59,6 +59,7 @@ If you stop partway, run `/lesson-videos:make` again later and it picks up where
   - ElevenLabs' use policy also restricts use by government entities without authorization. Read it (elevenlabs.io/use-policy) and decide whether it applies to you.
 - **Images from other sources.** If your deck has pictures from elsewhere on the web, check their licences before posting the videos publicly. Unlisted links or sharing the files directly is safer.
 - **Where things are kept.** Your keys and sound effects are stored in `~/.lesson-videos` (on Windows, `C:\Users\<you>\.lesson-videos`). Deleting that folder removes them.
+- **Keeping lessons in a project folder (optional).** By default everything goes next to your deck. If you'd rather keep all your lessons in one folder (one you back up, or keep in git), run `/lesson-videos:setup` and ask for a project folder, or run the `init --path` command it shows. Then each lesson's text (plan, scripts, scenes) lives in `lessons/<course>/<unit>/` there; finished videos, class materials and the paid parts (narration, music, clips, chosen images) in a results folder (`~/Movies/Lesson Videos` by default); and rebuildable files in your computer's cache. Nothing changes if you don't.
 
 ## Troubleshooting
 

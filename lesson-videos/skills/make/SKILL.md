@@ -15,7 +15,9 @@ If `uv` isn't found, or any command says a tool or key is missing, run the `setu
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/make/references/guide.md` before writing any `script.json` or `scenes.js`. The sample chapter in `${CLAUDE_PLUGIN_ROOT}/skills/make/references/sample/` shows every idiom.
 
-**Folders.** For a deck at `<folder>/<deck>.pptx`, everything goes in `<folder>/lesson-videos/`: finished videos at its top level, working files in `_work/` (`deck/`, `brief.md`, `plan.md`, `music/`, `clips/`, `ch1/`, `ch2/`…). Call `<folder>/lesson-videos/_work` **WORK**.
+**Folders.** Run `LV where` in the current folder first.
+- If it says there is no project folder, everything goes next to the deck: for a deck at `<folder>/<deck>.pptx`, finished videos in `<folder>/lesson-videos/` and working files in `<folder>/lesson-videos/_work/` (`deck/`, `brief.md`, `plan.md`, `music/`, `clips/`, `ch1/`, `ch2/`…). Call `<folder>/lesson-videos/_work` **WORK**.
+- If the teacher keeps lessons in a project folder, the lesson is a folder inside its lessons folder, one per course and unit (ask for both, e.g. `lessons/biology/unit-2`); create it and call it **WORK**. `LV where "WORK"` prints where each kind of file goes: the text (`brief.md`, `plan.md`, `chN/script.json`, `chN/scenes.js`) stays in WORK; images, clips, music and narration takes go under `sources`; what `ingest` extracts goes under `work`; finished videos under `videos`. Pass WORK (or `WORK/chN`) to every command, as below; the commands put each file in its place. Copy images with `LV asset` to the `assets:` folder that `LV where "WORK/chN"` prints. Put the deck and the other class files in a `class-materials/` folder inside the `videos` folder.
 
 **Ground rules.**
 - The teacher's slides are the only source of facts. Never add facts, numbers or examples that aren't in the deck or in files the teacher points you to.
@@ -32,10 +34,10 @@ If `WORK` already exists, run `LV status "WORK"` and read `WORK/plan.md`. Tell t
 Find the deck in the current folder (ask if there are several). Keynote, Google Slides or old `.ppt` files must be exported to `.pptx` first; `ingest` explains how. Run:
 
 ```
-LV ingest "<deck path>"
+LV ingest "<deck path>" --work "WORK"
 ```
 
-Read `WORK/deck/slides.md` in full and look at every `WORK/deck/contact-*.jpg` (and `deck/pages/` for PDFs). Ask whether there are other files to use (worksheets, labs, review sheets); read them too.
+`WORK/deck/` below means the `deck/` folder that `ingest` printed. Read `WORK/deck/slides.md` in full and look at every `WORK/deck/contact-*.jpg` (and `deck/pages/` for PDFs). Ask whether there are other files to use (worksheets, labs, review sheets); read them too.
 
 ## 2. Short interview (one message, sensible defaults offered)
 
@@ -69,13 +71,13 @@ Show the teacher the outline in brief and the estimate, and **ask for approval**
 Follow the workflow in `guide.md` for chapter 1 in `WORK/ch1/`:
 1. Write `script.json` (narration per scene; `"music": "../music/bed.mp3"` only if music exists).
 2. `LV narrate "WORK/ch1"`. It prints which voice it used. If it had to fall back (for example the free Microsoft voice was unavailable, or ElevenLabs credits ran out), tell the teacher in one line; running `narrate` again later switches back, and finished takes are kept.
-3. Copy each image you use with `LV asset "WORK/deck/media/<file>" "WORK/ch1/assets/<name>.jpg"` (it straightens, downscales to 1600 px and converts transparent PNGs; use `.png` as the target to keep transparency); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]`.
+3. Copy each image you use with `LV asset "WORK/deck/media/<file>" "WORK/ch1/assets/<name>.jpg"` (in a project folder, the target is in the `assets:` folder from `LV where "WORK/ch1"`) (it straightens, downscales to 1600 px and converts transparent PNGs; use `.png` as the target to keep transparency); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]` (same `assets:` folder in a project; clips are in the `clips/` folder that `clip` printed).
 4. Write `scenes.js`.
-5. `LV stills "WORK/ch1" <one time per scene>` and look at `WORK/ch1/build/stills.jpg`. Fix overlaps, text running off cards, things hidden behind captions, empty-looking scenes, and every `cue miss` warning. Repeat until clean (2–3 rounds is normal).
+5. `LV stills "WORK/ch1" <one time per scene>` and look at the `stills.jpg` it prints. Fix overlaps, text running off cards, things hidden behind captions, empty-looking scenes, and every `cue miss` warning. Repeat until clean (2–3 rounds is normal).
 6. `LV render "WORK/ch1"`. Rendering takes about a minute per minute of video on a fast computer and several on a slow laptop: use the Bash tool's longest timeout (10 minutes), and for long chapters on slow machines run it in the background and check its output.
-7. Verify: `render` prints the video length next to the narration length (they should match), and saves four frames of the finished video to `WORK/ch1/build/final.jpg`; look at them.
+7. Verify: `render` prints the video length next to the narration length (they should match), and saves four frames of the finished video to the `final.jpg` it prints; look at them.
 
-Then **stop**. Tell the teacher where the video is (`<folder>/lesson-videos/Chapter 1 - ….mp4`) and ask about tone, pace, reading level, voice and look. Apply their feedback to chapter 1 (re-narrating only changed scenes is cheap) before moving on, and write the agreed style notes at the top of `plan.md` so later chapters (and later sessions) follow them.
+Then **stop**. Tell the teacher where the video is (the path `render` printed) and ask about tone, pace, reading level, voice and look. Apply their feedback to chapter 1 (re-narrating only changed scenes is cheap) before moving on, and write the agreed style notes at the top of `plan.md` so later chapters (and later sessions) follow them.
 
 ## 7. Remaining chapters
 
@@ -85,7 +87,7 @@ Between chapters, `LV status "WORK"` shows what's left. If the session ends, the
 
 ## 8. Wrap up
 
-Write `<folder>/lesson-videos/README.md`: a table of the videos with their lengths, one line on what each covers, and these notes:
+Write `README.md` in the folder with the finished videos: a table of the videos with their lengths, one line on what each covers, and these notes:
 - Narration: say which voice was used: an AI voice from ElevenLabs, the free Microsoft Edge voice (an unofficial Microsoft service; for classroom, non-commercial use), the computer's built-in voice, or captions only. Music and clips, if any, are AI-generated (Google).
 - If the deck contains photos or diagrams from other sources, check their licences before posting the videos publicly; keeping them unlisted or sharing the files directly is safer.
 - If ElevenLabs' free plan was used, a published video's title must include "elevenlabs.io".
