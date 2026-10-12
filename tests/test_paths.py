@@ -63,3 +63,36 @@ def test_custom_lessons_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("LESSON_VIDEOS_PROJECT", str(tmp_path / "p"))
     p = paths.chapter(tmp_path / "p" / "teaching" / "chem" / "unit-1" / "ch3")
     assert p.lesson_id == "chem/unit-1" and p.out == tmp_path / "r" / "lessons" / "chem" / "unit-1"
+
+
+def test_unregistered_project_refuses_instead_of_teacher_mode(tmp_path):
+    from lv.util import write_text
+    write_text(tmp_path / "moved repo/config.yaml", "artist: Someone\nlessons_dir: lessons\n")
+    ch = tmp_path / "moved repo" / "lessons" / "biology" / "unit-2" / "ch1"
+    with pytest.raises(UserError) as e:
+        paths.chapter(ch)
+    assert "init --path" in str(e.value) and "moved repo" in str(e.value)
+
+
+def test_config_without_lessons_dir_is_not_a_project(tmp_path):
+    from lv.util import write_text
+    write_text(tmp_path / "music only/config.yaml", "artist: Someone\n")
+    ch = tmp_path / "music only" / "lessons" / "x" / "ch1"
+    assert not paths.chapter(ch).project
+
+
+def test_case_variant_path_on_case_insensitive_disk(lv_project):
+    unit = lv_project.lessons_dir / "biology" / "unit-2"
+    (unit / "ch1").mkdir(parents=True)
+    variant = Path(str(lv_project.lessons_dir).replace("/lessons", "/LESSONS")) / "biology" / "unit-2" / "ch1"
+    if not variant.exists():
+        pytest.skip("case-sensitive file system")
+    p = paths.chapter(variant)
+    assert p.project and p.lesson_id == "biology/unit-2" and p.voice == paths.chapter(unit / "ch1").voice
+
+
+def test_unreadable_config_above_a_deck_is_ignored(tmp_path):
+    from lv.util import write_text
+    write_text(tmp_path / "Documents/config.yaml", "this: [is not yaml\n")
+    ch = tmp_path / "Documents" / "Biology" / "lesson-videos" / "_work" / "ch1"
+    assert paths.chapter(ch).build == ch / "build"

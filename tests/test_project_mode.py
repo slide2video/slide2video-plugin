@@ -75,3 +75,17 @@ def test_status_and_estimate_project_mode(project_chapter, fake_speak):
     assert status.stage(project_chapter) == "done: Chapter 1 - Test.mp4"
     assert [c.name for c in status.chapters(unit)] == ["ch1"]
     assert estimate.chars_in_scripts(unit) == len("Hello there, students.") + len("Bye now.")
+
+
+def test_status_survives_a_wiped_cache(project_chapter, fake_speak):
+    import shutil
+    p = paths.chapter(project_chapter)
+    narrate.narrate(project_chapter, speak_fn=fake_speak)
+    write_text(project_chapter / "scenes.js", "")
+    out = p.out / "Chapter 1 - Test.mp4"
+    write_text(out, "x")
+    status.mark_rendered(project_chapter, out)
+    shutil.rmtree(p.build)
+    assert status.stage(project_chapter) == "done: Chapter 1 - Test.mp4"
+    write_text(project_chapter / "scenes.js", "// changed")
+    assert status.stage(project_chapter) == "script written: run narrate"

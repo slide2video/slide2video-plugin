@@ -59,3 +59,9 @@ def test_where_outside_the_project(lv_project, tmp_path, capsys):
     assert cli.main(["where", str(tmp_path / "Desktop")]) == 0
     out = capsys.readouterr().out
     assert "not inside" in out and str(lv_project.lessons_dir) in out
+
+
+def test_where_at_the_project_root(lv_project, capsys):
+    assert cli.main(["where", str(lv_project.home)]) == 0
+    out = capsys.readouterr().out
+    assert "next to the deck" not in out and "<course>/<unit>" in out and str(lv_project.lessons_dir) in out

@@ -61,3 +61,7 @@ def test_project_chapter_renders_end_to_end(lv_project, fake_speak, browser_ok):
     assert abs(tools.duration(out) - narrate.read_timing(ch)["duration"]) < 0.2
     assert out.with_suffix(".vtt").exists() and (p.build / "final.jpg").exists()
     assert sorted(f.name for f in ch.iterdir()) == ["scenes.js", "script.json"]  # the repo stays text-only
+    import shutil
+    from lv import status
+    shutil.rmtree(p.build)                                                       # the cache is free to wipe
+    assert status.stage(ch) == "done: Chapter 1 - Test.mp4"

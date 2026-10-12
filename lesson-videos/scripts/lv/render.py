@@ -14,7 +14,7 @@ import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import captions, config, mix, paths, sfx, tools
+from . import captions, config, mix, paths, sfx, status, tools
 from .narrate import read_timing
 from .page import ensure_page, output_path, routes
 from .util import UserError, read_json, run, write_json, write_text
@@ -207,6 +207,8 @@ def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir:
     run(tools.ffmpeg(), "-v", "error", "-y", "-i", b / "video.mp4", "-i", audio, "-c:v", "copy", "-c:a", "copy",
         "-map", "0:v", "-map", "1:a", "-shortest", "-movflags", "+faststart", out)
     write_text(out.with_suffix(".vtt"), captions.vtt(T))
+    if out_dir is None:  # a check render elsewhere doesn't count as the chapter's video
+        status.mark_rendered(ch, out)
     for p in parts:
         p.unlink(missing_ok=True)
     print(f"wrote {out} ({tools.duration(out):.1f}s; narration {T['duration']:.1f}s)")

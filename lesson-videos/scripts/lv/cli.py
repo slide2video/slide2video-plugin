@@ -186,6 +186,12 @@ def where(path: Path) -> str:
         lines += [f"chapter: {c.code}", f"assets:  {c.assets}", f"voice:   {c.voice}", f"build:   {c.build}",
                   f"videos:  {c.out}"]
         return "\n".join(lines)
+    if proj is not None and proj.exists and paths._below(path, proj.home) is not None \
+            and paths._below(path, proj.lessons_dir.resolve()) in (None, Path(".")):
+        lines += [f"project: {proj.home}", f"lessons: {proj.lessons_dir}  (one folder per lesson: <course>/<unit>)",
+                  f"videos:  {proj.results_dir / 'lessons'}", f"work:    {proj.work_dir / 'lessons'}",
+                  "Run `where` on a lesson folder (lessons/<course>/<unit>) to see where its files go."]
+        return "\n".join(lines)
     les = paths.lesson(path)
     if les.project:
         lines += [f"lesson:  {les.lesson_id}", f"text:    {les.code}", f"sources: {les.sources}",
