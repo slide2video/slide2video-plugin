@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import config
+from . import config, paths
 from .util import read_json
 
 
 def chars_in_scripts(work: Path) -> int:
-    return sum(len(sc.get("say", "").strip()) for f in Path(work).glob("*/script.json") for sc in read_json(f).get("scenes", []))
+    code = paths.lesson(work).code
+    return sum(len(sc.get("say", "").strip()) for f in code.glob("*/script.json") for sc in read_json(f).get("scenes", []))
 
 
 def plan_chars(chapters: int, minutes: float) -> int:

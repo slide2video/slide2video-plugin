@@ -4,12 +4,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from . import paths
 from .page import output_path
 from .util import read_json
 
 
 def chapters(work: Path) -> list[Path]:
-    found = [f.parent for f in Path(work).glob("*/script.json")]
+    found = [f.parent for f in paths.lesson(work).code.glob("*/script.json")]
     return sorted(found, key=lambda p: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", p.name)])
 
 
@@ -18,14 +19,15 @@ def _mtime(p: Path) -> float:
 
 
 def stage(ch: Path) -> str:
-    script, timing, scenes = ch / "script.json", ch / "build" / "timing.js", ch / "scenes.js"
+    p = paths.chapter(ch)
+    script, timing, scenes = p.code / "script.json", p.build / "timing.js", p.code / "scenes.js"
     if not script.exists():
         return "empty"
     if _mtime(timing) < _mtime(script):
         return "script written: run narrate"
     if not scenes.exists():
         return "narrated: write scenes.js"
-    out = output_path(ch, read_json(script))
+    out = output_path(ch, read_json(script), p.out)
     if _mtime(out) < max(_mtime(scenes), _mtime(timing)):
         return "scenes written: check stills, then render"
     return f"done: {out.name}"

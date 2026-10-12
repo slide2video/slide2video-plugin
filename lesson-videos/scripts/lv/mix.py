@@ -3,12 +3,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import sfx, tools
+from . import paths, sfx, tools
 from .util import read_json, run
 
 
+def music_file(ch: Path, spec: dict) -> Path | None:
+    """The music bed named in script.json, relative to the chapter's sources folder (so "../music/bed.mp3" finds the
+    lesson's music/ in both layouts)."""
+    music = spec.get("music")
+    return (paths.chapter(ch).sources / music).resolve() if music else None
+
+
 def mix_audio(ch: Path, T: dict, spec: dict) -> Path:
-    b = ch / "build"
+    b = paths.chapter(ch).build
     total = T["duration"]
     events = read_json(b / "sfx.json") if (b / "sfx.json").exists() else []
     ins = ["-i", str(b / "narration.mp3")]
@@ -16,7 +23,7 @@ def mix_audio(ch: Path, T: dict, spec: dict) -> Path:
     mixes = ["[nar]"]
     idx = 1
     music = spec.get("music")
-    mp = (ch / music).resolve() if music else None
+    mp = music_file(ch, spec)
     if mp and not mp.exists():
         print(f"note: music file {music} not found; mixing without music")
         mp = None
