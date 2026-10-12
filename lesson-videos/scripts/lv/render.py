@@ -10,12 +10,13 @@ import shutil
 import subprocess
 import sys
 import threading
+import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import captions, config, mix, sfx, tools
+from . import captions, config, mix, paths, sfx, tools
 from .narrate import read_timing
-from .page import ensure_page, output_path
+from .page import ensure_page, output_path, routes
 from .util import UserError, read_json, run, write_json, write_text
 
 GRAB = """async ([t, q]) => {
@@ -25,19 +26,39 @@ GRAB = """async ([t, q]) => {
 }"""
 
 
+_MISSING = str(Path(__file__).with_name(".lv-not-served") / "x")  # never exists: the base class answers 404
+
+
 class _Handler(http.server.SimpleHTTPRequestHandler):
     extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
                       ".js": "text/javascript", ".html": "text/html", ".ttf": "font/ttf", ".jpg": "image/jpeg",
                       ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".mp3": "audio/mpeg",
                       ".json": "application/json", ".svg": "image/svg+xml"}
 
+    def __init__(self, *args, routes=(), **kw):
+        self.routes = routes
+        super().__init__(*args, **kw)
+
+    def translate_path(self, path: str) -> str:
+        """URL prefix → folder (or exact URL → file); anything that escapes its folder is not served."""
+        url = urllib.parse.unquote(urllib.parse.urlsplit(path).path)
+        for prefix, target in self.routes:
+            if prefix.endswith("/") and url.startswith(prefix):
+                base = Path(target).resolve()
+                f = (base / url[len(prefix):]).resolve()
+                return str(f) if f.is_relative_to(base) else _MISSING
+            if url == prefix:
+                return str(target)
+        return _MISSING
+
     def log_message(self, *args):
         pass
 
 
 @contextmanager
-def serve(root: Path):
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Handler, directory=str(root)))
+def serve(routes: list[tuple[str, Path]]):
+    handler = functools.partial(_Handler, routes=routes, directory=str(Path.cwd()))
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
         yield srv.server_address[1]
@@ -50,7 +71,7 @@ def serve(root: Path):
 def page_for(ch: Path):
     from playwright.sync_api import sync_playwright
     logs: list[str] = []
-    with serve(ch) as port, sync_playwright() as p:
+    with serve(routes(paths.chapter(ch))) as port, sync_playwright() as p:
         try:
             browser = p.chromium.launch(args=["--use-gl=angle", "--enable-gpu-rasterization", "--ignore-gpu-blocklist"])
         except Exception as e:  # noqa: BLE001
@@ -92,7 +113,8 @@ def stills(ch: Path, times: list[float], cols: int = 3) -> Path:
     from PIL import Image, ImageDraw
     read_timing(ch)
     ensure_page(ch)
-    out = ch / "build" / "stills"
+    b = paths.chapter(ch).build
+    out = b / "stills"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
     with page_for(ch) as (pg, logs):
@@ -111,11 +133,11 @@ def stills(ch: Path, times: list[float], cols: int = 3) -> Path:
         with Image.open(f) as im:
             sheet.paste(im.resize((tw, th)), ((i % cols) * tw, (i // cols) * th))
         d.text(((i % cols) * tw + 8, (i // cols) * th + 8), f.stem, fill="yellow")
-    p = ch / "build" / "stills.jpg"
-    sheet.save(p, quality=85)
+    sheet_path = b / "stills.jpg"
+    sheet.save(sheet_path, quality=85)
     for line in notes[:20]:
         print(line)
-    return p
+    return sheet_path
 
 
 def video_part(ch: Path, out: Path, fps: int, f0: int, f1: int) -> None:
@@ -156,10 +178,11 @@ def default_workers() -> int:
 
 
 def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir: Path | None = None) -> Path:
-    spec = read_json(ch / "script.json")
+    p = paths.chapter(ch)
+    spec = read_json(p.code / "script.json")
     T = read_timing(ch)
     ensure_page(ch)
-    b = ch / "build"
+    b = p.build
     write_json(b / "sfx.json", events(ch))
     n = round(T["duration"] * fps)
     workers = workers or default_workers()
