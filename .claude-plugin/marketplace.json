@@ -25,7 +25,7 @@
       "name": "music-video",
       "source": "./music-video",
       "description": "Turn a theme into a music video: lyrics, a song from your own Suno account, word timings, and a code-rendered 2D/3D video.",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "category": "productivity"
     }
   ]
