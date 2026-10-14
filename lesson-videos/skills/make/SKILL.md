@@ -105,31 +105,49 @@ Tell the teacher the videos are done and where they are.
 ## Site mode (slide2video.com)
 
 Use this mode when the folder you were started in has `site/turn.json`. The teacher is not at this computer:
-they answer on slide2video.com, and `LV worker` ran you for one **turn**. **Never ask in chat** and never wait
-for an answer: do the work for this turn, write `site/card.json`, check it with `LV card "site/card.json"`, fix
-anything it reports, and **stop**.
+they answer on slide2video.com, and `LV worker` ran you for one **turn**. Each turn is a new session that remembers
+nothing from earlier turns except the files in the lesson folder, so keep every decision in the files listed
+below. **Never ask in chat** and never wait for an answer: do the work for this turn, write `site/card.json`,
+check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
 
 - **Commands:** use the command in `site/lv.txt` exactly, in place of the command at the top of this skill (it is
   the same plugin with absolute paths). Only that command, file reading and file editing are allowed.
 - Some commands are switched off in site mode (`open`, `pair`, `worker`, `init`, and `keys` except `keys check`); don't try them.
-- **Folders:** the deck is in `in/`; `WORK` is `lesson-videos/_work` (pass `--work "lesson-videos/_work"` to
-  `ingest`); finished videos land in `lesson-videos/`.
-- **Progress:** at each step, append one short line to `site/progress.txt` that a teacher would understand
-  ("Reading the deck", "Narrating 3 of 12 scenes", "Rendering chapter 1"). The website shows the last line.
-- **The teacher's input** is in `site/turn.json`: `turn.kind`, plus `instructions` (start), `answers` (answer),
-  `feedback` (change, feedback). Anything the cards didn't settle uses this skill's defaults.
+- **Replaces the chat steps:** site mode replaces every "ask the teacher" and "tell the teacher" in steps 0–8:
+  questions go in a `questions` card, notices go in the card's `message`.
+- **Files:** the deck and any other files are the `files` listed in `site/turn.json` (`kind` deck or extra),
+  saved in `in/`.
+- **Folders:** `WORK` is `lesson-videos/_work` (pass `--work "lesson-videos/_work"` to `ingest`); finished videos
+  land in `lesson-videos/`.
+- **Progress:** at each step, rewrite `site/progress.txt` with its lines plus one new line at the end, a line a
+  teacher would understand ("Reading the deck", "Narrating 3 of 12 scenes", "Rendering chapter 1"). You can only
+  read and write files, so write the whole file each time. The website shows the last line.
+- **Input:** the kind is the `kind` inside `turn` in `site/turn.json`. `instructions` (start) and `feedback`
+  (change, feedback) are the teacher's words. `answers` (answer) are entries shaped like
+  `{"question": "<id>", "choice": "<option label or null>", "other": "<typed text or null>"}`; `other` holds the
+  teacher's own words when they chose Other. Anything the cards didn't settle uses this skill's defaults, and
+  the card's message says which defaults were used.
+- **Questions:** at most 8 per card. If there are more, keep the most important and decide the rest with the
+  defaults, saying so in the message.
+- **Approval:** `approve` approves exactly the plan card's estimate. Only make music or clips if the plan card
+  listed them with their cost; otherwise make none. When the plan card's `markdown` includes music or clips, it
+  must list them with their costs.
+- **Files between turns** (in `WORK`):
+  - `student-info.md`: the slide numbers flagged for student information (never copy student names into any file).
+  - `interview.md`: the interview answers: grade, chapters, length, voice, and the decision for each possible issue.
+  - `review.md`: its first line is `Under review: chapter N`; write it with every `review` card.
 - **One chapter per turn**, no parallel helper agents.
 
 What to do for each `turn.kind`, and which card ends it:
 
 | `turn.kind` | Do | Card |
 |---|---|---|
-| `start` | Steps 0–3: ingest, read everything, write `brief.md`. First check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. | `"questions"`: if student information was found, one question listing it ("Remove these slides" / "They're not students"), and nothing else. Otherwise the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). |
-| `answer` | Apply the answers. If the student-information question was answered "Remove", leave those slides out entirely. Step 4: write `plan.md`, run `estimate`. | `"plan"`: `markdown` = the outline in brief; `estimate` = `{"usd": <total>, "minutes": <per video>, "chapters": <N>}`. |
+| `start` | Step 1 (ingest and read every slide). Then check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. If found, write the flagged slide numbers to `student-info.md`. Only then steps 2–3: write `brief.md`. | If student information was found: `"questions"` with one question whose `"id"` is `"students"`, options labelled exactly "Remove these slides" and "They're not students", and nothing else. Otherwise: the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). |
+| `answer` | If an answer has `"question": "students"`, read `student-info.md`: for "Remove these slides", leave those slides out everywhere (brief, plan, chapters). If `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (grade, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and the answers are not the interview, send the interview card instead. If the answers belong to a failure question (below), act on them and continue from where the work stopped. Otherwise step 4: write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = `{"usd": <total>, "minutes": <per video>, "chapters": <N>}`. |
 | `change` | Revise `plan.md` from `feedback`, re-run `estimate`. | `"plan"` again. |
-| `approve` | Note the approval and date at the top of `plan.md`. Steps 5–6: music/clips if approved, then chapter 1 (6.1–6.7). | `"review"` for chapter 1. |
-| `feedback` | Apply `feedback` to the chapter just reviewed (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
-| `continue` | Write the agreed style notes at the top of `plan.md` if not there yet. Make the next unfinished chapter (`LV status`). If none is left, step 8. | `"review"` for that chapter, or `"done"`. |
+| `approve` | Note the approval and date at the top of `plan.md`. Steps 5–6 (music and clips only as the approval rule above allows), then chapter 1 (6.1–6.7). | `"review"` for chapter 1. |
+| `feedback` | Read `review.md` for the chapter under review. Apply `feedback` to that chapter (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
+| `continue` | Read `review.md` for the last chapter shown. Write the agreed style notes at the top of `plan.md` if not there yet. Make the next unfinished chapter after it (`LV status`). If none is left, step 8. | `"review"` for that chapter, or `"done"`. |
 
 Card formats (all start with `"contract": 1`, `"kind"` and a one-line `"message"` for the teacher):
 
@@ -144,12 +162,13 @@ Card formats (all start with `"contract": 1`, `"kind"` and a one-line `"message"
 - `"plan"`: `"markdown"` and `"estimate"` as above.
 - `"review"`: `"chapter": N`, `"video"` (the MP4 path relative to this folder, e.g.
   `"lesson-videos/Chapter 1 - The Water Cycle.mp4"`), `"captions"` (its `.vtt`), `"stills"` (the `final.jpg`
-  that `render` printed, relative to this folder; files outside `lesson-videos/` are refused). The worker uploads
-  them; don't add `version` or `timing`.
+  that `render` printed, relative to this folder; files outside `lesson-videos/` are refused). Write
+  `review.md` first. The worker uploads the files; don't add `version` or `timing`.
 - `"done"`: `"chapters": [{"chapter": 1, "title": "…"}]` and `"readme"` (the README text from step 8).
 
 Card file paths must be inside `lesson-videos/`: video `.mp4`, captions `.vtt`, stills `.jpg`, `.jpeg` or `.png`.
 Anything else makes the card an error.
 
 If something fails that the teacher must fix (a deck that can't be read, a key that was rejected), write a
-`"questions"` card whose message explains it in one line, with one question and options for what to do next.
+`"questions"` card with one question whose options say what to do next, and a message that explains the problem
+in one line. Record where the work stopped in `plan.md`, so the next turn picks it up there.

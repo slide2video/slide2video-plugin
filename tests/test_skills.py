@@ -94,7 +94,9 @@ def test_make_skill_has_a_site_mode():
     _, text = frontmatter("make")
     site = text.split("## Site mode", 1)[1]
     for needed in ("site/turn.json", "site/card.json", "site/progress.txt", "site/lv.txt", "LV card",
-                   '"questions"', '"plan"', '"review"', '"done"', "student", "Never ask", "stop"):
+                   '"questions"', '"plan"', '"review"', '"done"', "student", "Never ask", "stop",
+                   "`answer`", "`approve`", "`change`", "`continue`", "`feedback`", "student-info.md",
+                   "interview.md", "review.md", '"students"'):
         assert needed in site, needed
 
 
