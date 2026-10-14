@@ -420,3 +420,18 @@ def test_server_error_on_finish_is_not_turned_into_an_error_card(monkeypatch):
     with pytest.raises(worker.net.ApiError):
         worker._finish("trn_x", QUESTIONS, "")
     assert sent == [QUESTIONS]
+
+
+def test_claude_always_runs_on_the_subscription(monkeypatch, tmp_path):
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
+                "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"):
+        monkeypatch.setenv(var, "set-by-parent")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "subscription-login")
+    seen = {}
+    monkeypatch.setattr(worker.subprocess, "run", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
+    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    env = seen["env"]
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
+                "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"):
+        assert var not in env, var
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "subscription-login"

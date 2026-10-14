@@ -30,6 +30,8 @@ CLAUDE_CONFIG = (".claude", ".mcp.json", "CLAUDE.md", "CLAUDE.local.md")
 DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Write(./.claude/**)", "Edit(./.mcp.json)",
           "Write(./.mcp.json)", "Edit(./CLAUDE.md)", "Write(./CLAUDE.md)", "Edit(./CLAUDE.local.md)",
           "Write(./CLAUDE.local.md)"]
+# Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
+DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
 
 
@@ -69,9 +71,10 @@ def claude_command(lv: str) -> list[str]:
 def _site_env(private: Path) -> dict:
     """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
     file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one.
-    Variables a parent Claude Code session set are dropped (the job is its own session); the sign-in token a teacher
-    may keep in CLAUDE_CODE_OAUTH_TOKEN is kept."""
-    env = {k: v for k, v in os.environ.items() if k not in ("LESSON_VIDEOS_PROJECT", "CLAUDECODE")
+    Variables a parent Claude Code session set are dropped (the job is its own session), and so is every way to use an
+    API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
+    token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept."""
+    env = {k: v for k, v in os.environ.items() if k not in DROPPED_ENV
            and (not k.startswith("CLAUDE_CODE_") or k == "CLAUDE_CODE_OAUTH_TOKEN")}
     env["LV_SITE_MODE"] = "1"
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
