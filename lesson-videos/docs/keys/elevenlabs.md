@@ -10,18 +10,18 @@ ElevenLabs gives the most natural narration voice. Without it, lesson-videos use
 
 ## Make the key
 
-1. Open https://elevenlabs.io/app/settings/api-keys and sign up or sign in.
+1. Open https://elevenlabs.io/app/developers/api-keys and sign up or sign in.
 
-   <!-- screenshot: elevenlabs-keys-page.webp -->
+   ![The API Keys page with the Create Key button](../images/elevenlabs-keys-page.webp)
 
-2. Click **Create API Key**.
+2. Click **Create Key**.
 3. Name it `lesson-videos`.
-4. Under permissions, turn on **Text to Speech** (access) and **User** (read). Leave the rest off.
-5. Optional but recommended: set a **credit quota** (for example 30,000) so the key can never spend more.
+4. Leave **Restrict Key** on. Set **Text to Speech** to **Access**, and further down, under Administration, set **User** to **Access** (so lesson-videos can show your remaining credits). Leave everything else on **No Access**.
+5. Optional but recommended: in **Per credit refresh period**, type a limit (for example 30000) so the key can never spend more.
 
-   <!-- screenshot: elevenlabs-create-dialog.webp -->
+   ![The Create API Key panel: name, credit limit, Text to Speech and User set to Access](../images/elevenlabs-create-dialog.webp)
 
-6. Click **Create**, then **Copy**. The key is shown only once.
+6. Click **Create Key**, then **Copy**. The key is shown only once.
 
 ## Save it
 

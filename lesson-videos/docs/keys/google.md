@@ -12,22 +12,25 @@ A Gemini key lets lesson-videos add soft background music and a few short AI-ani
 
 1. Open https://aistudio.google.com/api-keys and sign in. Accept the terms if asked.
 
-   <!-- screenshot: google-api-keys.webp -->
+   ![The API Keys page with the Create API key button](../images/google-api-keys.webp)
 
-2. Click **Create API key**. Let it create a project if it asks.
-3. Click **Copy**.
+2. Click **Create API key**, name it `lesson-videos`, keep the suggested project (or let it create one), and click **Create key**.
+
+   ![The Create a new key dialog](../images/google-create-dialog.webp)
+
+3. Click **Copy** next to the new key.
 
 ## Turn on billing
 
-4. Open https://aistudio.google.com/billing (or click **Set up billing**), link a billing account and add the $5 prepayment.
+4. Open https://aistudio.google.com/billing (or click **Set up billing**), link a billing account, then click **Buy credits** and add the $5 prepayment.
 
-   <!-- screenshot: google-billing.webp -->
+   ![The Payments card with Buy credits](../images/google-billing.webp)
 
 ## Set a spend cap
 
-5. Open https://aistudio.google.com/spend and set a monthly cap, for example $10. Google stops charging once it's reached.
+5. Open https://aistudio.google.com/spend, click **Edit spend cap** and set a monthly cap, for example $10. Google stops charging once it's reached.
 
-   <!-- screenshot: google-spend-cap.webp -->
+   ![The Monthly spend cap card with Edit spend cap](../images/google-spend-cap.webp)
 
 Billing is only confirmed the first time music or a clip is made, because testing it costs money.
 

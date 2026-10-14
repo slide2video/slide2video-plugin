@@ -29,17 +29,17 @@ Call `mcp__claude-in-chrome__tabs_context_mcp`. If the Claude in Chrome tools ar
 
 ## 2. Open the keys page
 
-Open a new tab (`tabs_create_mcp`) at `https://elevenlabs.io/app/settings/api-keys`. If it shows a sign-in or sign-up page, tell the teacher to sign in or sign up in that tab and say "done"; wait.
+Open a new tab (`tabs_create_mcp`) at `https://elevenlabs.io/app/developers/api-keys`. If it shows a sign-in or sign-up page, tell the teacher to sign in or sign up in that tab and say "done"; wait.
 
 ## 3. Fill in the key
 
-Click **Create API Key**. Set the name to `lesson-videos`. Under permissions turn on **Text to Speech** (access) and **User** (read); leave everything else off. Suggest a credit quota (30,000) so the key can never spend more; set it if they agree.
+Click **Create Key**. A panel opens. Set **Name** to `lesson-videos`, keep **Restrict Key** on, set **Text to Speech** to **Access** and, under Administration, **User** to **Access**; leave everything else on **No Access**. Suggest a limit in **Per credit refresh period** (30000) so the key can never spend more; set it if they agree.
 
-Tell the teacher what you filled in and ask: "Shall I click Create?" Click only after a yes.
+Tell the teacher what you filled in and ask: "Shall I click Create Key?" Click only after a yes.
 
 ## 4. Copy, then save
 
-After clicking Create, say: "Your key is on screen now. Click **Copy** next to it, close the dialog, and tell me when you're done. I won't look at the page until then." Take no screenshots and read nothing until they answer.
+After clicking Create Key, say: "Your key is on screen now. Click **Copy** next to it, close the dialog, and tell me when you're done. I won't look at the page until then." Take no screenshots and read nothing until they answer.
 
 Then run:
 

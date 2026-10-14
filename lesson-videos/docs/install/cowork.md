@@ -8,7 +8,9 @@ The trade-off: each Cowork chat runs on a fresh computer in the cloud, so you at
 
 On claude.ai open **Customize** → **Plugins** → **Add** → **Add marketplace** → **Add from a repository**. Type `DanielLandi/plugins` and click **Sync**. Then open **Discover**, find **Lesson videos** and click **Add**.
 
-<!-- screenshot: cowork-add-marketplace.webp -->
+![The Add menu on the Plugins page](../images/cowork-add-menu.webp)
+
+![The Add marketplace dialog with DanielLandi/plugins](../images/cowork-add-marketplace.webp)
 
 ## 2. Allow the voice website (once)
 
@@ -17,7 +19,7 @@ Claude's cloud computers can only reach a few package websites unless you allow 
 - `speech.platform.bing.com`: the free Microsoft voice. Without it, videos have captions but no voice.
 - Only if you use them: `api.elevenlabs.io` (ElevenLabs voice) and `generativelanguage.googleapis.com` (music and AI clips).
 
-<!-- screenshot: cowork-allowed-domains.webp -->
+![Settings, Capabilities: the Additional allowed domains box](../images/cowork-allowed-domains.webp)
 
 The change applies to **new** chats, not one that's already open.
 

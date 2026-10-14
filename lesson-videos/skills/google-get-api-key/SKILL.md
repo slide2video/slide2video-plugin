@@ -27,7 +27,7 @@ Music and AI clips need a Google account with billing turned on (there's no free
 
 ## 2. Create the key
 
-Open a new tab (`tabs_create_mcp`) at `https://aistudio.google.com/api-keys`. If Google asks them to sign in or accept terms, they do it and say "done"; wait. Ask "Shall I click Create API key?"; on yes, click it and let it create a project if it asks.
+Open a new tab (`tabs_create_mcp`) at `https://aistudio.google.com/api-keys`. If Google asks them to sign in or accept terms, they do it and say "done"; wait. Click **Create API key**; a "Create a new key" dialog opens. Name it `lesson-videos` and keep the suggested project (or let it create one). Ask "Shall I click Create key?"; click only after a yes.
 
 After clicking, say: "Your key is on screen now. Click **Copy** next to it, close the dialog, and tell me when you're done. I won't look at the page until then." Take no screenshots and read nothing until they answer. Then run:
 
@@ -37,11 +37,11 @@ LV keys paste gemini
 
 ## 3. Billing (the teacher pays; you only open the page)
 
-Navigate the same tab to `https://aistudio.google.com/billing` (or click the "Set up billing" link). Tell the teacher to link a billing account and add the $5 prepayment themselves, and say "done"; wait.
+Navigate the same tab to `https://aistudio.google.com/billing` (or click the "Set up billing" link). Tell the teacher to link a billing account and use **Buy credits** to add the $5 prepayment themselves, and say "done"; wait.
 
 ## 4. Spend cap
 
-Navigate to `https://aistudio.google.com/spend`. Propose a monthly cap of $10. On their yes, set it and save. Tell them the amount you saved.
+Navigate to `https://aistudio.google.com/spend`. Propose a monthly cap of $10. On their yes, click **Edit spend cap**, set it and save. Tell them the amount you saved.
 
 ## 5. Done
 

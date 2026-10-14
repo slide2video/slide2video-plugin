@@ -86,7 +86,7 @@ def test_check_missing_permission(monkeypatch):
         raise net.ApiError(401, '{"detail": {"status": "missing_permissions", "message": "user_read"}}', url)
     rows = keys.check(request=fake)
     assert rows[0][1] is True  # authenticated: narration still works, only the credit count is hidden
-    assert "User → Read" in rows[0][2] and "credits" in rows[0][2]
+    assert "User to Access" in rows[0][2] and "credits" in rows[0][2]
 
 
 def test_check_names_blocked_domain_behind_proxy(monkeypatch):

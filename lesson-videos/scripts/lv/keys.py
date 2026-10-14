@@ -22,7 +22,7 @@ TEMPLATE = """# lesson-videos API keys
 # Paste each key right after the = sign (no spaces, no quotes), then save and close.
 # Keep this file private. To replace a key, paste the new one over the old one.
 
-# ElevenLabs (optional, most natural narration; without it a free voice is used): https://elevenlabs.io/app/settings/api-keys
+# ElevenLabs (optional, most natural narration; without it a free voice is used): https://elevenlabs.io/app/developers/api-keys
 ELEVENLABS_API_KEY=
 
 # Gemini (optional, music and AI video clips): https://aistudio.google.com/api-keys
@@ -208,7 +208,7 @@ def check(request=None) -> list[tuple[str, bool, str]]:
             blocked = net.blocked_hint(urllib.parse.urlparse(config.ELEVEN_ROOT).netloc) if e.status == 0 else ""
             if "permission" in d:  # the key authenticated; it just can't read the account
                 rows.append(("ElevenLabs", True, f"{mask(el)}; key works, but can't show your remaining credits "
-                                                 "(to see them, edit the key at elevenlabs.io and allow User → Read)"))
+                                                 "(to see them, edit the key at elevenlabs.io and set User to Access)"))
             else:
                 hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status == 401 else str(e))
                 rows.append(("ElevenLabs", False, f"{mask(el)}; {hint}"))

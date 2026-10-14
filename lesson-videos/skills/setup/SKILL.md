@@ -50,12 +50,12 @@ If they choose the free voice, skip to step 4. If they choose ElevenLabs, explai
 - **Starter plan**: $6/month for 30,000 characters (about four videos, enough for most units) and a commercial licence. They can cancel after the unit is done.
 - One thing to read themselves: ElevenLabs' use policy (elevenlabs.io/use-policy) restricts use by government entities without authorization. A public school may count; a teacher using it personally is their own call. Don't decide for them.
 
-Then open the keys page in their browser with `LV open https://elevenlabs.io/app/settings/api-keys` and guide them:
+Then open the keys page in their browser with `LV open https://elevenlabs.io/app/developers/api-keys` and guide them:
 1. Sign up or log in.
-2. Click **Create API Key**. Name it `lesson-videos`.
-3. Under permissions, turn on **Text to Speech** (access) and **User** (read). Leave the rest off.
-4. Optional but recommended: set a **credit quota** (for example 30,000) so the key can never spend more.
-5. Click Create and **Copy** the key. It is shown only once.
+2. Click **Create Key**. Name it `lesson-videos`.
+3. Keep **Restrict Key** on. Set **Text to Speech** to **Access** and, under Administration, **User** to **Access**. Leave the rest on **No Access**.
+4. Optional but recommended: put a limit in **Per credit refresh period** (for example 30000) so the key can never spend more.
+5. Click **Create Key** and **Copy** the key. It is shown only once.
 
 ## 4. Gemini key (optional: music and AI video clips)
 
@@ -84,7 +84,7 @@ If the teacher prefers, they can click **Copy** on the website and you run `LV k
 ```
 LV keys check
 ```
-Read the result to them in plain words. "ElevenLabs: not set" is fine: the free Microsoft voice will be used. With a key, ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and allow User → Read. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
+Read the result to them in plain words. "ElevenLabs: not set" is fine: the free Microsoft voice will be used. With a key, ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and set User to Access. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
 
 ## 7. Optional: a project folder
 
