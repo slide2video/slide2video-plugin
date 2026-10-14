@@ -24,6 +24,7 @@ DEFAULT_VOICE = "cgSgspJ2msm6clMCkdW9"     # Jessica: playful, bright, warm (pre
 NARRATION_WORKERS = 2                      # the ElevenLabs free plan allows 2 concurrent requests
 EDGE_VOICE = "en-US-AvaMultilingualNeural"  # free Microsoft voice used when there is no ElevenLabs key
 EDGE_HOST = "speech.platform.bing.com"     # the free Microsoft voice's server
+SITE_URL = "https://slide2video.com"      # the website; LV_SITE_URL overrides it (tests, previews)
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 VEO_MODEL = "veo-3.1-lite-generate-preview"

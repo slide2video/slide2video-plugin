@@ -1,0 +1,67 @@
+import pytest
+
+from lv import cli, net, site
+from lv.util import UserError
+
+
+def test_site_url_defaults_to_slide2video(monkeypatch):
+    monkeypatch.delenv("LV_SITE_URL", raising=False)
+    assert site.site_url() == "https://slide2video.com"
+
+
+def test_pair_waits_for_the_code_then_stores_the_token(fake_site):
+    lines = []
+    email = site.pair(name="Test Mac", sleep=lambda s: None, out=lines.append)
+    assert email == "teacher@example.org"
+    assert site.store.get(fake_site.url) == fake_site.token
+    assert any("KQ7-4M2" in l for l in lines) and any("/devices" in l for l in lines)
+    assert not any(fake_site.token in l for l in lines)
+
+
+def test_pair_expired_code(fake_site):
+    fake_site.pair_expired = True
+    with pytest.raises(UserError) as e:
+        site.pair(name="Test Mac", sleep=lambda s: None, out=lambda s: None)
+    assert "expired" in str(e.value)
+
+
+def test_call_without_token_says_connect(fake_site):
+    with pytest.raises(UserError) as e:
+        site.call("/api/device/status")
+    assert e.value.args[0] == site.NOT_PAIRED
+
+
+def test_revoked_token_says_connect(paired):
+    site.store.set(paired.url, "s2v_revoked")
+    with pytest.raises(UserError) as e:
+        site.call("/api/device/status")
+    assert e.value.args[0] == site.NOT_PAIRED
+
+
+def test_contract_mismatch_says_update(paired):
+    paired.contract = 2
+    with pytest.raises(UserError) as e:
+        site.call("/api/device/status")
+    assert "/plugin update lesson-videos" in str(e.value)
+
+
+def test_empty_204_is_an_empty_dict(paired):
+    assert site.call("/api/device/next") == {}
+
+
+def test_cli_pair_and_status(fake_site, monkeypatch, capsys):
+    monkeypatch.setattr(site.time, "sleep", lambda s: None)
+    assert cli.main(["pair", "--name", "Test Mac"]) == 0
+    out = capsys.readouterr().out
+    assert "connected" in out and fake_site.token not in out
+    assert cli.main(["worker", "--status"]) == 0
+    assert "teacher@example.org" in capsys.readouterr().out
+
+
+def test_file_store_is_private(tmp_path, monkeypatch):
+    import os
+    s = site.FileStore()
+    s.set("https://slide2video.com", "s2v_x")
+    assert s.get("https://slide2video.com") == "s2v_x"
+    if os.name == "posix":
+        assert oct(s._file().stat().st_mode & 0o777) == "0o600"
