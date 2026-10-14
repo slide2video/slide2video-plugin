@@ -105,14 +105,15 @@ def main(argv=None) -> int:
 
 
 def _site_mode_paths_ok(args) -> None:
-    """In site mode every path argument must stay inside the lesson folder (or the plugin, to read its guide)."""
-    from . import config
-    roots = [Path.cwd().resolve(), config.PLUGIN_ROOT.resolve()]
+    """In site mode every path argument must stay inside the lesson folder (the current directory)."""
+    if os.environ.get("LESSON_VIDEOS_PROJECT"):
+        raise UserError("A lesson-videos project folder can't be used while working for slide2video.com.")
+    root = Path.cwd().resolve()
     for v in vars(args).values():
         for item in (v if isinstance(v, list) else [v]):
             if isinstance(item, Path):
                 r = item.resolve()
-                if not any(r == root or root in r.parents for root in roots):
+                if r != root and root not in r.parents:
                     raise UserError(f"{item} is outside this lesson's folder; in site mode only files in the lesson folder can be used.")
 
 

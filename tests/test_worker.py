@@ -277,3 +277,14 @@ def test_outgoing_card_is_redacted(paired, lessons):
     card = {**QUESTIONS, "message": "key sk_0123456789abcdef0123456789abcdef here"}
     assert worker.run_once(claude=_claude_writing(card)) == 0
     assert "sk_0123456789abcdef" not in paired.finished[0][1]["message"]
+
+
+def test_claude_env_hides_registered_projects(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setenv("LESSON_VIDEOS_PROJECT", "/somewhere")
+    monkeypatch.setattr(worker.subprocess, "run", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
+    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    env = seen["env"]
+    assert "LESSON_VIDEOS_PROJECT" not in env and env["LV_SITE_MODE"] == "1"
+    assert env["LESSON_VIDEOS_SETTINGS"] == str(tmp_path / "site" / "no-settings.json")
+    assert not (tmp_path / "site" / "no-settings.json").exists()

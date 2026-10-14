@@ -55,10 +55,18 @@ def claude_command(lv: str) -> list[str]:
             "--disallowedTools", "WebFetch", "WebSearch"]
 
 
+def _site_env(cwd: Path) -> dict:
+    """Claude's environment: site mode on, and no registered project folder to redirect output into."""
+    env = {k: v for k, v in os.environ.items() if k != "LESSON_VIDEOS_PROJECT"}
+    env["LV_SITE_MODE"] = "1"
+    env["LESSON_VIDEOS_SETTINGS"] = str(cwd / "site" / "no-settings.json")
+    return env
+
+
 def run_claude(cmd: list[str], cwd: Path, log: Path) -> int:
     with open(log, "w", encoding="utf-8") as f:
         return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                              env={**os.environ, "LV_SITE_MODE": "1"}, timeout=CLAUDE_TIMEOUT).returncode
+                              env=_site_env(cwd), timeout=CLAUDE_TIMEOUT).returncode
 
 
 def _reset_time(log: str, now: dt.datetime) -> dt.datetime:

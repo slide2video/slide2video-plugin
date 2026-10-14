@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 from conftest import PLUGIN
-from lv import cli, net
+from lv import cli, config, net
 
 
 def test_keys_check_without_keys(capsys):
@@ -105,7 +105,8 @@ def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("LV_SITE_MODE", "1")
     for argv in (["asset", "/etc/hosts", "x.jpg"],
                  ["render", "lesson-videos/_work/ch1", "--out", str(tmp_path / "elsewhere")],
-                 ["asset", "link.jpg", "x.jpg"]):
+                 ["asset", "link.jpg", "x.jpg"],
+                 ["asset", "site/card.json", str(config.PLUGIN_ROOT / "x.jpg")]):
         assert cli.main(argv) == 1
         assert "is outside this lesson's folder" in capsys.readouterr().err
     assert cli.main(["card", "site/card.json"]) == 0
@@ -113,3 +114,11 @@ def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     monkeypatch.delenv("LV_SITE_MODE")
     cli.main(["asset", "/etc/hosts", "x.jpg"])
     assert "is outside this lesson's folder" not in capsys.readouterr().err
+
+
+def test_site_mode_refuses_a_registered_project(monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    monkeypatch.setenv("LESSON_VIDEOS_PROJECT", str(tmp_path))
+    assert cli.main(["where"]) == 1
+    assert "project folder can't be used" in capsys.readouterr().err
