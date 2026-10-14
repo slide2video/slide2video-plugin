@@ -68,10 +68,10 @@ def serve(routes: list[tuple[str, Path]]):
 
 
 def _local_only(ctx, port: int, logs: list[str]) -> None:
-    """The page may load only what the local server serves (and data:/blob: URLs it makes itself): scenes.js is
-    written by Claude, so a fetch or image to any other address is stopped and logged. This is the second layer:
-    the browser itself has no network beyond the loopback (chromium.launch), which also stops WebSockets and WebRTC.
-    WebSockets are deliberately not routed here: a Playwright WebSocket route fakes an open socket."""
+    """Second layer (the first is chromium.launch: no network but the page server's port). Requests other than
+    http://127.0.0.1:<port>/… and the data:/blob: URLs the page makes itself are aborted and logged. WebSockets are
+    routed to a handler that only logs and never calls connect_to_server(): Playwright then answers with a fake
+    socket inside the browser, so scenes.js may see it "open" but no connection is made to any server."""
     local = f"http://127.0.0.1:{port}/"
 
     def gate(route):
@@ -82,7 +82,11 @@ def _local_only(ctx, port: int, logs: list[str]) -> None:
             logs.append(f"blocked: {url[:200]} (the page may only load its own files)")
             route.abort("blockedbyclient")
 
+    def no_socket(ws):  # log only: ws.close() here deadlocks the sync API, and nothing is connected anyway
+        logs.append(f"blocked: {ws.url[:200]} (the page may only load its own files)")
+
     ctx.route("**/*", gate)
+    ctx.route_web_socket("**/*", no_socket)
 
 
 @contextmanager
@@ -91,7 +95,7 @@ def page_for(ch: Path):
     logs: list[str] = []
     with serve(routes(paths.chapter(ch))) as port, sync_playwright() as p:
         try:
-            browser = chromium.launch(p)
+            browser = chromium.launch(p, local_port=port)
         except Exception as e:  # noqa: BLE001
             raise UserError(f"The Chromium renderer is missing or won't start ({str(e).splitlines()[0]}). Run `doctor`.") from None
         try:

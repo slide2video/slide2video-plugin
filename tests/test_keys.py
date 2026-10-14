@@ -244,3 +244,11 @@ def test_paste_without_clipboard_points_cowork_users_to_keys_load():
     with pytest.raises(keys.UserError) as e:
         keys.paste("elevenlabs", run=no_tool, platform="linux")
     assert "keys load" in str(e.value)
+
+
+def test_redact_hides_anthropic_tokens():
+    from lv import keys as k
+    tok = "sk-ant-oat01-AbCdEfGhIjKlMnOpQrStUvWxYz_0123-4567"
+    out = k.redact(f"login failed with {tok} at 3pm")
+    assert tok not in out and "sk-ant-" not in out and out.endswith("at 3pm")
+    assert k.redact("sk-ant-short") == "sk-ant-short"  # too short to be a token

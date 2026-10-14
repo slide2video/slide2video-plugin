@@ -1,3 +1,6 @@
+import contextlib
+from contextlib import contextmanager
+
 import pytest
 
 from conftest import HELLO_JS
@@ -109,13 +112,11 @@ def _lan_ip():
     return None if ip.startswith("127.") else ip
 
 
-def test_browser_itself_reaches_only_the_local_page_server(browser_ok):
-    """The browser layer alone (no Playwright routes): 127.0.0.1 works; this Mac's own network address, an IP
-    literal, a host name and a WebSocket all fail. The LAN server counts hits, so this needs no internet."""
+@contextmanager
+def _counting_server(host="127.0.0.1"):
+    """A server that records every request path (WebSocket handshakes included) and answers a small page."""
     import http.server
     import threading
-    from playwright.sync_api import sync_playwright
-    from lv import chromium
     hits = []
 
     class H(http.server.BaseHTTPRequestHandler):
@@ -131,46 +132,60 @@ def test_browser_itself_reaches_only_the_local_page_server(browser_ok):
 
         def log_message(self, *a):
             pass
-    srv = http.server.ThreadingHTTPServer(("0.0.0.0", 0), H)
-    port = srv.server_address[1]
+    srv = http.server.ThreadingHTTPServer((host, 0), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    lan = _lan_ip()
     try:
-        with sync_playwright() as p:
-            browser = chromium.launch(p)
-            try:
-                pg = browser.new_page()
-                pg.goto(f"http://127.0.0.1:{port}/page")
-                assert hits == ["/page"]
-                probe = """async (url) => { try { await fetch(url); return 'reached'; } catch (e) { return 'failed'; } }"""
-                for url in ([f"http://{lan}:{port}/lan"] if lan else []) + ["http://93.184.216.34/", "http://example.com/"]:
-                    assert pg.evaluate(probe, url) == "failed", url
-                ws_urls = ([f"ws://{lan}:{port}/ws"] if lan else []) + ["ws://example.com/"]
-                states = pg.evaluate("""async (urls) => {
-                    const out = [];
-                    for (const u of urls) {
-                        const ws = new WebSocket(u); let opened = false;
-                        ws.onopen = () => { opened = true; };
-                        await new Promise(r => setTimeout(r, 1500));
-                        out.push(opened || ws.readyState === 1 ? 'open' : 'never opened');
-                    }
-                    return out; }""", ws_urls)
-                assert states == ["never opened"] * len(ws_urls)
-                assert hits == ["/page"]  # nothing but the page itself reached the server
-            finally:
-                browser.close()
+        yield srv.server_address[1], hits
     finally:
         srv.shutdown()
         srv.server_close()
 
 
-def test_rendering_page_websocket_never_opens(make_chapter, fake_speak, browser_ok):
-    js = ("window.__ws = new WebSocket('ws://example.com/'); window.__wsOpened = false;\n"
-          "window.__ws.onopen = () => { window.__wsOpened = true; };\n" + HELLO_JS)
-    ch = make_chapter([{"id": "hello", "min": 1}], js)
-    narrate.narrate(ch, speak_fn=fake_speak)
-    page.ensure_page(ch)
-    with render.page_for(ch) as (pg, logs):
-        pg.wait_for_timeout(1500)
-        assert pg.evaluate("window.__wsOpened") is False
-        assert pg.evaluate("window.__ws.readyState") != 1
+PROBE = """async ([fetches, sockets]) => {
+    const out = {};
+    for (const u of fetches) { try { await fetch(u); out[u] = 'reached'; } catch (e) { out[u] = 'failed'; } }
+    for (const u of sockets) { try { new WebSocket(u); } catch (e) {} }
+    await new Promise(r => setTimeout(r, 1500));
+    return out; }"""
+
+
+def test_browser_itself_reaches_only_the_local_page_server(browser_ok):
+    """The browser layer alone (no Playwright routes): the page server's port works; another service on this Mac's
+    loopback, this Mac's own network address, an IP literal and a host name are all unreachable, by fetch or
+    WebSocket. The servers count hits, so this needs no internet."""
+    from playwright.sync_api import sync_playwright
+    from lv import chromium
+    lan_ip = _lan_ip()
+    with _counting_server() as (port, page_hits), _counting_server() as (other, other_hits), \
+            (_counting_server(lan_ip) if lan_ip else contextlib.nullcontext((None, []))) as (lan_port, lan_hits):
+        with sync_playwright() as p:
+            browser = chromium.launch(p, local_port=port)
+            try:
+                pg = browser.new_page()
+                pg.goto(f"http://127.0.0.1:{port}/page")
+                fetches = [f"http://127.0.0.1:{other}/f", f"http://localhost:{other}/f", "http://93.184.216.34/",
+                           "http://example.com/"] + ([f"http://{lan_ip}:{lan_port}/f"] if lan_ip else [])
+                sockets = [f"ws://127.0.0.1:{other}/ws", f"ws://localhost:{other}/ws", "ws://example.com/"] + \
+                          ([f"ws://{lan_ip}:{lan_port}/ws"] if lan_ip else [])
+                got = pg.evaluate(PROBE, [fetches, sockets])
+                assert set(got.values()) == {"failed"}, got
+            finally:
+                browser.close()
+        assert page_hits == ["/page"] and other_hits == [] and lan_hits == []
+
+
+def test_rendering_page_cannot_reach_other_local_services(make_chapter, fake_speak, browser_ok):
+    with _counting_server() as (other, other_hits):
+        js = (f"new WebSocket('ws://127.0.0.1:{other}/ws'); new WebSocket('ws://localhost:{other}/ws');\n"
+              f"fetch('http://127.0.0.1:{other}/f').catch(() => {{}});\n"
+              f"new WebSocket('ws://example.com/');\n" + HELLO_JS)
+        ch = make_chapter([{"id": "hello", "min": 1}], js)
+        narrate.narrate(ch, speak_fn=fake_speak)
+        page.ensure_page(ch)
+        with render.page_for(ch) as (pg, logs):
+            pg.wait_for_timeout(1500)
+            blocked = [l for l in logs if l.startswith("blocked:")]
+        assert other_hits == []
+        for url in (f"ws://127.0.0.1:{other}/ws", f"ws://localhost:{other}/ws", f"http://127.0.0.1:{other}/f",
+                    "ws://example.com/"):
+            assert any(url in l for l in blocked), (url, blocked)

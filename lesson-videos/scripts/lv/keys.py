@@ -29,7 +29,7 @@ ELEVENLABS_API_KEY=
 GEMINI_API_KEY=
 """
 _PLACEHOLDER = re.compile(r"^(|x+|changeme|your[-_ ].*|<.*>|\.\.\.)$", re.I)
-_SHAPES = re.compile(r"(AIza[0-9A-Za-z_\-]{10,}|sk_[A-Za-z0-9]{16,}|xi-[A-Za-z0-9]{8,})")
+_SHAPES = re.compile(r"(AIza[0-9A-Za-z_\-]{10,}|sk-ant-[A-Za-z0-9_-]{20,}|sk_[A-Za-z0-9]{16,}|xi-[A-Za-z0-9]{8,})")
 SERVICES = {"elevenlabs": "ELEVENLABS_API_KEY", "gemini": "GEMINI_API_KEY"}
 NAMES = {"ELEVENLABS_API_KEY": "ElevenLabs", "GEMINI_API_KEY": "Gemini"}
 _KEY = {"ELEVENLABS_API_KEY": r"sk_[A-Za-z0-9]{16,}", "GEMINI_API_KEY": r"AIza[0-9A-Za-z_\-]{30,}"}

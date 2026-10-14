@@ -119,5 +119,7 @@ def test_site_mode_plans_only_after_the_interview():
     row = next(l for l in site.splitlines() if l.startswith("| `answer`"))
     assert "for every case" not in row
     assert "Otherwise (`interview.md` exists or was just written in this turn), step 4" in row
+    assert "then leave the flagged slides out everywhere" not in row
+    assert "if the decision is `remove`, leave the flagged slides out everywhere" in row
     start = next(l for l in site.splitlines() if l.startswith("| `start`"))
     assert "don't write `brief.md` yet" in start
