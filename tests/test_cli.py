@@ -81,3 +81,12 @@ def test_keys_load_reports_nothing_found(tmp_path, capsys):
     f.write_text("nothing here\n", encoding="utf-8")
     assert cli.main(["keys", "load", str(f)]) == 1
     assert "No keys found" in capsys.readouterr().out
+
+
+def test_site_mode_refuses_risky_commands(monkeypatch, capsys):
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    for argv in (["open", "https://x"], ["keys", "load", "f"], ["pair"], ["worker"]):
+        assert cli.main(argv) == 1
+        assert "isn't available while working for slide2video.com" in capsys.readouterr().err
+    cli.main(["keys", "check"])
+    assert "isn't available while working" not in capsys.readouterr().err

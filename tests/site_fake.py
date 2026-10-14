@@ -13,6 +13,7 @@ class FakeSite:
     def __init__(self):
         self.turns, self.files, self.uploads, self.finished, self.heartbeats = [], {}, {}, [], []
         self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 1
+        self.fail_uploads = False
         self.token = "s2v_test-token-0123456789"
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -65,6 +66,8 @@ class FakeSite:
                         site.heartbeats.append((tid, json.loads(self._body())["progress"]))
                         return self._send(204)
                     if action == "files" and method == "PUT":
+                        if site.fail_uploads:
+                            return self._send(500, {"error": "boom"})
                         path = urllib.parse.parse_qs(u.query)["path"][0]
                         site.uploads[path] = (self.headers.get("Content-Type"), self._body())
                         return self._send(201, {"id": "fil_up"})

@@ -152,11 +152,11 @@ def test_invalid_card_is_an_error(paired, lessons):
 
 def test_usage_limit_sets_retry_after():
     now = dt.datetime(2026, 10, 14, 10, 0, tzinfo=dt.timezone(dt.timedelta(hours=-7)))
-    card = worker.error_card("Claude stopped.", "5-hour limit reached ∙ resets 3pm\n", now=now)
+    card = worker.error_card("Claude stopped.", "5-hour limit reached ∙ resets 3pm\n", now=now, detect_limit=True)
     assert card["retry_after"] == "2026-10-14T15:00:00-07:00" and "usage limit" in card["message"]
     later = now.replace(hour=16)
-    assert worker.error_card("x", "limit reached ∙ resets 3pm", now=later)["retry_after"].startswith("2026-10-15T15:00")
-    assert worker.error_card("x", "some other failure", now=now)["retry_after"] is None
+    assert worker.error_card("x", "5-hour limit reached ∙ resets 3pm", now=later, detect_limit=True)["retry_after"].startswith("2026-10-15T15:00")
+    assert worker.error_card("x", "some other failure", now=now, detect_limit=True)["retry_after"] is None
 
 
 def test_delete_turn_removes_the_folder_without_claude(paired, lessons):
@@ -207,3 +207,73 @@ def test_claude_command_limits_tools(monkeypatch):
     i = cmd.index("--disallowedTools")
     assert cmd[i + 1:] == ["WebFetch", "WebSearch"]
     assert not any(t.startswith("Bash") and t != 'Bash("/usr/bin/uv" run "/p/lesson-videos.py":*)' for t in cmd)
+    for bare in ("Read", "Write", "Edit"):
+        assert bare not in cmd
+    assert {"Read(./**)", "Edit(./**)", "Write(./**)", "Glob", "Grep"} <= set(cmd)
+    plugin = str(worker.config.PLUGIN_ROOT).lstrip("/")
+    assert f"Read(//{plugin}/**)" in cmd
+
+
+def test_site_mode_env_is_set_for_claude(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return type("R", (), {"returncode": 0})()
+    monkeypatch.setattr(worker.subprocess, "run", fake_run)
+    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    assert seen["env"]["LV_SITE_MODE"] == "1"
+
+
+def test_missing_deck_download_still_finishes_with_error(paired, lessons):
+    paired.turns.append(_turn())  # no file on the site, no local copy
+    assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 1
+    assert paired.finished[0][1]["kind"] == "error"
+
+
+def test_upload_failure_still_finishes_with_error(paired, lessons):
+    paired.fail_uploads = True
+    paired.turns.append(_turn("approve"))
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(REVIEW, also=_chapter)) == 1
+    assert paired.finished[0][1]["kind"] == "error"
+
+
+def test_invalid_card_error_is_valid_and_short(paired, lessons):
+    from lv import contract
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    card = {"contract": 1, "kind": "plan", "message": "x", "markdown": "m" * 20001}
+    assert worker.run_once(claude=_claude_writing(card)) == 1
+    sent = paired.finished[0][1]
+    assert contract.problems("card", sent) == [] and "problems at" in sent["message"]
+
+
+def test_other_service_limit_is_not_a_claude_usage_limit(paired, lessons):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    bad = {"contract": 1, "kind": "plan", "message": "x"}
+    assert worker.run_once(claude=_claude_writing(bad, log="ElevenLabs character limit reached\n")) == 1
+    sent = paired.finished[0][1]
+    assert sent["retry_after"] is None and "usage limit" not in sent["message"]
+
+
+def test_claude_stopped_with_limit_keeps_original_message():
+    card = worker.error_card("Claude stopped.", "5-hour limit reached ∙ resets 3pm", detect_limit=True)
+    assert "usage limit" in card["message"] and card["message"].endswith("Claude stopped.")
+
+
+def test_card_naming_the_log_is_an_error(paired, lessons):
+    paired.turns.append(_turn("approve"))
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    card = {**REVIEW, "video": "site/claude.log"}
+    assert worker.run_once(claude=_claude_writing(card, also=_chapter)) == 1
+    assert paired.uploads == {} and paired.finished[0][1]["kind"] == "error"
+
+
+def test_outgoing_card_is_redacted(paired, lessons):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    card = {**QUESTIONS, "message": "key sk_0123456789abcdef0123456789abcdef here"}
+    assert worker.run_once(claude=_claude_writing(card)) == 0
+    assert "sk_0123456789abcdef" not in paired.finished[0][1]["message"]

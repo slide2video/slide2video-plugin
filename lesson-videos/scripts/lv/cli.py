@@ -106,6 +106,9 @@ def main(argv=None) -> int:
 
 def dispatch(args) -> int:
     from . import keys
+    if os.environ.get("LV_SITE_MODE") == "1" and (
+            args.cmd in ("open", "pair", "worker", "init") or (args.cmd == "keys" and args.action != "check")):
+        raise UserError(f"{args.cmd} isn't available while working for slide2video.com.")
     if args.cmd == "doctor":
         from . import doctor
         return doctor.run_doctor(args.no_keys)

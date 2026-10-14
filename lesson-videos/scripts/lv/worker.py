@@ -21,7 +21,8 @@ HEARTBEAT = 60                 # seconds between lease renewals
 CLAUDE_TIMEOUT = 3 * 3600      # one turn never runs longer than this
 CONTENT_TYPES = {".mp4": "video/mp4", ".vtt": "text/vtt", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                  ".png": "image/png", ".json": "application/json"}
-LIMIT = re.compile(r"(usage limit|limit reached|out of (?:extra )?usage)", re.I)
+LIMIT = re.compile(r"(?:5-hour|weekly|usage|session) limit (?:reached|hit)|Claude usage limit", re.I)
+LIMIT_SUFFIX = {".mp4": "video", ".vtt": "captions", ".jpg": "stills", ".jpeg": "stills", ".png": "stills"}
 RESET = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", re.I)
 
 
@@ -48,14 +49,16 @@ def claude_command(lv: str) -> list[str]:
     if not claude:
         raise UserError("Claude Code isn't installed on this Mac (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
-    return [claude, "-p", PROMPT, "--allowedTools", f"Bash({lv}:*)", "Read", "Write", "Edit", "Glob", "Grep",
+    plugin = str(config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
+    return [claude, "-p", PROMPT, "--allowedTools", f"Bash({lv}:*)", "Read(./**)", f"Read(//{plugin}/**)",
+            "Edit(./**)", "Write(./**)", "Glob", "Grep",
             "--disallowedTools", "WebFetch", "WebSearch"]
 
 
 def run_claude(cmd: list[str], cwd: Path, log: Path) -> int:
     with open(log, "w", encoding="utf-8") as f:
         return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                              timeout=CLAUDE_TIMEOUT).returncode
+                              env={**os.environ, "LV_SITE_MODE": "1"}, timeout=CLAUDE_TIMEOUT).returncode
 
 
 def _reset_time(log: str, now: dt.datetime) -> dt.datetime:
@@ -67,11 +70,13 @@ def _reset_time(log: str, now: dt.datetime) -> dt.datetime:
     return t if t > now else t + dt.timedelta(days=1)
 
 
-def error_card(message: str, log: str, now=None) -> dict:
+def error_card(message: str, log: str, now=None, detect_limit: bool = False) -> dict:
+    message = keys.redact(message)[:2000]
     card = {"contract": contract.VERSION, "kind": "error", "message": message,
             "log_tail": keys.redact("\n".join(log.splitlines()[-40:]))[:20000], "retry_after": None}
-    if LIMIT.search(log):
-        card["message"] = "Your Claude plan's usage limit was reached; this continues automatically when it resets."
+    if detect_limit and LIMIT.search(log):
+        card["message"] = ("Your Claude plan's usage limit was reached; this continues automatically when it resets. "
+                           + message)[:2000]
         card["retry_after"] = _reset_time(log, now or dt.datetime.now().astimezone()).isoformat()
     return card
 
@@ -161,10 +166,10 @@ def _next_version(folder: Path, chapter: int) -> int:
     return d[str(chapter)]
 
 
-def _inside(folder: Path, rel: str) -> Path:
+def _inside(folder: Path, rel: str, field: str) -> Path:
     p = (folder / rel).resolve()
-    if folder.resolve() not in p.parents or not p.is_file():
-        raise UserError(f"The card names {rel!r}, which isn't a file in this lesson's folder.")
+    if (folder / "lesson-videos").resolve() not in p.parents or not p.is_file() or LIMIT_SUFFIX.get(p.suffix.lower()) != field:
+        raise UserError(f"The card names {rel!r}, which isn't a {field} file in this lesson's lesson-videos folder.")
     return p
 
 
@@ -172,7 +177,7 @@ def _publish(card: dict, folder: Path, turn_id: str) -> dict:
     """Upload what a review card names and point the card at the uploaded copies (out/chN/vK/…)."""
     if card["kind"] != "review":
         return card
-    local = {k: _inside(folder, card[k]) for k in ("video", "captions", "stills") if card.get(k)}
+    local = {k: _inside(folder, card[k], k) for k in ("video", "captions", "stills") if card.get(k)}
     ch = card["chapter"]
     card = {**card, "version": _next_version(folder, ch)}
     base = f"out/ch{ch}/v{card['version']}"
@@ -186,7 +191,18 @@ def _publish(card: dict, folder: Path, turn_id: str) -> dict:
     return card
 
 
+def _redacted(v):
+    if isinstance(v, str):
+        return keys.redact(v)
+    if isinstance(v, list):
+        return [_redacted(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _redacted(x) for k, x in v.items()}
+    return v
+
+
 def _finish(turn_id: str, card: dict) -> None:
+    card = _redacted(card)
     site.call(f"/api/device/turns/{turn_id}/finish", card)
 
 
@@ -207,32 +223,40 @@ def _run_turn(turn: dict, claude, out) -> int:
     (sitedir / "card.json").unlink(missing_ok=True)
     write_text(sitedir / "progress.txt", "Starting\n")
     log = sitedir / "claude.log"
+    beat = _Heartbeat(tid, sitedir / "progress.txt")
+    beat.start()
     try:
         _fetch_inputs(turn, folder)
         write_json(sitedir / "turn.json", turn)
         lv = lv_command()
         write_text(sitedir / "lv.txt", lv + "\n")
-        beat = _Heartbeat(tid, sitedir / "progress.txt")
-        beat.start()
-        try:
-            code = claude(claude_command(lv), folder, log)
-        finally:
-            beat.done.set()
         card_file = sitedir / "card.json"
+        code = claude(claude_command(lv), folder, log)
         if code != 0 or not card_file.exists():
-            card = error_card("Claude stopped before it finished this step.", _log_text(log))
+            card = error_card("Claude stopped before it finished this step.", _log_text(log), detect_limit=True)
         else:
             card = read_json(card_file)
             bad = contract.problems("card", card)
-            card = (error_card("Claude's reply couldn't be read: " + "; ".join(bad[:3]), _log_text(log)) if bad
-                    else _publish(card, folder, tid))
+            if bad:
+                where = sorted({m.split(":")[0].strip() for m in bad})[:6]
+                card = error_card("Claude's reply couldn't be read (problems at: " + ", ".join(where) + ")", _log_text(log))
+            else:
+                card = _publish(card, folder, tid)
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
     except ValueError as e:  # card.json that isn't JSON
         card = error_card(f"Claude's reply couldn't be read: {e}", _log_text(log))
     except UserError as e:
         card = error_card(str(e), _log_text(log))
-    _finish(tid, card)
+    except Exception as e:  # noqa: BLE001  site or disk failure: still answer the turn if we can
+        card = error_card(f"This step failed on the Mac: {e}", _log_text(log))
+    finally:
+        beat.done.set()
+    try:
+        _finish(tid, card)
+    except Exception as e:  # noqa: BLE001
+        out(f"Couldn't send the result back: {keys.redact(str(e))[:200]}")
+        return 1
     out(f"Sent back: {card['kind']}. {card['message']}")
     return 1 if card["kind"] == "error" else 0
 
