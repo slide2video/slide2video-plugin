@@ -1,0 +1,4 @@
+{"duration": 161.2,
+ "scenes": [{"id": "hook", "start": 0, "dur": 15.2, "label": "Hook", "first_words": "Where does rain come from?"},
+            {"id": "condensation", "start": 15.2, "dur": 22.4, "label": "Condensation",
+             "first_words": "When warm, moist air rises"}]}

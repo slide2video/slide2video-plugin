@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slide2video.com/contract/1/turn.schema.json",
+  "title": "A turn: what the teacher sent, for the Mac",
+  "type": "object",
+  "required": ["contract", "lesson", "turn", "files"],
+  "properties": {
+    "contract": {"const": 1},
+    "lesson": {
+      "type": "object",
+      "required": ["id", "title"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^les_[0-9A-Za-z]{22}$"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 200}
+      }
+    },
+    "turn": {
+      "type": "object",
+      "required": ["id", "seq", "kind"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^trn_[0-9A-Za-z]{22}$"},
+        "seq": {"type": "integer", "minimum": 1},
+        "kind": {"enum": ["start", "answer", "approve", "change", "continue", "feedback", "revise", "delete"]},
+        "lease_seconds": {"type": "integer", "minimum": 60}
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind", "sha256", "size", "path"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^fil_[0-9A-Za-z]{22}$"},
+          "name": {"type": "string", "minLength": 1, "maxLength": 200},
+          "kind": {"enum": ["deck", "extra"]},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size": {"type": "integer", "minimum": 0},
+          "path": {"type": "string", "pattern": "^in/[^/\\\\.][^/\\\\]*$"}
+        }
+      }
+    },
+    "instructions": {"type": ["string", "null"], "maxLength": 4000},
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["question", "choice"],
+        "properties": {
+          "question": {"type": "string", "maxLength": 32},
+          "choice": {"type": ["string", "null"], "maxLength": 120},
+          "other": {"type": ["string", "null"], "maxLength": 2000}
+        }
+      }
+    },
+    "feedback": {"type": ["string", "null"], "maxLength": 4000},
+    "notes": {"type": "array"},
+    "delete": {"type": "boolean"}
+  }
+}

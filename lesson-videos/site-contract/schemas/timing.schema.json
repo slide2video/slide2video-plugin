@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slide2video.com/contract/1/timing.schema.json",
+  "title": "Scene timing of one video version, for the player's scene marks",
+  "type": "object",
+  "required": ["duration", "scenes"],
+  "properties": {
+    "duration": {"type": "number", "minimum": 0},
+    "scenes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "start", "dur"],
+        "properties": {
+          "id": {"type": "string"},
+          "start": {"type": "number", "minimum": 0},
+          "dur": {"type": "number", "minimum": 0},
+          "label": {"type": "string"},
+          "first_words": {"type": "string"}
+        }
+      }
+    }
+  }
+}

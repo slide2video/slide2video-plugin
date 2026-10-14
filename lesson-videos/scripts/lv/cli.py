@@ -67,6 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("clip", type=Path)
     f.add_argument("dest", type=Path)
     f.add_argument("--max", type=int)
+    cd = sub.add_parser("card", help="check a site-mode card (site/card.json) before stopping")
+    cd.add_argument("file", type=Path)
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -134,6 +136,17 @@ def dispatch(args) -> int:
         for name, good, msg in rows:
             print(f"{'✓' if good else '✗'} {name}: {msg}")
         return 0 if all(good for _, good, _ in rows) else 1
+    if args.cmd == "card":
+        from . import contract
+        from .util import read_json
+        try:
+            obj = read_json(args.file)
+        except (OSError, ValueError) as e:
+            print(f"{args.file}: not readable JSON ({e})")
+            return 1
+        bad = contract.problems("card", obj)
+        print("card ok" if not bad else "\n".join(bad))
+        return 0 if not bad else 1
     if args.cmd == "open":
         import webbrowser
         webbrowser.open(args.url)
