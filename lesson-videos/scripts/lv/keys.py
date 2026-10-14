@@ -130,8 +130,8 @@ def clipboard_commands(platform: str = sys.platform) -> tuple[list[str], list[st
     return ["xclip", "-o", "-selection", "clipboard"], ["xclip", "-i", "-selection", "clipboard"]
 
 
-def paste(service: str, run=subprocess.run, platform: str = sys.platform) -> str:
-    """Save the key on the clipboard for `service`, then clear the clipboard. Returns the variable name."""
+def paste(service: str, run=subprocess.run, platform: str = sys.platform) -> tuple[str, bool]:
+    """Save the key on the clipboard for `service`, then clear the clipboard. Returns (variable name, cleared)."""
     var = SERVICES[service]
     label = f"{'an' if service == 'elevenlabs' else 'a'} {NAMES[var]} key"
     read, clear = clipboard_commands(platform)
@@ -146,10 +146,19 @@ def paste(service: str, run=subprocess.run, platform: str = sys.platform) -> str
                         "then try again.")
     store(var, value)
     try:
-        run(clear, input="", capture_output=True, encoding="utf-8", errors="replace", timeout=10)
+        cleared = run(clear, input="", capture_output=True, encoding="utf-8", errors="replace", timeout=10).returncode == 0
     except (OSError, subprocess.TimeoutExpired):
-        pass
-    return var
+        cleared = False
+    return var, cleared
+
+
+def _decode(data: bytes) -> str:
+    """UTF-8, or UTF-16 (what Notepad's "Unicode" saves), with or without its byte-order mark."""
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16", errors="replace")
+    if len(data) > 1 and data.count(0) * 3 > len(data):
+        return data.decode("utf-16-le" if data[1] == 0 else "utf-16-be", errors="replace")
+    return data.decode("utf-8", errors="replace")
 
 
 def _texts(path: Path) -> list[str]:
@@ -157,8 +166,8 @@ def _texts(path: Path) -> list[str]:
     data = path.read_bytes()
     if zipfile.is_zipfile(io.BytesIO(data)):
         with zipfile.ZipFile(io.BytesIO(data)) as z:
-            return [z.read(i).decode("utf-8", errors="replace") for i in z.infolist() if not i.is_dir()]
-    return [data.decode("utf-8", errors="replace")]
+            return [_decode(z.read(i)) for i in z.infolist() if not i.is_dir()]
+    return [_decode(data)]
 
 
 def load(path: Path) -> list[str]:
@@ -169,7 +178,7 @@ def load(path: Path) -> list[str]:
     found = []
     for text in _texts(path):
         for var, shape in _KEY.items():
-            m = re.search(rf"{var}\s*=\s*[\"']?({shape})", text)
+            m = re.search(rf"{var}\s*=\s*[\"'\u201c\u201d\u2018\u2019]?({shape})", text)
             if m and var not in found and not _PLACEHOLDER.match(m.group(1)):
                 store(var, m.group(1))
                 found.append(var)

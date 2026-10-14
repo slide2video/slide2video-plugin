@@ -106,8 +106,11 @@ def dispatch(args) -> int:
         if args.action == "paste":
             if args.target not in keys.SERVICES:
                 raise UserError("Say which key: `keys paste elevenlabs` or `keys paste gemini`.")
-            stored = [keys.paste(args.target)]
-            print(f"Saved the {keys.NAMES[stored[0]]} key and cleared the clipboard.")
+            var, cleared = keys.paste(args.target)
+            stored = [var]
+            print(f"Saved the {keys.NAMES[var]} key and cleared the clipboard." if cleared else
+                  f"Saved the {keys.NAMES[var]} key, but couldn't clear the clipboard: copy something else "
+                  "so the key isn't pasted somewhere by accident.")
         elif args.action == "load":
             if not args.target:
                 raise UserError("Give the attached keys file: `keys load <file>`.")

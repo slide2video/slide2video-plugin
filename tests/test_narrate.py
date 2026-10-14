@@ -46,6 +46,16 @@ def test_no_speech_makes_silence(make_chapter, fake_speak):
     assert abs(tools.duration(ch / "build/narration.mp3") - 2) < 0.15
 
 
+def test_no_speech_names_no_voice(make_chapter, monkeypatch, capsys):
+    from lv import voices
+    def down(*a):
+        raise voices.VoiceUnavailable("offline")
+    monkeypatch.setitem(voices.SPEAKERS, "edge", down)
+    narrate.narrate(make_chapter([{"id": "only", "min": 2}]))
+    out = capsys.readouterr().out
+    assert "Microsoft" not in out and "voice: none" in out
+
+
 def test_quota_error_keeps_finished_scenes(make_chapter, fake_speak):
     ch = make_chapter([{"id": f"s{i}", "say": f"Scene number {i}."} for i in range(4)])
     def flaky(text, voice, out):

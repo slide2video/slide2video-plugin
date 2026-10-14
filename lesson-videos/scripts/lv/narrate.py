@@ -176,7 +176,8 @@ def _narrate(p: paths.ChapterPaths, spec: dict, provider: str, speak_fn, workers
     T["narrator"] = provider
     write_text(p.build / "timing.js", "window.TIMING = " + json.dumps(T) + ";\n")
     narration_track(p.code, T)
-    print(f"voice: {voices.LABELS[provider]}", flush=True)
+    print(f"voice: {voices.LABELS[provider]}" if files or silent else "voice: none (no narration in this chapter)",
+          flush=True)
     return T
 
 
