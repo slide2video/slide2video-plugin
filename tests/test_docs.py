@@ -44,3 +44,12 @@ def test_key_skills_send_cowork_users_to_the_keys_file():
     for name in ("elevenlabs-get-api-key", "google-get-api-key"):
         text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
         assert "Cowork" in text and "keys-file.md" in text
+
+
+def test_cowork_troubleshooting_quotes_the_real_blocked_message(monkeypatch):
+    from lv import net
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+    said = net.blocked_hint("speech.platform.bing.com")
+    guide = (PLUGIN / "docs" / "install" / "cowork.md").read_text(encoding="utf-8")
+    quoted = guide.split("## Troubleshooting", 1)[1].split('"')[1].split("…")[0].strip()
+    assert quoted and said.startswith(quoted)

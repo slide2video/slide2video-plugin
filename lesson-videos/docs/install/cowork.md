@@ -42,7 +42,7 @@ The first few minutes go to setting up the cloud computer. Then Claude works the
 
 | Problem | Fix |
 |---|---|
-| "blocked by Claude's network setting … add *website*" | Do step 2 for that website, then start a **new** chat. |
+| "can't be reached … add *website* and start a new chat" | Do step 2 for that website, then start a **new** chat. If you already added it, the service may be down: try again later. |
 | "No keys found in that file" | Check each key is right after its `=` sign, save, zip the file again and attach the .zip. See [the keys file](../keys/keys-file.md). |
 | Claude says it could see your keys | You attached the keys file without zipping it. Delete those keys on the websites, make new ones, and attach them zipped next time. |
 | Chromium or renderer errors | Type `/lesson-videos:setup` in the same chat; it reinstalls the renderer. |
