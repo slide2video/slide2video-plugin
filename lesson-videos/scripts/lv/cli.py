@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -15,8 +16,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
     d = sub.add_parser("doctor", help="install and check everything, then render a 3-second test video")
     d.add_argument("--no-keys", action="store_true", help="skip the API key checks (for CI)")
-    k = sub.add_parser("keys", help="open the keys file; `keys check` tests the keys")
-    k.add_argument("action", nargs="?", choices=["open", "check"], default="open")
+    k = sub.add_parser("keys", help="open the keys file; `keys check` tests them; `keys paste elevenlabs|gemini` "
+                                    "saves the key on the clipboard; `keys load FILE` imports a keys file (or .zip)")
+    k.add_argument("action", nargs="?", choices=["open", "check", "paste", "load"], default="open")
+    k.add_argument("target", nargs="?", help="paste: elevenlabs or gemini; load: the keys file")
     ini = sub.add_parser("init", help="optional: keep lessons in a project folder (text there, videos and paid media "
                                       "in a results folder)")
     ini.add_argument("--path", type=Path, required=True)
@@ -100,15 +103,34 @@ def dispatch(args) -> int:
         from . import doctor
         return doctor.run_doctor(args.no_keys)
     if args.cmd == "keys":
-        if args.action == "check":
-            rows = keys.check()
-            for name, good, msg in rows:
-                print(f"{'✓' if good else '✗'} {name}: {msg}")
-            return 0 if all(good for _, good, _ in rows) else 1
-        f = keys.ensure_file()
-        keys.open_in_editor(f)
-        print(f"Opened {f}. Paste the keys after the = signs, save, close the editor, then run `keys check`.")
-        return 0
+        if args.action == "paste":
+            if args.target not in keys.SERVICES:
+                raise UserError("Say which key: `keys paste elevenlabs` or `keys paste gemini`.")
+            stored = [keys.paste(args.target)]
+            print(f"Saved the {keys.NAMES[stored[0]]} key and cleared the clipboard.")
+        elif args.action == "load":
+            if not args.target:
+                raise UserError("Give the attached keys file: `keys load <file>`.")
+            stored = keys.load(Path(args.target))
+            if not stored:
+                print("No keys found in that file. Check each key is pasted right after its = sign, then attach it again.")
+                return 1
+            print("Saved: " + ", ".join(keys.NAMES[v] for v in stored) + ".")
+        elif args.action == "check":
+            stored = list(keys.VARS)
+        else:
+            f = keys.ensure_file()
+            keys.open_in_editor(f)
+            print(f"Opened {f}. Paste the keys after the = signs, save, close the editor, then run `keys check`.")
+            return 0
+        for var in stored:
+            if os.environ.get(var, "").strip() and args.action != "check":
+                print(f"note: {var} is also set in this computer's environment, and that value is used instead.")
+        names = {keys.NAMES[v] for v in stored}
+        rows = [r for r in keys.check() if r[0] in names]
+        for name, good, msg in rows:
+            print(f"{'✓' if good else '✗'} {name}: {msg}")
+        return 0 if all(good for _, good, _ in rows) else 1
     if args.cmd == "open":
         import webbrowser
         webbrowser.open(args.url)

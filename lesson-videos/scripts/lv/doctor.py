@@ -5,7 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import config, keys, narrate, render, sfx, tools, voices
+from . import chromium, config, keys, narrate, render, sfx, tools, voices
 from .util import UserError, write_json, write_text
 
 TEST_SCENES = ("scene('hello', (g, t, s) => Engine.titleCard(g, t, s, { kicker: 'lesson-videos', title: 'It *works*!', "
@@ -28,8 +28,11 @@ def test_render() -> float:
 
 def narration_summary() -> str:
     """Which voices work right now. Never a failure: captions-only always works."""
+    from . import net
     parts = ["ElevenLabs (key set)"] if keys.get("ELEVENLABS_API_KEY", required=False) else []
-    for provider, works, fails in (("edge", "free Microsoft voice works", "free Microsoft voice unavailable right now"),
+    hint = net.blocked_hint(config.EDGE_HOST)
+    edge_down = f"free Microsoft voice {hint}" if hint else "free Microsoft voice unavailable right now"
+    for provider, works, fails in (("edge", "free Microsoft voice works", edge_down),
                                    ("system", "computer's own voice works", "no computer voice")):
         try:
             voices.probe(provider)
@@ -51,9 +54,7 @@ def run_doctor(no_keys: bool = False, install: bool = True) -> int:
     except UserError as e:
         bad("ffmpeg", str(e))
     try:
-        if install:
-            tools.install_chromium()
-        ok("Chromium renderer", "ready")
+        ok("Chromium renderer", chromium.ensure() if install else "ready")
     except UserError as e:
         bad("Chromium renderer", str(e))
     missing = [f for f in config.FONT_FILES if not (config.FONTS_DIR / f).exists()]

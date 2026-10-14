@@ -81,4 +81,4 @@ def test_missing_tts_permission_says_how_to_fix(make_chapter):
         raise net.ApiError(401, '{"detail": {"status": "missing_permissions", "message": "The API key you used is missing the permission text_to_speech"}}', "https://api.elevenlabs.io/v1/x")
     with pytest.raises(UserError) as e:
         narrate.narrate(ch, speak_fn=denied)
-    assert "Text to Speech" in str(e.value) and "elevenlabs.io/app/settings/api-keys" in str(e.value)
+    assert "Text to Speech" in str(e.value) and "elevenlabs.io/app/developers/api-keys" in str(e.value)

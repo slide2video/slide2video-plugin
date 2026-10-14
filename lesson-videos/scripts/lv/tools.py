@@ -1,10 +1,9 @@
-"""ffmpeg/ffprobe (system first, else the static-ffmpeg download) and the Playwright browser."""
+"""ffmpeg/ffprobe: the system ones first, else the static-ffmpeg download."""
 from __future__ import annotations
 
 import functools
 import shutil
 import subprocess
-import sys
 
 from .util import UserError
 
@@ -47,11 +46,3 @@ def streams(path) -> set[str]:
 def has_x264() -> bool:
     out = subprocess.run([ffmpeg(), "-hide_banner", "-encoders"], capture_output=True, encoding="utf-8", errors="replace").stdout
     return "libx264" in out
-
-
-def install_chromium() -> None:
-    r = subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], capture_output=True,
-                       encoding="utf-8", errors="replace")
-    if r.returncode:
-        raise UserError("Could not download the Chromium renderer (about 150 MB). Check the internet connection "
-                        "(school networks may block it), then run `doctor` again.\n" + r.stderr[-800:])

@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use once per computer before making lesson videos, or whenever lesson-videos says a tool or key is missing. Installs uv, the renderer and ffmpeg, then helps the teacher choose a narrator voice (a free one needs no account) and optionally create ElevenLabs and Gemini API keys, checking them without ever showing them in chat.
+description: Use once per computer before making lesson videos, or whenever lesson-videos says a tool or key is missing. Installs uv, the renderer and ffmpeg, then helps the teacher choose a narrator voice (a free one needs no account) and optionally create ElevenLabs and Gemini API keys, checking them without ever showing them in chat. Also use it when the teacher says they copied a key and wants it saved.
 ---
 
 # lesson-videos setup
@@ -10,7 +10,7 @@ You are helping a teacher who may never have used a terminal. Explain each step 
 In this skill, **LV** means this command (keep the quotes):
 
 ```
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/lesson-videos.py"
+uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"
 ```
 
 **Never ask for an API key in chat, never read or print `keys.env`.** If the teacher pastes a key into the chat anyway, tell them it's safest to delete that key on the website and create a new one, then continue.
@@ -39,6 +39,8 @@ Every line should start with ✓. For each ✗, do what the message says. Common
 
 ## 3. Narrator voice: free, or ElevenLabs
 
+**If Claude in Chrome is connected** (`mcp__claude-in-chrome__tabs_context_mcp` answers), offer to do the clicking: for ElevenLabs follow `/lesson-videos:elevenlabs-get-api-key`, for Gemini `/lesson-videos:google-get-api-key`; both save the key with `LV keys paste`, so skip step 5 for that key. Otherwise use the steps below; the teacher can also follow the illustrated guides in `${CLAUDE_SKILL_DIR}/../../docs/keys/`.
+
 Videos work with **no accounts and no keys at all**. Explain the two choices in plain words:
 - **Free Microsoft voice** (default): a natural-sounding voice from Microsoft Edge's Read Aloud feature. No account and no cost. It is an unofficial Microsoft service, fine for classroom use but not for commercial videos, and the narration text is sent to Microsoft. If it's ever unavailable, the computer's own voice is used instead (offline, more robotic), and if even that fails the video is made with captions only, so something is always produced.
 - **ElevenLabs** (optional): the most natural voice, and the one used for the example videos. It needs an account and a key.
@@ -48,12 +50,12 @@ If they choose the free voice, skip to step 4. If they choose ElevenLabs, explai
 - **Starter plan**: $6/month for 30,000 characters (about four videos, enough for most units) and a commercial licence. They can cancel after the unit is done.
 - One thing to read themselves: ElevenLabs' use policy (elevenlabs.io/use-policy) restricts use by government entities without authorization. A public school may count; a teacher using it personally is their own call. Don't decide for them.
 
-Then open the keys page in their browser with `LV open https://elevenlabs.io/app/settings/api-keys` and guide them:
+Then open the keys page in their browser with `LV open https://elevenlabs.io/app/developers/api-keys` and guide them:
 1. Sign up or log in.
-2. Click **Create API Key**. Name it `lesson-videos`.
-3. Under permissions, turn on **Text to Speech** (access) and **User** (read). Leave the rest off.
-4. Optional but recommended: set a **credit quota** (for example 30,000) so the key can never spend more.
-5. Click Create and **Copy** the key. It is shown only once.
+2. Click **Create Key**. Name it `lesson-videos`.
+3. Keep **Restrict Key** on. Set **Text to Speech** to **Access** and, under Administration, **User** to **Access**. Leave the rest on **No Access**.
+4. Optional but recommended: put a limit in **Per credit refresh period** (for example 30000) so the key can never spend more.
+5. Click **Create Key** and **Copy** the key. It is shown only once.
 
 ## 4. Gemini key (optional: music and AI video clips)
 
@@ -75,12 +77,14 @@ LV keys
 ```
 It opens a small text file in TextEdit (Mac) or Notepad (Windows). Tell the teacher: paste the ElevenLabs key right after `ELEVENLABS_API_KEY=` and, if they made one, the Gemini key after `GEMINI_API_KEY=`, with no spaces, then **save and close** the file. Wait for them to say they've done it.
 
+If the teacher prefers, they can click **Copy** on the website and you run `LV keys paste elevenlabs` (or `gemini`) instead of using the file.
+
 ## 6. Check
 
 ```
 LV keys check
 ```
-Read the result to them in plain words. "ElevenLabs: not set" is fine: the free Microsoft voice will be used. With a key, ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and allow User → Read. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
+Read the result to them in plain words. "ElevenLabs: not set" is fine: the free Microsoft voice will be used. With a key, ✓ ElevenLabs shows how many characters are left this month. If it says it can't show the remaining credits, narration still works; to see the credits, they can edit the key and set User to Access. Gemini billing is only verified the first time music or a clip is made, because testing it costs money.
 
 ## 7. Optional: a project folder
 

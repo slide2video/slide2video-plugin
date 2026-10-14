@@ -41,3 +41,31 @@ def test_cli_help_runs(capsys):
     except SystemExit as e:
         assert e.code == 0
     assert "lesson-videos" in capsys.readouterr().out
+
+
+def test_skills_use_skill_dir_not_plugin_root():
+    offenders = [str(f.relative_to(REPO)) for f in (PLUGIN / "skills").rglob("*.md")
+                 if "CLAUDE_PLUGIN_ROOT" in f.read_text(encoding="utf-8")]
+    assert offenders == []
+    for name in ("make", "setup"):
+        text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        assert 'uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"' in text
+
+
+def test_key_skills_present_and_safe():
+    import yaml
+    for name, service in (("elevenlabs-get-api-key", "elevenlabs"), ("google-get-api-key", "gemini")):
+        text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        front = yaml.safe_load(text.split("---")[1])
+        assert front["name"] == name and len(front["description"]) <= 1024
+        assert f"keys paste {service}" in text
+        assert "no screenshots" in text.lower() and "password" in text.lower()
+    setup = (PLUGIN / "skills/setup/SKILL.md").read_text(encoding="utf-8")
+    assert "elevenlabs-get-api-key" in setup and "google-get-api-key" in setup
+
+
+def test_edge_tts_floor_has_the_v2_token_fix():
+    """Microsoft's Read Aloud server requires the Sec-MS-GEC v2 token since 2026-10; edge-tts added it in 7.3.0."""
+    script = (PLUGIN / "scripts/lesson-videos.py").read_text(encoding="utf-8")
+    floor = re.search(r'"edge-tts>=([\d.]+)"', script).group(1)
+    assert tuple(map(int, floor.split("."))) >= (7, 3, 1)

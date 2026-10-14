@@ -1,10 +1,14 @@
 """API keys: environment first, then ~/.lesson-videos/keys.env. Values are never printed."""
 from __future__ import annotations
 
+import io
 import os
 import re
+import shutil
 import subprocess
 import sys
+import urllib.parse
+import zipfile
 from pathlib import Path
 
 from . import config
@@ -18,7 +22,7 @@ TEMPLATE = """# lesson-videos API keys
 # Paste each key right after the = sign (no spaces, no quotes), then save and close.
 # Keep this file private. To replace a key, paste the new one over the old one.
 
-# ElevenLabs (optional, most natural narration; without it a free voice is used): https://elevenlabs.io/app/settings/api-keys
+# ElevenLabs (optional, most natural narration; without it a free voice is used): https://elevenlabs.io/app/developers/api-keys
 ELEVENLABS_API_KEY=
 
 # Gemini (optional, music and AI video clips): https://aistudio.google.com/api-keys
@@ -26,6 +30,9 @@ GEMINI_API_KEY=
 """
 _PLACEHOLDER = re.compile(r"^(|x+|changeme|your[-_ ].*|<.*>|\.\.\.)$", re.I)
 _SHAPES = re.compile(r"(AIza[0-9A-Za-z_\-]{10,}|sk_[A-Za-z0-9]{16,}|xi-[A-Za-z0-9]{8,})")
+SERVICES = {"elevenlabs": "ELEVENLABS_API_KEY", "gemini": "GEMINI_API_KEY"}
+NAMES = {"ELEVENLABS_API_KEY": "ElevenLabs", "GEMINI_API_KEY": "Gemini"}
+_KEY = {"ELEVENLABS_API_KEY": r"sk_[A-Za-z0-9]{16,}", "GEMINI_API_KEY": r"AIza[0-9A-Za-z_\-]{30,}"}
 
 
 class MissingKey(UserError):
@@ -86,6 +93,89 @@ def ensure_file() -> Path:
     return f
 
 
+def store(var: str, value: str) -> Path:
+    """Write var=value into keys.env, replacing any existing line for var. The value is never printed."""
+    f = ensure_file()
+    out, done = [], False
+    for line in read_text(f).splitlines():
+        body = line.strip().lstrip("\ufeff")
+        if body.startswith("export "):
+            body = body[7:].lstrip()
+        if not body.startswith("#") and "=" in body and body.partition("=")[0].strip() == var:
+            if not done:
+                out.append(f"{var}={value}")
+                done = True
+            continue
+        out.append(line)
+    if not done:
+        out.append(f"{var}={value}")
+    write_text(f, "\n".join(out) + "\n")
+    if os.name == "posix":
+        os.chmod(f, 0o600)
+    return f
+
+
+def clean(text: str) -> str:
+    return text.strip().strip('"').strip("'").strip()
+
+
+def clipboard_commands(platform: str = sys.platform) -> tuple[list[str], list[str]]:
+    """(read, clear) commands; clear is run with empty input."""
+    if platform == "darwin":
+        return ["pbpaste"], ["pbcopy"]
+    if platform.startswith("win"):
+        return ["powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw"], ["clip"]
+    if shutil.which("wl-paste"):
+        return ["wl-paste", "--no-newline"], ["wl-copy"]
+    return ["xclip", "-o", "-selection", "clipboard"], ["xclip", "-i", "-selection", "clipboard"]
+
+
+def paste(service: str, run=subprocess.run, platform: str = sys.platform) -> str:
+    """Save the key on the clipboard for `service`, then clear the clipboard. Returns the variable name."""
+    var = SERVICES[service]
+    label = f"{'an' if service == 'elevenlabs' else 'a'} {NAMES[var]} key"
+    read, clear = clipboard_commands(platform)
+    try:
+        r = run(read, capture_output=True, encoding="utf-8", errors="replace", timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        raise UserError("Couldn't read the clipboard here. In a Cowork chat, attach your keys file zipped and use "
+                        "`keys load`; on your own computer, run `keys` and paste the key into the file that opens.") from None
+    value = clean(r.stdout or "")
+    if r.returncode or not re.fullmatch(_KEY[var], value):
+        raise UserError(f"The clipboard doesn't hold {label}. Click Copy next to the key on the website, "
+                        "then try again.")
+    store(var, value)
+    try:
+        run(clear, input="", capture_output=True, encoding="utf-8", errors="replace", timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return var
+
+
+def _texts(path: Path) -> list[str]:
+    """The file's text, or the text of every file inside it when it's a .zip (how Cowork keeps it out of the chat)."""
+    data = path.read_bytes()
+    if zipfile.is_zipfile(io.BytesIO(data)):
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            return [z.read(i).decode("utf-8", errors="replace") for i in z.infolist() if not i.is_dir()]
+    return [data.decode("utf-8", errors="replace")]
+
+
+def load(path: Path) -> list[str]:
+    """Import keys from a keys file the teacher attached (plain text, TextEdit rich text, or a .zip). Never prints them."""
+    path = Path(path)
+    if not path.is_file():
+        raise UserError(f"There's no file at {path}. Attach the keys file to this session and try again.")
+    found = []
+    for text in _texts(path):
+        for var, shape in _KEY.items():
+            m = re.search(rf"{var}\s*=\s*[\"']?({shape})", text)
+            if m and var not in found and not _PLACEHOLDER.match(m.group(1)):
+                store(var, m.group(1))
+                found.append(var)
+    return found
+
+
 def editor_command(path: Path, platform: str = sys.platform) -> list[str]:
     if platform == "darwin":
         return ["open", "-e", str(path)]
@@ -115,11 +205,12 @@ def check(request=None) -> list[tuple[str, bool, str]]:
             rows.append(("ElevenLabs", True, f"{mask(el)}; {left:,} characters left this month ({sub.get('tier', '?')} plan)"))
         except net.ApiError as e:
             d = e.detail.lower()
+            blocked = net.blocked_hint(urllib.parse.urlparse(config.ELEVEN_ROOT).netloc) if e.status == 0 else ""
             if "permission" in d:  # the key authenticated; it just can't read the account
                 rows.append(("ElevenLabs", True, f"{mask(el)}; key works, but can't show your remaining credits "
-                                                 "(to see them, edit the key at elevenlabs.io and allow User → Read)"))
+                                                 "(to see them, edit the key at elevenlabs.io and set User to Access)"))
             else:
-                hint = "the key was rejected: create a new one and paste it again" if e.status == 401 else str(e)
+                hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status == 401 else str(e))
                 rows.append(("ElevenLabs", False, f"{mask(el)}; {hint}"))
     gm = get("GEMINI_API_KEY", required=False)
     if not gm:
@@ -129,6 +220,7 @@ def check(request=None) -> list[tuple[str, bool, str]]:
             request(f"{config.GEMINI_ROOT}/models?pageSize=1", headers={"x-goog-api-key": gm}, timeout=30)
             rows.append(("Gemini", True, f"{mask(gm)}; key works. Billing is checked the first time music or a clip is made."))
         except net.ApiError as e:
-            hint = "the key was rejected: create a new one and paste it again" if e.status in (400, 401, 403) else str(e)
+            blocked = net.blocked_hint(urllib.parse.urlparse(config.GEMINI_ROOT).netloc) if e.status == 0 else ""
+            hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status in (400, 401, 403) else str(e))
             rows.append(("Gemini", False, f"{mask(gm)}; {hint}"))
     return rows

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -17,6 +18,19 @@ class ApiError(RuntimeError):
         self.detail = keys.redact(detail)
         self.host = urllib.parse.urlparse(url).netloc or "service"
         super().__init__(f"{self.host} failed ({status}): {self.detail[:300]}")
+
+
+def behind_proxy() -> bool:
+    """True in claude.ai cloud sessions (and other proxied networks)."""
+    return bool(os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy"))
+
+
+def blocked_hint(host: str) -> str:
+    if not behind_proxy():
+        return ""
+    return (f"can't be reached. If you haven't already, in claude.ai open Settings → Capabilities → Additional "
+            f"allowed domains, add {host} and start a new chat; if you already did, the service may be down, "
+            "so try again later")
 
 
 def _open(req, timeout):

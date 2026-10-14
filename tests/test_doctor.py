@@ -14,3 +14,14 @@ def test_doctor_passes_with_no_keys_at_all(browser_ok, capsys, monkeypatch):
     assert doctor.run_doctor(no_keys=False, install=False) == 0
     out = capsys.readouterr().out
     assert "✓ ElevenLabs key: not set (optional)" in out and "✓ Narration:" in out and "captions" in out
+
+
+def test_narration_names_bing_when_blocked(monkeypatch):
+    from lv import voices
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+    def down(*a):
+        raise voices.VoiceUnavailable("offline")
+    monkeypatch.setitem(voices.SPEAKERS, "edge", down)
+    monkeypatch.setitem(voices.SPEAKERS, "system", down)
+    out = doctor.narration_summary()
+    assert "speech.platform.bing.com" in out and "captions-only always works" in out

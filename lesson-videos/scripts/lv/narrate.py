@@ -79,8 +79,8 @@ def narration_error(e: net.ApiError, done: int, total: int) -> str:
         msg += f" ElevenLabs says: {said[:240]}"
     d = e.detail.lower()
     if "missing_permissions" in d or "permission" in d:
-        msg += (" The key can't use Text to Speech: edit it at https://elevenlabs.io/app/settings/api-keys, turn on "
-                "Text to Speech, then run `narrate` again.")
+        msg += (" The key can't use Text to Speech: edit it at https://elevenlabs.io/app/developers/api-keys, set "
+                "Text to Speech to Access, then run `narrate` again.")
     elif "quota" in d or e.status == 402:
         msg += (" Your ElevenLabs credits for this month are used up: run `keys check` to see what's left, "
                 "or upgrade the plan, then run `narrate` again.")
