@@ -105,8 +105,10 @@ def main(argv=None) -> int:
 
 
 def _site_mode_paths_ok(args) -> None:
-    """In site mode every path argument must stay inside the lesson folder (the current directory)."""
-    if os.environ.get("LESSON_VIDEOS_PROJECT"):
+    """In site mode every path argument must stay inside the lesson folder (the current directory), and no
+    registered project folder (env or settings file) may redirect output elsewhere."""
+    from . import project
+    if os.environ.get("LESSON_VIDEOS_PROJECT") or project.project_home() is not None:
         raise UserError("A lesson-videos project folder can't be used while working for slide2video.com.")
     root = Path.cwd().resolve()
     for v in vars(args).values():

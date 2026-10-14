@@ -122,3 +122,18 @@ def test_site_mode_refuses_a_registered_project(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("LESSON_VIDEOS_PROJECT", str(tmp_path))
     assert cli.main(["where"]) == 1
     assert "project folder can't be used" in capsys.readouterr().err
+
+
+def test_site_mode_refuses_a_project_registered_in_settings(monkeypatch, tmp_path, capsys):
+    import json
+    settings = tmp_path / "prefs" / "planted.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_text(json.dumps({"project": str(tmp_path / "elsewhere")}), encoding="utf-8")
+    lesson = tmp_path / "lesson"
+    lesson.mkdir()
+    monkeypatch.chdir(lesson)
+    monkeypatch.delenv("LESSON_VIDEOS_PROJECT", raising=False)
+    monkeypatch.setenv("LESSON_VIDEOS_SETTINGS", str(settings))
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    assert cli.main(["where"]) == 1
+    assert "A lesson-videos project folder can't be used while working for slide2video.com." in capsys.readouterr().err

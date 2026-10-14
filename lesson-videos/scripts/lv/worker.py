@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import urllib.parse
 from pathlib import Path
@@ -55,18 +56,23 @@ def claude_command(lv: str) -> list[str]:
             "--disallowedTools", "WebFetch", "WebSearch"]
 
 
-def _site_env(cwd: Path) -> dict:
-    """Claude's environment: site mode on, and no registered project folder to redirect output into."""
+def _site_env(private: Path) -> dict:
+    """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
+    file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one."""
     env = {k: v for k, v in os.environ.items() if k != "LESSON_VIDEOS_PROJECT"}
     env["LV_SITE_MODE"] = "1"
-    env["LESSON_VIDEOS_SETTINGS"] = str(cwd / "site" / "no-settings.json")
+    env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
     return env
 
 
 def run_claude(cmd: list[str], cwd: Path, log: Path) -> int:
-    with open(log, "w", encoding="utf-8") as f:
-        return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                              env=_site_env(cwd), timeout=CLAUDE_TIMEOUT).returncode
+    private = Path(tempfile.mkdtemp(prefix="lv-site-"))
+    try:
+        with open(log, "w", encoding="utf-8") as f:
+            return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                  env=_site_env(private), timeout=CLAUDE_TIMEOUT).returncode
+    finally:
+        shutil.rmtree(private, ignore_errors=True)
 
 
 def _reset_time(log: str, now: dt.datetime) -> dt.datetime:

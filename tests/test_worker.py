@@ -2,6 +2,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -286,5 +287,21 @@ def test_claude_env_hides_registered_projects(monkeypatch, tmp_path):
     worker.run_claude(["claude"], tmp_path, tmp_path / "log")
     env = seen["env"]
     assert "LESSON_VIDEOS_PROJECT" not in env and env["LV_SITE_MODE"] == "1"
-    assert env["LESSON_VIDEOS_SETTINGS"] == str(tmp_path / "site" / "no-settings.json")
-    assert not (tmp_path / "site" / "no-settings.json").exists()
+    settings = Path(env["LESSON_VIDEOS_SETTINGS"])
+    lesson = tmp_path.resolve()
+    assert settings.resolve() != lesson and lesson not in settings.resolve().parents
+    assert settings.parent.name.startswith("lv-site-")
+    assert not settings.parent.exists()  # the private folder is gone once Claude exits
+
+
+def test_claude_settings_folder_is_removed_after_a_timeout(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        assert Path(kw["env"]["LESSON_VIDEOS_SETTINGS"]).parent.is_dir()
+        raise worker.subprocess.TimeoutExpired(cmd, 1)
+    monkeypatch.setattr(worker.subprocess, "run", fake_run)
+    with pytest.raises(worker.subprocess.TimeoutExpired):
+        worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    assert not Path(seen["env"]["LESSON_VIDEOS_SETTINGS"]).parent.exists()
