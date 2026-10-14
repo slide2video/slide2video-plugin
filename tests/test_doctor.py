@@ -25,3 +25,13 @@ def test_narration_names_bing_when_blocked(monkeypatch):
     monkeypatch.setitem(voices.SPEAKERS, "system", down)
     out = doctor.narration_summary()
     assert "speech.platform.bing.com" in out and "captions-only always works" in out
+
+
+def test_narration_shows_why_the_free_voice_failed(monkeypatch):
+    from lv import voices
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+    def down(*a):
+        raise voices.VoiceUnavailable("the free Microsoft voice didn't answer (ClientConnectorCertificateError: bad cert)")
+    monkeypatch.setitem(voices.SPEAKERS, "edge", down)
+    monkeypatch.setitem(voices.SPEAKERS, "system", down)
+    assert "ClientConnectorCertificateError" in doctor.narration_summary()

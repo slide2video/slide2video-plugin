@@ -103,3 +103,46 @@ def test_system_voice_live(tmp_path):
 def test_edge_voice_live(tmp_path):
     words = voices.SPEAKERS["edge"]("Step one is evaporation.", "en-US-AvaMultilingualNeural", tmp_path / "take.mp3")
     assert [w["w"] for w in words] == ["Step", "one", "is", "evaporation."] and words[0]["s"] < 0.5
+
+
+PROXY_CA = os.path.join(os.path.dirname(__file__), "proxy-ca.pem")
+
+
+def _trusts_test_ca(ctx) -> bool:
+    return any(("commonName", "lesson-videos test proxy CA") in sum(c["subject"], ()) for c in ctx.get_ca_certs())
+
+
+@pytest.mark.parametrize("var", ["SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"])
+def test_tls_context_trusts_the_proxy_ca(monkeypatch, var):
+    for v in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setenv(var, PROXY_CA)
+    ctx = voices.tls_context()
+    assert _trusts_test_ca(ctx) and len(ctx.get_ca_certs()) > 50  # certifi's roots are kept too
+
+
+def test_tls_context_ignores_a_missing_ca_file(monkeypatch):
+    monkeypatch.setenv("SSL_CERT_FILE", "/nonexistent/ca.pem")
+    assert len(voices.tls_context().get_ca_certs()) > 50
+
+
+def test_edge_voice_trusts_the_proxy_ca(monkeypatch, tmp_path):
+    """claude.ai cloud sessions re-sign HTTPS with a proxy CA named in SSL_CERT_FILE; edge-tts only trusts certifi."""
+    import edge_tts
+    monkeypatch.setenv("SSL_CERT_FILE", PROXY_CA)
+    monkeypatch.setattr(voices.time, "sleep", lambda s: None)
+    seen = []
+
+    class Fake:
+        def __init__(self, *a, **kw):
+            seen.append(edge_tts.communicate._SSL_CTX)
+
+        async def stream(self):
+            raise OSError("offline")
+            yield
+
+    monkeypatch.setattr(edge_tts, "Communicate", Fake)
+    monkeypatch.setattr(edge_tts.communicate, "_SSL_CTX", edge_tts.communicate._SSL_CTX)
+    with pytest.raises(voices.VoiceUnavailable):
+        voices.speak_edge("Hello there.", "en-US-AvaNeural", tmp_path / "x.mp3")
+    assert seen and _trusts_test_ca(seen[0])
