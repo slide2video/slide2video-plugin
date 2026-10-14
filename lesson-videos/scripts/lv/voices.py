@@ -7,6 +7,7 @@ import hashlib
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -109,9 +110,30 @@ def align_events(text: str, events: list[tuple[float, float, str]]) -> list[dict
     return out
 
 
+CA_VARS = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+
+
+def tls_context() -> ssl.SSLContext:
+    """certifi's roots plus any CA bundle the environment names: claude.ai cloud sessions re-sign HTTPS
+    with their proxy's own CA, which edge-tts (certifi only) would otherwise reject."""
+    import certifi
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    for var in CA_VARS:
+        f = os.environ.get(var, "").strip()
+        if f and os.path.isfile(f):
+            try:
+                ctx.load_verify_locations(cafile=f)
+            except (ssl.SSLError, OSError):
+                pass
+    return ctx
+
+
 def speak_edge(text: str, voice: str, out: Path) -> list[dict]:
     """Microsoft Edge's free online voices (unofficial endpoint, no account), with real word timings."""
     import edge_tts
+    import edge_tts.communicate
+    if hasattr(edge_tts.communicate, "_SSL_CTX"):
+        edge_tts.communicate._SSL_CTX = tls_context()
 
     async def go():
         com = edge_tts.Communicate(text, voice, boundary="WordBoundary")

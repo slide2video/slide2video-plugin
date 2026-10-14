@@ -37,8 +37,8 @@ def narration_summary() -> str:
         try:
             voices.probe(provider)
             parts.append(works)
-        except voices.VoiceUnavailable:
-            parts.append(fails)
+        except voices.VoiceUnavailable as e:
+            parts.append(f"{fails} [{str(e)[:240]}]" if provider == "edge" else fails)
     return "; ".join(parts) + "; captions-only always works"
 
 
