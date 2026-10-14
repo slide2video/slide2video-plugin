@@ -1,4 +1,4 @@
-"""slide2video.com: this Mac's connection (pairing, its token in the Keychain, device API calls). The token is
+"""slide2video.com: this computer's connection (pairing, its token in the Keychain, device API calls). The token is
 never printed."""
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ import time
 from . import config, contract, net
 from .util import UserError, read_json, write_json
 
-NOT_PAIRED = ("This Mac isn't connected to slide2video.com (or it was removed there). Run /lesson-videos:setup "
-              "and choose to connect this Mac.")
-UPDATE = "Update the lesson-videos plugin on this Mac: run /plugin update lesson-videos"
+NOT_PAIRED = ("This computer isn't connected to slide2video.com (or it was removed there). Run /lesson-videos:setup "
+              "and choose to connect this computer.")
+UPDATE = "Update the lesson-videos plugin on this computer: run /plugin update lesson-videos"
 BAD_CODE = "The website sent a connection code this plugin can't use. Run the pairing again."
 _TOKEN_RE = re.compile(r"s2v_[A-Za-z0-9_-]{20,200}")
 _SITE_RE = re.compile(r"[A-Za-z0-9:/._-]+")
@@ -113,9 +113,9 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
 def pair(name=None, sleep=None, out=print, clock=time.monotonic) -> str:
     """Show a code to type on the website, wait for it, keep the token. Returns the teacher's email."""
     sleep = sleep or time.sleep
-    name = (name or platform.node().removesuffix(".local") or "Mac")[:60]
+    name = (name or platform.node().removesuffix(".local") or "Computer")[:60]
     start = call("/api/device/pair/start", {"name": name}, auth=False)
-    out(f"On any computer, sign in at {start['verify_url']}, choose Add a Mac, and type this code: "
+    out(f"On any computer, sign in at {start['verify_url']}, open Devices, and type this code: "
         f"{start['user_code']}")
     out(f"The code works for {start['expires_in'] // 60} minutes. Waiting…")
     deadline = clock() + start["expires_in"]

@@ -69,11 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--max", type=int)
     cd = sub.add_parser("card", help="check a site-mode card (site/card.json) before stopping")
     cd.add_argument("file", type=Path)
-    pr = sub.add_parser("pair", help="connect this Mac to slide2video.com (shows a code to type on the website)")
-    pr.add_argument("--name", help="what the website calls this Mac (default: its computer name)")
-    wk = sub.add_parser("worker", help="take this Mac's next job from slide2video.com and run it")
+    pr = sub.add_parser("pair", help="connect this computer to slide2video.com (shows a code to type on the website)")
+    pr.add_argument("--name", help="what the website calls this computer (default: its computer name)")
+    wk = sub.add_parser("worker", help="take this computer's next job from slide2video.com and run it")
     wk.add_argument("--once", action="store_true", help="run at most one job, then exit (the default)")
-    wk.add_argument("--status", action="store_true", help="show which account this Mac is connected to")
+    wk.add_argument("--status", action="store_true", help="show which account this computer is connected to")
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -175,13 +175,13 @@ def dispatch(args) -> int:
     if args.cmd == "pair":
         from . import site
         email = site.pair(name=args.name)
-        print(f"This Mac is connected to {site.site_url()} for {email}.")
+        print(f"This computer is connected to {site.site_url()} for {email}.")
         return 0
     if args.cmd == "worker":
         from . import site
         if args.status:
             s = site.status()
-            print(f"Connected to {site.site_url()} as {s['teacher_email']} (this Mac: {s['device_name']}).")
+            print(f"Connected to {site.site_url()} as {s['teacher_email']} (this device: {s['device_name']}).")
             return 0
         from . import worker
         return worker.run_once()

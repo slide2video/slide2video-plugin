@@ -40,7 +40,7 @@ class FakeSite:
             def _route(self, method):
                 u = urllib.parse.urlparse(self.path)
                 if self.headers.get("X-LV-Contract") != str(site.contract):
-                    return self._send(426, {"error": "Update the lesson-videos plugin on this Mac: run /plugin update lesson-videos"})
+                    return self._send(426, {"error": "Update the lesson-videos plugin on this computer: run /plugin update lesson-videos"})
                 if u.path == "/api/device/pair/start":
                     return self._send(200, {"user_code": "KQ7-4M2", "device_code": "dc_1", "expires_in": 600,
                                             "verify_url": f"{site.url}/devices"})

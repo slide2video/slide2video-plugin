@@ -1,4 +1,4 @@
-"""`worker --once`: take this Mac's next turn from slide2video.com, run Claude Code on it in the lesson's folder,
+"""`worker --once`: take this computer's next turn from slide2video.com, run Claude Code on it in the lesson's folder,
 and send back the card Claude wrote (or an error card)."""
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def claude_command(lv: str) -> list[str]:
     below is refused without asking (nobody is there to answer)."""
     claude = shutil.which("claude")
     if not claude:
-        raise UserError("Claude Code isn't installed on this Mac (no `claude` command). Install it from "
+        raise UserError("Claude Code isn't installed on this computer (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
     plugin = str(config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
     return [claude, "-p", PROMPT, "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
@@ -291,7 +291,7 @@ def _run_turn(turn: dict, claude, out) -> int:
         folder = lesson_dir(turn["lesson"])
         if kind == "delete":
             shutil.rmtree(folder, ignore_errors=True)
-            card = {"contract": contract.VERSION, "kind": "done", "message": "Removed from this Mac."}
+            card = {"contract": contract.VERSION, "kind": "done", "message": "Removed from this computer."}
         else:
             sitedir = folder / "site"
             sitedir.mkdir(parents=True, exist_ok=True)
@@ -308,7 +308,7 @@ def _run_turn(turn: dict, claude, out) -> int:
     except UserError as e:
         card = error_card(str(e), _log_text(log))
     except Exception as e:  # noqa: BLE001  site or disk failure: still answer the turn if we can
-        card = error_card(f"This step failed on the Mac: {e}", _log_text(log))
+        card = error_card(f"This step failed on this computer: {e}", _log_text(log))
     finally:
         if beat is not None:
             beat.done.set()
