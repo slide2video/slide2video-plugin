@@ -45,7 +45,7 @@ def test_open_uses_the_default_browser(monkeypatch, capsys):
 def test_keys_paste_cli_never_prints_key(monkeypatch, capsys):
     from lv import keys
     el = "sk_0123456789abcdef0123456789abcdef"
-    monkeypatch.setattr(keys, "paste", lambda service: keys.store("ELEVENLABS_API_KEY", el) and "ELEVENLABS_API_KEY")
+    monkeypatch.setattr(keys, "paste", lambda service: (keys.store("ELEVENLABS_API_KEY", el) and "ELEVENLABS_API_KEY", True))
     monkeypatch.setattr(keys, "check", lambda: [("ElevenLabs", True, "set, ends in …cdef; 9,000 characters left"),
                                                 ("Gemini", True, "not set (optional)")])
     assert cli.main(["keys", "paste", "elevenlabs"]) == 0
@@ -56,10 +56,19 @@ def test_keys_paste_cli_never_prints_key(monkeypatch, capsys):
 def test_keys_paste_warns_when_env_wins(monkeypatch, capsys):
     from lv import keys
     monkeypatch.setenv("ELEVENLABS_API_KEY", "sk_fromenvironment0000000000")
-    monkeypatch.setattr(keys, "paste", lambda service: "ELEVENLABS_API_KEY")
+    monkeypatch.setattr(keys, "paste", lambda service: ("ELEVENLABS_API_KEY", True))
     monkeypatch.setattr(keys, "check", lambda: [("ElevenLabs", True, "ok"), ("Gemini", True, "ok")])
     cli.main(["keys", "paste", "elevenlabs"])
     assert "environment" in capsys.readouterr().out
+
+
+def test_keys_paste_says_when_clipboard_still_holds_key(monkeypatch, capsys):
+    from lv import keys
+    monkeypatch.setattr(keys, "paste", lambda service: ("ELEVENLABS_API_KEY", False))
+    monkeypatch.setattr(keys, "check", lambda: [("ElevenLabs", True, "ok"), ("Gemini", True, "ok")])
+    cli.main(["keys", "paste", "elevenlabs"])
+    out = capsys.readouterr().out
+    assert "cleared the clipboard" not in out and "copy something else" in out
 
 
 def test_keys_paste_needs_service(capsys):

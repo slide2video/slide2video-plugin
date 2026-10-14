@@ -125,11 +125,32 @@ class _Run:
 @pytest.mark.parametrize("clip", [EL, EL + "\n", EL + "\r\n", f'"{EL}"', f"  {EL}  "])
 def test_paste_stores_clean_value_and_clears_clipboard(clip, capsys):
     run = _Run(clip)
-    assert keys.paste("elevenlabs", run=run, platform="darwin") == "ELEVENLABS_API_KEY"
+    assert keys.paste("elevenlabs", run=run, platform="darwin") == ("ELEVENLABS_API_KEY", True)
     assert keys.parse(keys.keys_file().read_text(encoding="utf-8"))["ELEVENLABS_API_KEY"] == EL
     assert run.calls[0][0] == ["pbpaste"] and run.calls[1][0] == ["pbcopy"] and run.calls[1][1]["input"] == ""
     out = capsys.readouterr()
     assert EL not in out.out + out.err
+
+
+class _NoClear(_Run):
+    def __call__(self, cmd, **kw):
+        if self.calls:
+            self.calls.append((cmd, kw))
+            raise FileNotFoundError(cmd[0])
+        return super().__call__(cmd, **kw)
+
+
+def test_paste_reports_when_clipboard_was_not_cleared():
+    assert keys.paste("elevenlabs", run=_NoClear(EL), platform="darwin") == ("ELEVENLABS_API_KEY", False)
+    assert keys.get("ELEVENLABS_API_KEY") == EL
+
+
+def test_paste_reports_failed_clear_exit_code():
+    class Fails(_Run):
+        def __call__(self, cmd, **kw):
+            r = super().__call__(cmd, **kw)
+            return _sp.CompletedProcess(cmd, 1 if len(self.calls) > 1 else 0, r.stdout, "")
+    assert keys.paste("elevenlabs", run=Fails(EL), platform="darwin") == ("ELEVENLABS_API_KEY", False)
 
 
 def test_paste_refuses_non_key_without_echo():
@@ -189,6 +210,21 @@ def test_load_reads_zip_attachment(tmp_path):
         zf.writestr("lesson-videos-keys.txt", f"ELEVENLABS_API_KEY={EL}\nGEMINI_API_KEY=\n")
     assert keys.load(z) == ["ELEVENLABS_API_KEY"]
     assert keys.get("ELEVENLABS_API_KEY") == EL
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-le", "utf-16-be"])
+def test_load_reads_utf16_notepad_file(tmp_path, encoding):
+    f = tmp_path / "keys.txt"
+    f.write_bytes(f"ELEVENLABS_API_KEY={EL}\r\nGEMINI_API_KEY={GM}\r\n".encode(encoding))
+    assert sorted(keys.load(f)) == ["ELEVENLABS_API_KEY", "GEMINI_API_KEY"]
+    assert keys.get("GEMINI_API_KEY") == GM
+
+
+def test_load_reads_curly_quoted_values(tmp_path):
+    f = tmp_path / "keys.txt"
+    f.write_text(f"ELEVENLABS_API_KEY=\u201c{EL}\u201d\nGEMINI_API_KEY = \u2018{GM}\u2019\n", encoding="utf-8")
+    assert sorted(keys.load(f)) == ["ELEVENLABS_API_KEY", "GEMINI_API_KEY"]
+    assert keys.get("ELEVENLABS_API_KEY") == EL and keys.get("GEMINI_API_KEY") == GM
 
 
 def test_load_missing_file():
