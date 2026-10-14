@@ -65,7 +65,8 @@ def install_npm(run=subprocess.run) -> Path:
             capture_output=True, encoding="utf-8", errors="replace")
     if r.returncode:
         raise UserError(f"Could not install {NPM_PACKAGE} from npm.\n" + (r.stderr or "")[-800:])
-    js = f"require({json.dumps(NPM_PACKAGE)}).executablePath().then(p => console.log(p))"
+    # 153+ is an ES module, so require() returns {default: ...}; older builds export executablePath directly.
+    js = f"const m = require({json.dumps(NPM_PACKAGE)}); (m.default ?? m).executablePath().then(p => console.log(p))"
     r = run(["node", "-e", js], cwd=str(prefix), capture_output=True, encoding="utf-8", errors="replace")
     lines = (r.stdout or "").strip().splitlines()
     if r.returncode or not lines or not Path(lines[-1]).is_file():
