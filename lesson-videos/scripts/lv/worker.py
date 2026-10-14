@@ -14,7 +14,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
-from . import config, contract, keys, narrate, paths, site
+from . import config, contract, keys, narrate, net, paths, site
 from .util import UserError, read_json, read_text, safe_name, write_json, write_text
 
 PROMPT = "Run /lesson-videos:make in site mode for this folder."
@@ -25,6 +25,12 @@ CONTENT_TYPES = {".mp4": "video/mp4", ".vtt": "text/vtt", ".jpg": "image/jpeg", 
 LIMIT = re.compile(r"(?:5-hour|weekly|usage|session) limit (?:reached|hit)|Claude usage limit", re.I)
 LIMIT_SUFFIX = {".mp4": "video", ".vtt": "captions", ".jpg": "stills", ".jpeg": "stills", ".png": "stills"}
 RESET = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", re.I)
+# Claude Code reads these from the folder it runs in; a turn could plant them for the next turn. Never part of a lesson.
+CLAUDE_CONFIG = (".claude", ".mcp.json", "CLAUDE.md", "CLAUDE.local.md")
+DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Write(./.claude/**)", "Edit(./.mcp.json)",
+          "Write(./.mcp.json)", "Edit(./CLAUDE.md)", "Write(./CLAUDE.md)", "Edit(./CLAUDE.local.md)",
+          "Write(./CLAUDE.local.md)"]
+BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
 
 
 def lessons_root() -> Path:
@@ -46,26 +52,44 @@ def lv_command() -> str:
 
 
 def claude_command(lv: str) -> list[str]:
+    """Claude Code pinned to this job: no user, project or local settings (so no hooks, extra allow rules or
+    permission mode of the teacher's own), no MCP servers, this plugin loaded explicitly, and anything not allowed
+    below is refused without asking (nobody is there to answer)."""
     claude = shutil.which("claude")
     if not claude:
         raise UserError("Claude Code isn't installed on this Mac (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
     plugin = str(config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
-    return [claude, "-p", PROMPT, "--allowedTools", f"Bash({lv}:*)", "Read(./**)", f"Read(//{plugin}/**)",
-            "Edit(./**)", "Write(./**)", "Glob", "Grep",
-            "--disallowedTools", "WebFetch", "WebSearch"]
+    return [claude, "-p", PROMPT, "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
+            "--plugin-dir", str(config.PLUGIN_ROOT),
+            "--allowedTools", f"Bash({lv}:*)", "Read(./**)", f"Read(//{plugin}/**)", "Edit(./**)", "Write(./**)",
+            "--disallowedTools", *DENIED]
 
 
 def _site_env(private: Path) -> dict:
     """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
-    file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one."""
-    env = {k: v for k, v in os.environ.items() if k != "LESSON_VIDEOS_PROJECT"}
+    file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one.
+    Variables a parent Claude Code session set are dropped (the job is its own session); the sign-in token a teacher
+    may keep in CLAUDE_CODE_OAUTH_TOKEN is kept."""
+    env = {k: v for k, v in os.environ.items() if k not in ("LESSON_VIDEOS_PROJECT", "CLAUDECODE")
+           and (not k.startswith("CLAUDE_CODE_") or k == "CLAUDE_CODE_OAUTH_TOKEN")}
     env["LV_SITE_MODE"] = "1"
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
+    env["BASH_DEFAULT_TIMEOUT_MS"] = env["BASH_MAX_TIMEOUT_MS"] = BASH_TIMEOUT_MS
     return env
 
 
+def _clear_claude_config(folder: Path) -> None:
+    for name in CLAUDE_CONFIG:
+        p = folder / name
+        if p.is_dir() and not p.is_symlink():
+            shutil.rmtree(p)
+        elif p.exists() or p.is_symlink():
+            p.unlink()
+
+
 def run_claude(cmd: list[str], cwd: Path, log: Path) -> int:
+    _clear_claude_config(cwd)
     private = Path(tempfile.mkdtemp(prefix="lv-site-"))
     try:
         with open(log, "w", encoding="utf-8") as f:
@@ -193,7 +217,8 @@ def _publish(card: dict, folder: Path, turn_id: str) -> dict:
         return card
     local = {k: _inside(folder, card[k], k) for k in ("video", "captions", "stills") if card.get(k)}
     ch = card["chapter"]
-    card = {**card, "version": _next_version(folder, ch)}
+    card = {k: v for k, v in card.items() if k not in ("timing", "version")}  # only the worker sets these
+    card["version"] = _next_version(folder, ch)
     base = f"out/ch{ch}/v{card['version']}"
     for k, f in local.items():
         _upload(turn_id, f"{base}/{f.name}", f.read_bytes(), CONTENT_TYPES.get(f.suffix.lower(), "application/octet-stream"))
@@ -215,47 +240,64 @@ def _redacted(v):
     return v
 
 
-def _finish(turn_id: str, card: dict) -> None:
-    card = _redacted(card)
-    site.call(f"/api/device/turns/{turn_id}/finish", card)
+def _finish(turn_id: str, card: dict, log: str = "") -> dict:
+    """Send the card; if the website refuses it (a 4xx other than 401/426), send an error card saying why, once.
+    Returns the card the website accepted."""
+    try:
+        site.call(f"/api/device/turns/{turn_id}/finish", _redacted(card))
+        return card
+    except net.ApiError as e:
+        if not 400 <= e.status < 500 or e.status in (401, 426):
+            raise
+        reason = keys.redact(site._error_message(e.detail) or f"HTTP {e.status}")[:200]
+    card = error_card(f"The website refused this result: {reason}", log)
+    site.call(f"/api/device/turns/{turn_id}/finish", _redacted(card))
+    return card
 
 
-def _log_text(log: Path) -> str:
-    return read_text(log) if log.exists() else ""
+def _log_text(log: Path | None) -> str:
+    return read_text(log) if log is not None and log.exists() else ""
+
+
+def _claude_turn(turn: dict, folder: Path, sitedir: Path, log: Path, claude) -> dict:
+    tid = turn["turn"]["id"]
+    _fetch_inputs(turn, folder)
+    write_json(sitedir / "turn.json", turn)
+    lv = lv_command()
+    write_text(sitedir / "lv.txt", lv + "\n")
+    card_file = sitedir / "card.json"
+    code = claude(claude_command(lv), folder, log)
+    if code != 0 or not card_file.exists():
+        return error_card("Claude stopped before it finished this step.", _log_text(log), detect_limit=True)
+    card = read_json(card_file)
+    bad = contract.problems("card", card)
+    if bad:
+        where = sorted({m.split(":")[0].strip() for m in bad})[:6]
+        return error_card("Claude's reply couldn't be read (problems at: " + ", ".join(where) + ")", _log_text(log))
+    if card["kind"] == "error":  # Claude's own words, but the worker's log and no retry time Claude chose
+        return error_card(card.get("message") or "Claude reported a problem.", _log_text(log), detect_limit=False)
+    return _publish(card, folder, tid)
 
 
 def _run_turn(turn: dict, claude, out) -> int:
     tid, kind = turn["turn"]["id"], turn["turn"]["kind"]
-    folder = lesson_dir(turn["lesson"])
     out(f"Working on “{turn['lesson']['title']}” ({kind}).")
-    if kind == "delete":
-        shutil.rmtree(folder, ignore_errors=True)
-        _finish(tid, {"contract": contract.VERSION, "kind": "done", "message": "Removed from this Mac."})
-        return 0
-    sitedir = folder / "site"
-    sitedir.mkdir(parents=True, exist_ok=True)
-    (sitedir / "card.json").unlink(missing_ok=True)
-    write_text(sitedir / "progress.txt", "Starting\n")
-    log = sitedir / "claude.log"
-    beat = _Heartbeat(tid, sitedir / "progress.txt")
-    beat.start()
+    log: Path | None = None
+    beat: _Heartbeat | None = None
     try:
-        _fetch_inputs(turn, folder)
-        write_json(sitedir / "turn.json", turn)
-        lv = lv_command()
-        write_text(sitedir / "lv.txt", lv + "\n")
-        card_file = sitedir / "card.json"
-        code = claude(claude_command(lv), folder, log)
-        if code != 0 or not card_file.exists():
-            card = error_card("Claude stopped before it finished this step.", _log_text(log), detect_limit=True)
+        folder = lesson_dir(turn["lesson"])
+        if kind == "delete":
+            shutil.rmtree(folder, ignore_errors=True)
+            card = {"contract": contract.VERSION, "kind": "done", "message": "Removed from this Mac."}
         else:
-            card = read_json(card_file)
-            bad = contract.problems("card", card)
-            if bad:
-                where = sorted({m.split(":")[0].strip() for m in bad})[:6]
-                card = error_card("Claude's reply couldn't be read (problems at: " + ", ".join(where) + ")", _log_text(log))
-            else:
-                card = _publish(card, folder, tid)
+            sitedir = folder / "site"
+            sitedir.mkdir(parents=True, exist_ok=True)
+            (sitedir / "card.json").unlink(missing_ok=True)
+            write_text(sitedir / "progress.txt", "Starting\n")
+            log = sitedir / "claude.log"
+            beat = _Heartbeat(tid, sitedir / "progress.txt")
+            beat.start()
+            card = _claude_turn(turn, folder, sitedir, log, claude)
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
     except ValueError as e:  # card.json that isn't JSON
@@ -265,9 +307,10 @@ def _run_turn(turn: dict, claude, out) -> int:
     except Exception as e:  # noqa: BLE001  site or disk failure: still answer the turn if we can
         card = error_card(f"This step failed on the Mac: {e}", _log_text(log))
     finally:
-        beat.done.set()
+        if beat is not None:
+            beat.done.set()
     try:
-        _finish(tid, card)
+        card = _finish(tid, card, _log_text(log))
     except Exception as e:  # noqa: BLE001
         out(f"Couldn't send the result back: {keys.redact(str(e))[:200]}")
         return 1

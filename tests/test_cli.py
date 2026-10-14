@@ -137,3 +137,18 @@ def test_site_mode_refuses_a_project_registered_in_settings(monkeypatch, tmp_pat
     monkeypatch.setenv("LV_SITE_MODE", "1")
     assert cli.main(["where"]) == 1
     assert "A lesson-videos project folder can't be used while working for slide2video.com." in capsys.readouterr().err
+
+
+def test_clip_name_cannot_leave_the_clips_folder(monkeypatch, tmp_path, capsys):
+    import pytest
+    from lv import clips
+    monkeypatch.setattr(clips, "veo", lambda *a, **k: pytest.fail("no clip should be made"))
+    (tmp_path / "photo.jpg").write_bytes(b"x")
+    for site_mode in (False, True):
+        if site_mode:
+            monkeypatch.chdir(tmp_path)
+            monkeypatch.setenv("LV_SITE_MODE", "1")
+        for name in ("../x", "a/b", "a\\b", ".hidden", "..", "x..y/z"):
+            assert cli.main(["clip", str(tmp_path / "photo.jpg"), "--work", str(tmp_path / "w"), "--name", name,
+                             "--prompt", "p"]) == 1
+            assert "clip name" in capsys.readouterr().err

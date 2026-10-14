@@ -14,6 +14,7 @@ class FakeSite:
         self.turns, self.files, self.uploads, self.finished, self.heartbeats = [], {}, {}, [], []
         self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 1
         self.fail_uploads = False
+        self.finish_statuses = []   # statuses to answer finish with, one per call, before accepting
         self.token = "s2v_test-token-0123456789"
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -72,6 +73,9 @@ class FakeSite:
                         site.uploads[path] = (self.headers.get("Content-Type"), self._body())
                         return self._send(201, {"id": "fil_up"})
                     if action == "finish":
+                        if site.finish_statuses:
+                            self._body()
+                            return self._send(site.finish_statuses.pop(0), {"error": "card refused: bad field"})
                         site.finished.append((tid, json.loads(self._body())))
                         return self._send(204)
                 return self._send(404, {"error": "not found"})

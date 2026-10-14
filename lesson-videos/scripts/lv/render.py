@@ -67,6 +67,26 @@ def serve(routes: list[tuple[str, Path]]):
         srv.server_close()
 
 
+def _local_only(ctx, port: int, logs: list[str]) -> None:
+    """The page may load only what the local server serves (and data:/blob: URLs it makes itself): scenes.js is
+    written by Claude, so a fetch, image or socket to any other address is stopped before it leaves the Mac."""
+    local = f"http://127.0.0.1:{port}/"
+
+    def gate(route):
+        url = route.request.url
+        if url.startswith(local) or url.startswith(("data:", "blob:")):
+            route.continue_()
+        else:
+            logs.append(f"blocked: {url[:200]} (the page may only load its own files)")
+            route.abort("blockedbyclient")
+
+    def no_socket(ws):  # never connect_to_server(): the socket stays inside the browser
+        logs.append(f"blocked: {ws.url[:200]} (the page may only load its own files)")
+
+    ctx.route("**/*", gate)
+    ctx.route_web_socket("**/*", no_socket)
+
+
 @contextmanager
 def page_for(ch: Path):
     from playwright.sync_api import sync_playwright
@@ -77,7 +97,10 @@ def page_for(ch: Path):
         except Exception as e:  # noqa: BLE001
             raise UserError(f"The Chromium renderer is missing or won't start ({str(e).splitlines()[0]}). Run `doctor`.") from None
         try:
-            pg = browser.new_page(viewport={"width": config.W, "height": config.H}, device_scale_factor=1)
+            ctx = browser.new_context(viewport={"width": config.W, "height": config.H}, device_scale_factor=1,
+                                      service_workers="block")
+            _local_only(ctx, port, logs)
+            pg = ctx.new_page()
             pg.on("console", lambda m: logs.append(f"{m.type}: {m.text}") if m.type in ("error", "warning") else None)
             pg.on("pageerror", lambda e: logs.append(f"PAGEERROR: {e}"))
             pg.goto(f"http://127.0.0.1:{port}/index.html?export=1")

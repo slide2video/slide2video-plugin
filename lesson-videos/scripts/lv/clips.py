@@ -67,8 +67,17 @@ def veo(image_png: bytes, prompt: str, request=None, sleep=time.sleep, max_polls
     raise UserError(f"Veo was still working after {max_polls * 10 // 60} minutes; try again later.")
 
 
+def check_name(name: str) -> str:
+    """A clip name is one plain file name inside _work/clips/."""
+    if not name or "/" in name or "\\" in name or ".." in name or name.startswith("."):
+        raise UserError(f"The clip name {name!r} can't be used: give a plain name such as `river`, without "
+                        "slashes, `..` or a leading dot.")
+    return name
+
+
 def make_clip(image: Path, prompt: str, name: str, work: Path, frac: float = 0.5, request=None, sleep=time.sleep,
               strip: bool = True) -> Path:
+    check_name(name)
     out = paths.lesson(work).sources / "clips" / f"{name}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(veo(prep(image, frac), prompt, request=request, sleep=sleep))
