@@ -1,3 +1,4 @@
+import shutil
 import sys
 
 import pytest
@@ -122,3 +123,19 @@ def test_npm_browser_is_not_saved_when_it_wont_start(tmp_path, monkeypatch):
     with pytest.raises(UserError):
         chromium.ensure(probe=lambda: "missing libs", playwright_install=pw_fail, npm_install=lambda: exe)
     assert not chromium.saved_file().exists()
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="needs node")
+def test_install_npm_handles_the_es_module_build(tmp_path):
+    """@sparticuz/chromium 153+ is an ES module: require() returns {default: {...}} (seen in a Cowork cloud session)."""
+    import subprocess
+    exe = write_text(tmp_path / "unpacked" / "chromium", "#!/bin/sh\n")
+    pkg = chromium.config.home() / "chromium-npm" / "node_modules" / "@sparticuz" / "chromium"
+    write_text(pkg / "package.json", '{"name": "@sparticuz/chromium", "type": "module", "main": "index.js"}')
+    write_text(pkg / "index.js", f"export default {{ executablePath: async () => {str(exe)!r} }};\n")
+
+    def run(cmd, **kw):
+        if cmd[0] == "npm":
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.run(cmd, **kw)
+    assert chromium.install_npm(run=run).read_text(encoding="utf-8") == "#!/bin/sh\n"
