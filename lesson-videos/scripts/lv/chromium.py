@@ -11,7 +11,22 @@ from pathlib import Path
 from . import config
 from .util import UserError, read_text, write_text
 
-LAUNCH_ARGS = ["--use-gl=angle", "--enable-gpu-rasterization", "--ignore-gpu-blocklist"]
+# The page runs Claude-written scenes.js, so the browser itself has no network (first layer; render._local_only is the
+# second). Every request, WebSockets included, goes to a dead proxy at 127.0.0.1:9; only the page server's own
+# 127.0.0.1:<port> bypasses it ("<-loopback>" removes Chromium's implicit bypass for other loopback ports). Host names
+# other than localhost don't resolve, and WebRTC may not send UDP around the proxy.
+NO_NETWORK_ARGS = ["--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",
+                   "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+                   "--webrtc-ip-handling-policy=disable_non_proxied_udp"]
+DEAD_PROXY = "http://127.0.0.1:9"
+
+
+def proxy(local_port: int | None) -> dict:
+    """The proxy setting: everything to DEAD_PROXY except the local page server (none when there isn't one)."""
+    return {"server": DEAD_PROXY, "bypass": "<-loopback>" + (f",127.0.0.1:{local_port}" if local_port else "")}
+
+
+LAUNCH_ARGS = ["--use-gl=angle", "--enable-gpu-rasterization", "--ignore-gpu-blocklist", *NO_NETWORK_ARGS]
 NPM_PACKAGE = "@sparticuz/chromium"   # ships the browser inside the npm package; used where downloads are blocked
 
 
@@ -32,10 +47,11 @@ def path() -> str | None:
     return None
 
 
-def launch(p):
-    """Start headless Chromium from a sync_playwright() handle."""
+def launch(p, local_port: int | None = None):
+    """Start headless Chromium from a sync_playwright() handle. It can reach nothing but http://127.0.0.1:<local_port>
+    (the page server), or nothing at all without one."""
     exe = path()
-    return p.chromium.launch(args=LAUNCH_ARGS, **({"executable_path": exe} if exe else {}))
+    return p.chromium.launch(args=LAUNCH_ARGS, proxy=proxy(local_port), **({"executable_path": exe} if exe else {}))
 
 
 def can_launch() -> str:

@@ -36,11 +36,20 @@ def test_launch_passes_executable_only_when_set(tmp_path, monkeypatch):
 
     monkeypatch.delenv("LV_CHROMIUM", raising=False)
     assert chromium.launch(P) == "browser"
-    assert calls[-1] == {"args": chromium.LAUNCH_ARGS}
+    assert calls[-1] == {"args": chromium.LAUNCH_ARGS, "proxy": chromium.proxy(None)}
     exe = write_text(tmp_path / "chrome", "")
     monkeypatch.setenv("LV_CHROMIUM", str(exe))
     chromium.launch(P)
-    assert calls[-1] == {"args": chromium.LAUNCH_ARGS, "executable_path": str(exe)}
+    assert calls[-1] == {"args": chromium.LAUNCH_ARGS, "proxy": chromium.proxy(None), "executable_path": str(exe)}
+
+
+def test_launch_has_no_network_beyond_this_mac():
+    args = chromium.LAUNCH_ARGS
+    assert "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1" in args
+    assert "--force-webrtc-ip-handling-policy=disable_non_proxied_udp" in args
+    assert "--webrtc-ip-handling-policy=disable_non_proxied_udp" in args
+    assert chromium.proxy(None) == {"server": "http://127.0.0.1:9", "bypass": "<-loopback>"}
+    assert chromium.proxy(8123) == {"server": "http://127.0.0.1:9", "bypass": "<-loopback>,127.0.0.1:8123"}
 
 
 def test_ensure_skips_download_when_browser_starts():

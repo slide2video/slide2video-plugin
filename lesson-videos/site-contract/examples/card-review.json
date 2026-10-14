@@ -1,0 +1,6 @@
+{"contract": 1, "kind": "review", "message": "Chapter 1 is ready. What would you change?",
+ "chapter": 1, "version": 1,
+ "video": "out/ch1/v1/Chapter 1 - The Water Cycle.mp4",
+ "captions": "out/ch1/v1/Chapter 1 - The Water Cycle.vtt",
+ "stills": "out/ch1/v1/final.jpg",
+ "timing": "out/ch1/v1/timing.json"}

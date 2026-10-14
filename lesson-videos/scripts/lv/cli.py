@@ -67,6 +67,13 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("clip", type=Path)
     f.add_argument("dest", type=Path)
     f.add_argument("--max", type=int)
+    cd = sub.add_parser("card", help="check a site-mode card (site/card.json) before stopping")
+    cd.add_argument("file", type=Path)
+    pr = sub.add_parser("pair", help="connect this Mac to slide2video.com (shows a code to type on the website)")
+    pr.add_argument("--name", help="what the website calls this Mac (default: its computer name)")
+    wk = sub.add_parser("worker", help="take this Mac's next job from slide2video.com and run it")
+    wk.add_argument("--once", action="store_true", help="run at most one job, then exit (the default)")
+    wk.add_argument("--status", action="store_true", help="show which account this Mac is connected to")
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -97,8 +104,28 @@ def main(argv=None) -> int:
         return 130
 
 
+def _site_mode_paths_ok(args) -> None:
+    """In site mode every path argument must stay inside the lesson folder (the current directory), and no
+    registered project folder (env or settings file) may redirect output elsewhere."""
+    from . import project
+    if os.environ.get("LESSON_VIDEOS_PROJECT") or project.project_home() is not None:
+        raise UserError("A lesson-videos project folder can't be used while working for slide2video.com.")
+    root = Path.cwd().resolve()
+    for v in vars(args).values():
+        for item in (v if isinstance(v, list) else [v]):
+            if isinstance(item, Path):
+                r = item.resolve()
+                if r != root and root not in r.parents:
+                    raise UserError(f"{item} is outside this lesson's folder; in site mode only files in the lesson folder can be used.")
+
+
 def dispatch(args) -> int:
     from . import keys
+    if os.environ.get("LV_SITE_MODE") == "1" and (
+            args.cmd in ("open", "pair", "worker", "init") or (args.cmd == "keys" and args.action != "check")):
+        raise UserError(f"{args.cmd} isn't available while working for slide2video.com.")
+    if os.environ.get("LV_SITE_MODE") == "1":
+        _site_mode_paths_ok(args)
     if args.cmd == "doctor":
         from . import doctor
         return doctor.run_doctor(args.no_keys)
@@ -134,6 +161,30 @@ def dispatch(args) -> int:
         for name, good, msg in rows:
             print(f"{'✓' if good else '✗'} {name}: {msg}")
         return 0 if all(good for _, good, _ in rows) else 1
+    if args.cmd == "card":
+        from . import contract
+        from .util import read_json
+        try:
+            obj = read_json(args.file)
+        except (OSError, ValueError) as e:
+            print(f"{args.file}: not readable JSON ({e})")
+            return 1
+        bad = contract.problems("card", obj)
+        print("card ok" if not bad else "\n".join(bad))
+        return 0 if not bad else 1
+    if args.cmd == "pair":
+        from . import site
+        email = site.pair(name=args.name)
+        print(f"This Mac is connected to {site.site_url()} for {email}.")
+        return 0
+    if args.cmd == "worker":
+        from . import site
+        if args.status:
+            s = site.status()
+            print(f"Connected to {site.site_url()} as {s['teacher_email']} (this Mac: {s['device_name']}).")
+            return 0
+        from . import worker
+        return worker.run_once()
     if args.cmd == "open":
         import webbrowser
         webbrowser.open(args.url)

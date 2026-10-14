@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 from conftest import PLUGIN
-from lv import cli, net
+from lv import cli, config, net
 
 
 def test_keys_check_without_keys(capsys):
@@ -81,3 +81,74 @@ def test_keys_load_reports_nothing_found(tmp_path, capsys):
     f.write_text("nothing here\n", encoding="utf-8")
     assert cli.main(["keys", "load", str(f)]) == 1
     assert "No keys found" in capsys.readouterr().out
+
+
+def test_site_mode_refuses_risky_commands(monkeypatch, capsys):
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    for argv in (["open", "https://x"], ["keys", "load", "f"], ["pair"], ["worker"]):
+        assert cli.main(argv) == 1
+        assert "isn't available while working for slide2video.com" in capsys.readouterr().err
+    cli.main(["keys", "check"])
+    assert "isn't available while working" not in capsys.readouterr().err
+
+
+def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
+    import json
+    lesson = tmp_path / "lesson"
+    (lesson / "site").mkdir(parents=True)
+    (tmp_path / "outside.jpg").write_bytes(b"x")
+    (lesson / "link.jpg").symlink_to(tmp_path / "outside.jpg")
+    (lesson / "site" / "card.json").write_text(json.dumps(
+        {"contract": 1, "kind": "questions", "message": "Q",
+         "questions": [{"id": "g", "text": "Grade?", "options": [{"label": "6"}]}]}), encoding="utf-8")
+    monkeypatch.chdir(lesson)
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    for argv in (["asset", "/etc/hosts", "x.jpg"],
+                 ["render", "lesson-videos/_work/ch1", "--out", str(tmp_path / "elsewhere")],
+                 ["asset", "link.jpg", "x.jpg"],
+                 ["asset", "site/card.json", str(config.PLUGIN_ROOT / "x.jpg")]):
+        assert cli.main(argv) == 1
+        assert "is outside this lesson's folder" in capsys.readouterr().err
+    assert cli.main(["card", "site/card.json"]) == 0
+    capsys.readouterr()
+    monkeypatch.delenv("LV_SITE_MODE")
+    cli.main(["asset", "/etc/hosts", "x.jpg"])
+    assert "is outside this lesson's folder" not in capsys.readouterr().err
+
+
+def test_site_mode_refuses_a_registered_project(monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    monkeypatch.setenv("LESSON_VIDEOS_PROJECT", str(tmp_path))
+    assert cli.main(["where"]) == 1
+    assert "project folder can't be used" in capsys.readouterr().err
+
+
+def test_site_mode_refuses_a_project_registered_in_settings(monkeypatch, tmp_path, capsys):
+    import json
+    settings = tmp_path / "prefs" / "planted.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_text(json.dumps({"project": str(tmp_path / "elsewhere")}), encoding="utf-8")
+    lesson = tmp_path / "lesson"
+    lesson.mkdir()
+    monkeypatch.chdir(lesson)
+    monkeypatch.delenv("LESSON_VIDEOS_PROJECT", raising=False)
+    monkeypatch.setenv("LESSON_VIDEOS_SETTINGS", str(settings))
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    assert cli.main(["where"]) == 1
+    assert "A lesson-videos project folder can't be used while working for slide2video.com." in capsys.readouterr().err
+
+
+def test_clip_name_cannot_leave_the_clips_folder(monkeypatch, tmp_path, capsys):
+    import pytest
+    from lv import clips
+    monkeypatch.setattr(clips, "veo", lambda *a, **k: pytest.fail("no clip should be made"))
+    (tmp_path / "photo.jpg").write_bytes(b"x")
+    for site_mode in (False, True):
+        if site_mode:
+            monkeypatch.chdir(tmp_path)
+            monkeypatch.setenv("LV_SITE_MODE", "1")
+        for name in ("../x", "a/b", "a\\b", ".hidden", "..", "x..y/z"):
+            assert cli.main(["clip", str(tmp_path / "photo.jpg"), "--work", str(tmp_path / "w"), "--name", name,
+                             "--prompt", "p"]) == 1
+            assert "clip name" in capsys.readouterr().err

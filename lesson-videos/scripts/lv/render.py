@@ -67,17 +67,42 @@ def serve(routes: list[tuple[str, Path]]):
         srv.server_close()
 
 
+def _local_only(ctx, port: int, logs: list[str]) -> None:
+    """Second layer (the first is chromium.launch: no network but the page server's port). Requests other than
+    http://127.0.0.1:<port>/… and the data:/blob: URLs the page makes itself are aborted and logged. WebSockets are
+    routed to a handler that only logs and never calls connect_to_server(): Playwright then answers with a fake
+    socket inside the browser, so scenes.js may see it "open" but no connection is made to any server."""
+    local = f"http://127.0.0.1:{port}/"
+
+    def gate(route):
+        url = route.request.url
+        if url.startswith(local) or url.startswith(("data:", "blob:")):
+            route.continue_()
+        else:
+            logs.append(f"blocked: {url[:200]} (the page may only load its own files)")
+            route.abort("blockedbyclient")
+
+    def no_socket(ws):  # log only: ws.close() here deadlocks the sync API, and nothing is connected anyway
+        logs.append(f"blocked: {ws.url[:200]} (the page may only load its own files)")
+
+    ctx.route("**/*", gate)
+    ctx.route_web_socket("**/*", no_socket)
+
+
 @contextmanager
 def page_for(ch: Path):
     from playwright.sync_api import sync_playwright
     logs: list[str] = []
     with serve(routes(paths.chapter(ch))) as port, sync_playwright() as p:
         try:
-            browser = chromium.launch(p)
+            browser = chromium.launch(p, local_port=port)
         except Exception as e:  # noqa: BLE001
             raise UserError(f"The Chromium renderer is missing or won't start ({str(e).splitlines()[0]}). Run `doctor`.") from None
         try:
-            pg = browser.new_page(viewport={"width": config.W, "height": config.H}, device_scale_factor=1)
+            ctx = browser.new_context(viewport={"width": config.W, "height": config.H}, device_scale_factor=1,
+                                      service_workers="block")
+            _local_only(ctx, port, logs)
+            pg = ctx.new_page()
             pg.on("console", lambda m: logs.append(f"{m.type}: {m.text}") if m.type in ("error", "warning") else None)
             pg.on("pageerror", lambda e: logs.append(f"PAGEERROR: {e}"))
             pg.goto(f"http://127.0.0.1:{port}/index.html?export=1")

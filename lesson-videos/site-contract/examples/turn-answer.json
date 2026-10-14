@@ -1,0 +1,8 @@
+{"contract": 1,
+ "lesson": {"id": "les_0123456789abcdefghijkl", "title": "Unit 3 – The Water Cycle"},
+ "turn": {"id": "trn_1123456789abcdefghijkl", "seq": 2, "kind": "answer", "lease_seconds": 1800},
+ "files": [{"id": "fil_0123456789abcdefghijkl", "name": "water-cycle.pptx", "kind": "deck",
+            "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "size": 51200,
+            "path": "in/water-cycle.pptx"}],
+ "answers": [{"question": "grade", "choice": "Grades 6–8", "other": null},
+             {"question": "steps", "choice": null, "other": "Teach all four steps"}]}

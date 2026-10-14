@@ -88,3 +88,38 @@ def test_docs_say_videos_work_without_any_keys():
 def test_make_skill_explains_both_layouts():
     _, text = frontmatter("make")
     assert "LV where" in text and "next to the deck" in text and "_source" not in text
+
+
+def test_make_skill_has_a_site_mode():
+    _, text = frontmatter("make")
+    site = text.split("## Site mode", 1)[1]
+    for needed in ("site/turn.json", "site/card.json", "site/progress.txt", "site/lv.txt", "LV card",
+                   '"questions"', '"plan"', '"review"', '"done"', "student", "Never ask", "stop",
+                   "`answer`", "`approve`", "`change`", "`continue`", "`feedback`", "student-info.md",
+                   "interview.md", "review.md", '"students"', "Decision: remove", '"problem"'):
+        assert needed in site, needed
+
+
+def test_setup_offers_to_connect_this_mac():
+    _, text = frontmatter("setup")
+    assert "LV pair" in text and "slide2video.com" in text
+
+
+def test_setup_hands_the_worker_command_to_the_teacher():
+    _, text = frontmatter("setup")
+    connect = text.split("## Connect this Mac to slide2video.com", 1)[1].split("\n## ", 1)[0]
+    assert "worker --once" in connect and "Terminal" in connect
+    assert "run `LV worker --once`" not in connect  # Claude's Bash tool would stop it after 10 minutes
+    assert "don't run" in connect.lower() or "do not run" in connect.lower()
+
+
+def test_site_mode_plans_only_after_the_interview():
+    _, text = frontmatter("make")
+    site = text.split("## Site mode", 1)[1]
+    row = next(l for l in site.splitlines() if l.startswith("| `answer`"))
+    assert "for every case" not in row
+    assert "Otherwise (`interview.md` exists or was just written in this turn), step 4" in row
+    assert "then leave the flagged slides out everywhere" not in row
+    assert "if the decision is `remove`, leave the flagged slides out everywhere" in row
+    start = next(l for l in site.splitlines() if l.startswith("| `start`"))
+    assert "don't write `brief.md` yet" in start

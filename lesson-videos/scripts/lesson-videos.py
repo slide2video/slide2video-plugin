@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "edge-tts>=7.3.1",
+#   "jsonschema>=4.23",
 #   "numpy>=1.26",
 #   "pillow>=10.0",
 #   "playwright>=1.45",

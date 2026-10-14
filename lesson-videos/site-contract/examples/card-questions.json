@@ -1,0 +1,7 @@
+{"contract": 1, "kind": "questions", "message": "A few questions before I plan the videos.",
+ "questions": [
+   {"id": "grade", "text": "What grade are the students?",
+    "options": [{"label": "Grades 3–5"}, {"label": "Grades 6–8"}, {"label": "Grades 9–10"}], "other": true},
+   {"id": "steps", "text": "The review asks for three main steps, but the deck teaches four. How should the video handle it?",
+    "options": [{"label": "Teach 4, quiz on 4", "detail": "Quiz asks for the four steps"},
+                {"label": "Follow the slide", "detail": "Keep three main steps"}], "other": true}]}

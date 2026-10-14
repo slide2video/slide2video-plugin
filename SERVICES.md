@@ -9,6 +9,7 @@
 | Downloads at first run: astral.sh (uv), PyPI, Playwright browser CDN, github.com (static-ffmpeg binaries) | `skills/setup`, `lv/tools.py` | none | free |
 | Suno (`suno.com`) | `music-video` skills | none: used only through the user's own signed-in Chrome via Claude in Chrome; no API | the user (their Suno plan) |
 | npm registry, Remotion's headless-browser CDN, PyPI and the alignment models' hubs (first run) | `music-video` `doctor`, `align` | none | free |
+| slide2video.com (decks come down; videos, captions, stills and timing go up) | `lv/site.py`, `lv/worker.py` (`pair`, `worker`) | a per-Mac device token in the macOS Keychain (service `slide2video`), created by pairing | free (invite-only site run by the maintainer) |
 | Poly Pizza (`poly.pizza`) | source of `music-video/studio/assets/models` (CC0), no runtime use | none | free |
 
 The repo itself holds no keys.

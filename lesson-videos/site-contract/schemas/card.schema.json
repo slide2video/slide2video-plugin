@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slide2video.com/contract/1/card.schema.json",
+  "title": "A card: what the Mac sends back for the teacher",
+  "type": "object",
+  "required": ["contract", "kind", "message"],
+  "properties": {
+    "contract": {"const": 1},
+    "kind": {"enum": ["questions", "plan", "review", "done", "error"]},
+    "message": {"type": "string", "maxLength": 2000}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "questions"}}},
+      "then": {
+        "required": ["questions"],
+        "properties": {
+          "questions": {
+            "type": "array", "minItems": 1, "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": ["id", "text", "options"],
+              "properties": {
+                "id": {"type": "string", "pattern": "^[a-z0-9_-]{1,32}$"},
+                "text": {"type": "string", "minLength": 1, "maxLength": 500},
+                "options": {
+                  "type": "array", "minItems": 1, "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "required": ["label"],
+                    "properties": {
+                      "label": {"type": "string", "minLength": 1, "maxLength": 120},
+                      "detail": {"type": "string", "maxLength": 300}
+                    }
+                  }
+                },
+                "other": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "plan"}}},
+      "then": {
+        "required": ["markdown", "estimate"],
+        "properties": {
+          "markdown": {"type": "string", "minLength": 1, "maxLength": 20000},
+          "estimate": {
+            "type": "object",
+            "required": ["usd", "minutes", "chapters"],
+            "properties": {
+              "usd": {"type": "number", "minimum": 0},
+              "minutes": {"type": "number", "minimum": 0},
+              "chapters": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "review"}}},
+      "then": {
+        "required": ["chapter", "video"],
+        "properties": {
+          "chapter": {"type": "integer", "minimum": 1},
+          "version": {"type": "integer", "minimum": 1},
+          "video": {"type": "string", "minLength": 1, "maxLength": 400},
+          "captions": {"type": "string", "maxLength": 400},
+          "stills": {"type": "string", "maxLength": 400},
+          "timing": {"type": "string", "maxLength": 400},
+          "resolved": {
+            "type": "array",
+            "items": {"type": "object", "required": ["note", "answer"],
+                      "properties": {"note": {"type": "string"}, "answer": {"type": "string", "maxLength": 1000}}}
+          },
+          "cost_next": {"type": "object", "required": ["usd"], "properties": {"usd": {"type": "number", "minimum": 0}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "done"}}},
+      "then": {
+        "properties": {
+          "chapters": {
+            "type": "array",
+            "items": {"type": "object", "required": ["chapter", "title"],
+                      "properties": {"chapter": {"type": "integer", "minimum": 1}, "title": {"type": "string"}}}
+          },
+          "readme": {"type": "string", "maxLength": 20000}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "error"}}},
+      "then": {
+        "properties": {
+          "log_tail": {"type": "string", "maxLength": 20000},
+          "retry_after": {"type": ["string", "null"], "format": "date-time"}
+        }
+      }
+    }
+  ]
+}
