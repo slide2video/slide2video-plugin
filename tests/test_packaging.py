@@ -69,3 +69,10 @@ def test_edge_tts_floor_has_the_v2_token_fix():
     script = (PLUGIN / "scripts/lesson-videos.py").read_text(encoding="utf-8")
     floor = re.search(r'"edge-tts>=([\d.]+)"', script).group(1)
     assert tuple(map(int, floor.split("."))) >= (7, 3, 1)
+
+
+def test_skills_say_where_to_find_the_scripts_when_skill_dir_is_empty():
+    """Seen in a claude.ai session: ${CLAUDE_SKILL_DIR} came through empty and the skill copy lived elsewhere."""
+    for name in ("make", "setup"):
+        text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        assert "/root/.claude/plugins/synced/" in text

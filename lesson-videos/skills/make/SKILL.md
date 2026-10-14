@@ -11,6 +11,8 @@ In this skill, **LV** means this command (keep the quotes):
 uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"
 ```
 
+If that path doesn't exist (in some claude.ai sessions `${CLAUDE_SKILL_DIR}` comes through empty), the plugin is under `/root/.claude/plugins/synced/`: use the `lesson-videos/scripts/lesson-videos.py` you find there.
+
 If `uv` isn't found, or any command says a tool or key is missing, run the `setup` skill first.
 
 Read `${CLAUDE_SKILL_DIR}/references/guide.md` before writing any `script.json` or `scenes.js`. The sample chapter in `${CLAUDE_SKILL_DIR}/references/sample/` shows every idiom.
