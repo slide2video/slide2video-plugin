@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,16 @@ from .util import UserError, read_json, write_json
 NOT_PAIRED = ("This Mac isn't connected to slide2video.com (or it was removed there). Run /lesson-videos:setup "
               "and choose to connect this Mac.")
 UPDATE = "Update the lesson-videos plugin on this Mac: run /plugin update lesson-videos"
+BAD_CODE = "The website sent a connection code this plugin can't use. Run the pairing again."
+_TOKEN_RE = re.compile(r"s2v_[A-Za-z0-9_-]{20,200}")
+_SITE_RE = re.compile(r"[A-Za-z0-9:/._-]+")
+
+
+def _check_token(token) -> str:
+    """The website's token must look like one of ours before it reaches the Keychain or the file store."""
+    if not isinstance(token, str) or not _TOKEN_RE.fullmatch(token):
+        raise UserError(BAD_CODE) from None
+    return token
 
 
 def site_url() -> str:
@@ -33,6 +44,9 @@ class KeychainStore:
 
     def set(self, site: str, token: str) -> None:
         # The token goes in on stdin (security -i), never in argv, so ps and error messages cannot show it.
+        if not _SITE_RE.fullmatch(site):
+            raise UserError(BAD_CODE) from None
+        _check_token(token)
         line = f"add-generic-password -U -s {self.service} -a {site} -w {token}\n"
         r = subprocess.run(["security", "-i"], input=line, capture_output=True, encoding="utf-8")
         if r.returncode != 0 or "error" in (r.stderr or "").lower():
@@ -115,7 +129,8 @@ def pair(name=None, sleep=None, out=print, clock=time.monotonic) -> str:
             if e.status == 410:
                 break
             raise
-        store.set(site_url(), got["token"])
+        token = _check_token(got.get("token"))
+        store.set(site_url(), token)
         return got["teacher_email"]
     raise UserError("The code expired before it was entered. Run the pairing again for a new code.")
 

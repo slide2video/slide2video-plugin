@@ -71,21 +71,21 @@ def test_keychain_set_keeps_the_token_out_of_argv(monkeypatch):
         return _Done()
 
     monkeypatch.setattr(site.subprocess, "run", fake_run)
-    site.KeychainStore().set("https://slide2video.com", "s2v_secret-token")
+    site.KeychainStore().set("https://slide2video.com", "s2v_secret-token-0123456789ab")
     argv, kw = calls[0]
-    assert not any("s2v_secret-token" in a for a in argv)
-    assert "s2v_secret-token" in kw["input"]
+    assert not any("s2v_secret-token-0123456789ab" in a for a in argv)
+    assert "s2v_secret-token-0123456789ab" in kw["input"]
 
 
 def test_keychain_set_failure_does_not_show_the_token(monkeypatch):
     def fake_run(argv, **kw):
-        return _Done(returncode=1, stderr="error: keychain locked s2v_secret-token")
+        return _Done(returncode=1, stderr="error: keychain locked s2v_secret-token-0123456789ab")
 
     monkeypatch.setattr(site.subprocess, "run", fake_run)
     with pytest.raises(UserError) as e:
-        site.KeychainStore().set("https://slide2video.com", "s2v_secret-token")
+        site.KeychainStore().set("https://slide2video.com", "s2v_secret-token-0123456789ab")
     assert "Keychain" in str(e.value)
-    assert "s2v_secret-token" not in str(e.value)
+    assert "s2v_secret-token-0123456789ab" not in str(e.value)
 
 
 def test_file_store_is_private(tmp_path, monkeypatch):
@@ -95,3 +95,28 @@ def test_file_store_is_private(tmp_path, monkeypatch):
     assert s.get("https://slide2video.com") == "s2v_x"
     if os.name == "posix":
         assert oct(s._file().stat().st_mode & 0o777) == "0o600"
+
+
+def test_keychain_set_refuses_a_token_that_injects_a_command(monkeypatch):
+    calls = []
+    monkeypatch.setattr(site.subprocess, "run", lambda argv, **kw: calls.append(argv) or _Done())
+    with pytest.raises(UserError) as e:
+        site.KeychainStore().set("https://slide2video.com", "s2v_abcdefghijklmnopqrst\ndelete-keychain x")
+    assert "s2v" not in str(e.value)
+    assert calls == []
+
+
+def test_keychain_set_refuses_a_site_with_a_space(monkeypatch):
+    calls = []
+    monkeypatch.setattr(site.subprocess, "run", lambda argv, **kw: calls.append(argv) or _Done())
+    with pytest.raises(UserError):
+        site.KeychainStore().set("https://evil.example x", "s2v_abcdefghijklmnopqrst")
+    assert calls == []
+
+
+def test_pair_refuses_a_malformed_token_and_stores_nothing(fake_site):
+    fake_site.token = "s2v_bad token\nx"
+    with pytest.raises(UserError) as e:
+        site.pair(name="Test Mac", sleep=lambda s: None, out=lambda s: None)
+    assert "bad token" not in str(e.value)
+    assert site.store.get(fake_site.url) is None
