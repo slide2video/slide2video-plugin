@@ -107,7 +107,7 @@ def test_setup_offers_to_connect_this_mac():
 
 def test_setup_hands_the_worker_command_to_the_teacher():
     _, text = frontmatter("setup")
-    connect = text.split("## Connect this Mac to slide2video.com", 1)[1].split("\n## ", 1)[0]
+    connect = text.split("## Connect this computer to slide2video.com", 1)[1].split("\n## ", 1)[0]
     assert "worker --once" in connect and "Terminal" in connect
     assert "run `LV worker --once`" not in connect  # Claude's Bash tool would stop it after 10 minutes
     assert "don't run" in connect.lower() or "do not run" in connect.lower()

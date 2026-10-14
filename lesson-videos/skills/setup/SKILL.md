@@ -92,21 +92,21 @@ Read the result to them in plain words. "ElevenLabs: not set" is fine: the free 
 
 Only if the teacher asks to keep lessons in one project folder (for example a folder they back up or keep in git): `LV init --path "<folder>"`. Lessons then live in `<folder>/lessons/<course>/<unit>/` as text, and finished videos, class materials and paid media in the results folder it prints. Nobody else needs this.
 
-## Connect this Mac to slide2video.com (optional)
+## Connect this computer to slide2video.com (optional)
 
-Only if the teacher was invited to slide2video.com and wants this Mac to make videos for lessons they upload
-there. On a Mac, run `LV pair`. It prints a short code and the website address: the teacher signs in there (on
-any computer), chooses **Add a Mac** and types the code. Then run `LV worker --status` to confirm the
+Only if the teacher was invited to slide2video.com and wants this computer to make videos for lessons they upload
+there. Today this works on a Mac (Windows support is on the way). Run `LV pair`. It prints a short code and the website address: the teacher signs in there (on
+any computer), opens **Devices** and types the code. Then run `LV worker --status` to confirm the
 connection.
 
 Don't run `worker --once` yourself: one lesson step can take an hour or more, far longer than a command may run
 here, so it would be stopped halfway. Instead, give the teacher the exact line to paste into the Terminal app
-whenever the website says a lesson is waiting for this Mac: the `LV` line with the real paths filled in (the
+whenever the website says a lesson is waiting for this computer: the `LV` line with the real paths filled in (the
 `uv` you used in step 1 and the full path of `lesson-videos.py`, no `${CLAUDE_SKILL_DIR}`), then `worker --once`.
-It looks like this, with this Mac's paths:
+It looks like this, with this computer's paths:
 
 ```
-uv run "<full path on this Mac>/lesson-videos/scripts/lesson-videos.py" worker --once
+uv run "<full path on this computer>/lesson-videos/scripts/lesson-videos.py" worker --once
 ```
 
 Tell them to open Terminal (Applications ▸ Utilities ▸ Terminal), paste the line, press Return, and leave the
