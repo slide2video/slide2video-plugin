@@ -62,3 +62,10 @@ def test_key_skills_present_and_safe():
         assert "no screenshots" in text.lower() and "password" in text.lower()
     setup = (PLUGIN / "skills/setup/SKILL.md").read_text(encoding="utf-8")
     assert "elevenlabs-get-api-key" in setup and "google-get-api-key" in setup
+
+
+def test_edge_tts_floor_has_the_v2_token_fix():
+    """Microsoft's Read Aloud server requires the Sec-MS-GEC v2 token since 2026-10; edge-tts added it in 7.3.0."""
+    script = (PLUGIN / "scripts/lesson-videos.py").read_text(encoding="utf-8")
+    floor = re.search(r'"edge-tts>=([\d.]+)"', script).group(1)
+    assert tuple(map(int, floor.split("."))) >= (7, 3, 1)
