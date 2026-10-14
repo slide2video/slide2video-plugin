@@ -96,7 +96,7 @@ def test_make_skill_has_a_site_mode():
     for needed in ("site/turn.json", "site/card.json", "site/progress.txt", "site/lv.txt", "LV card",
                    '"questions"', '"plan"', '"review"', '"done"', "student", "Never ask", "stop",
                    "`answer`", "`approve`", "`change`", "`continue`", "`feedback`", "student-info.md",
-                   "interview.md", "review.md", '"students"'):
+                   "interview.md", "review.md", '"students"', "Decision: remove", '"problem"'):
         assert needed in site, needed
 
 

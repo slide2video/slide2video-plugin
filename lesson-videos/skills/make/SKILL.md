@@ -133,7 +133,10 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   listed them with their cost; otherwise make none. When the plan card's `markdown` includes music or clips, it
   must list them with their costs.
 - **Files between turns** (in `WORK`):
-  - `student-info.md`: the slide numbers flagged for student information (never copy student names into any file).
+  - `student-info.md`: the slide numbers flagged for student information (never copy student names into any file),
+    and at its end the teacher's decision, a line `Decision: remove` or `Decision: not students`. Every turn that
+    writes `brief.md`, `plan.md` or a chapter reads it first (if it exists) and leaves the flagged slides out when
+    the decision is `remove`.
   - `interview.md`: the interview answers: grade, chapters, length, voice, and the decision for each possible issue.
   - `review.md`: its first line is `Under review: chapter N`; write it with every `review` card.
 - **One chapter per turn**, no parallel helper agents.
@@ -143,7 +146,7 @@ What to do for each `turn.kind`, and which card ends it:
 | `turn.kind` | Do | Card |
 |---|---|---|
 | `start` | Step 1 (ingest and read every slide). Then check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. If found, write the flagged slide numbers to `student-info.md`. Only then steps 2–3: write `brief.md`. | If student information was found: `"questions"` with one question whose `"id"` is `"students"`, options labelled exactly "Remove these slides" and "They're not students", and nothing else. Otherwise: the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). |
-| `answer` | If an answer has `"question": "students"`, read `student-info.md`: for "Remove these slides", leave those slides out everywhere (brief, plan, chapters). If `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (grade, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and the answers are not the interview, send the interview card instead. If the answers belong to a failure question (below), act on them and continue from where the work stopped. Otherwise step 4: write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = `{"usd": <total>, "minutes": <per video>, "chapters": <N>}`. |
+| `answer` | Check the answers in this order. (1) An answer to `"question": "problem"` (see the failure paragraph below): act on it and continue from where the work stopped. (2) An answer to `"question": "students"`: append `Decision: remove` (for "Remove these slides") or `Decision: not students` (for "They're not students") as the last line of `student-info.md`; then leave the flagged slides out everywhere. (3) The interview: if `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (grade, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and there are no interview answers, send the interview card instead. Then, for every case, step 4: read `student-info.md` if it exists, write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = `{"usd": <total>, "minutes": <per video>, "chapters": <N>}`. |
 | `change` | Revise `plan.md` from `feedback`, re-run `estimate`. | `"plan"` again. |
 | `approve` | Note the approval and date at the top of `plan.md`. Steps 5–6 (music and clips only as the approval rule above allows), then chapter 1 (6.1–6.7). | `"review"` for chapter 1. |
 | `feedback` | Read `review.md` for the chapter under review. Apply `feedback` to that chapter (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
@@ -170,5 +173,5 @@ Card file paths must be inside `lesson-videos/`: video `.mp4`, captions `.vtt`, 
 Anything else makes the card an error.
 
 If something fails that the teacher must fix (a deck that can't be read, a key that was rejected), write a
-`"questions"` card with one question whose options say what to do next, and a message that explains the problem
+`"questions"` card with one question whose `"id"` is `"problem"` and whose options say what to do next, and a message that explains the problem
 in one line. Record where the work stopped in `plan.md`, so the next turn picks it up there.
