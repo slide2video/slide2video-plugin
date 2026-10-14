@@ -14,7 +14,7 @@ import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import captions, config, mix, paths, sfx, status, tools
+from . import captions, chromium, config, mix, paths, sfx, status, tools
 from .narrate import read_timing
 from .page import ensure_page, output_path, routes
 from .util import UserError, read_json, run, write_json, write_text
@@ -73,7 +73,7 @@ def page_for(ch: Path):
     logs: list[str] = []
     with serve(routes(paths.chapter(ch))) as port, sync_playwright() as p:
         try:
-            browser = p.chromium.launch(args=["--use-gl=angle", "--enable-gpu-rasterization", "--ignore-gpu-blocklist"])
+            browser = chromium.launch(p)
         except Exception as e:  # noqa: BLE001
             raise UserError(f"The Chromium renderer is missing or won't start ({str(e).splitlines()[0]}). Run `doctor`.") from None
         try:
