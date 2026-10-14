@@ -90,3 +90,26 @@ def test_site_mode_refuses_risky_commands(monkeypatch, capsys):
         assert "isn't available while working for slide2video.com" in capsys.readouterr().err
     cli.main(["keys", "check"])
     assert "isn't available while working" not in capsys.readouterr().err
+
+
+def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
+    import json
+    lesson = tmp_path / "lesson"
+    (lesson / "site").mkdir(parents=True)
+    (tmp_path / "outside.jpg").write_bytes(b"x")
+    (lesson / "link.jpg").symlink_to(tmp_path / "outside.jpg")
+    (lesson / "site" / "card.json").write_text(json.dumps(
+        {"contract": 1, "kind": "questions", "message": "Q",
+         "questions": [{"id": "g", "text": "Grade?", "options": [{"label": "6"}]}]}), encoding="utf-8")
+    monkeypatch.chdir(lesson)
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    for argv in (["asset", "/etc/hosts", "x.jpg"],
+                 ["render", "lesson-videos/_work/ch1", "--out", str(tmp_path / "elsewhere")],
+                 ["asset", "link.jpg", "x.jpg"]):
+        assert cli.main(argv) == 1
+        assert "is outside this lesson's folder" in capsys.readouterr().err
+    assert cli.main(["card", "site/card.json"]) == 0
+    capsys.readouterr()
+    monkeypatch.delenv("LV_SITE_MODE")
+    cli.main(["asset", "/etc/hosts", "x.jpg"])
+    assert "is outside this lesson's folder" not in capsys.readouterr().err

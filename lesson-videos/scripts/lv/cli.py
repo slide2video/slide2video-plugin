@@ -104,11 +104,25 @@ def main(argv=None) -> int:
         return 130
 
 
+def _site_mode_paths_ok(args) -> None:
+    """In site mode every path argument must stay inside the lesson folder (or the plugin, to read its guide)."""
+    from . import config
+    roots = [Path.cwd().resolve(), config.PLUGIN_ROOT.resolve()]
+    for v in vars(args).values():
+        for item in (v if isinstance(v, list) else [v]):
+            if isinstance(item, Path):
+                r = item.resolve()
+                if not any(r == root or root in r.parents for root in roots):
+                    raise UserError(f"{item} is outside this lesson's folder; in site mode only files in the lesson folder can be used.")
+
+
 def dispatch(args) -> int:
     from . import keys
     if os.environ.get("LV_SITE_MODE") == "1" and (
             args.cmd in ("open", "pair", "worker", "init") or (args.cmd == "keys" and args.action != "check")):
         raise UserError(f"{args.cmd} isn't available while working for slide2video.com.")
+    if os.environ.get("LV_SITE_MODE") == "1":
+        _site_mode_paths_ok(args)
     if args.cmd == "doctor":
         from . import doctor
         return doctor.run_doctor(args.no_keys)
