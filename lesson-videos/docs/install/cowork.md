@@ -28,13 +28,13 @@ The change applies to **new** chats, not one that's already open.
 1. Start a new chat on claude.ai.
 2. Attach your deck (`.pptx` or `.pdf`).
 3. Using ElevenLabs or Google? Also attach your keys file **as a .zip**. [How to make it](../keys/keys-file.md).
-4. Type `/lesson-videos:make`.
+4. Type `/lesson-videos:make` and send it. That's the whole prompt. (As you type, a menu appears: picking **make** from it shows up as `/make`, which is the same thing.)
 
-The first few minutes go to setting up the cloud computer. Then Claude works the same way as in Claude Code: a few questions, a content brief, a plan with costs for you to approve, chapter 1 for your feedback, then the rest. Each finished chapter appears as a file to download, with its `.vtt` captions.
+The first couple of minutes go to setting up the cloud computer. Then Claude works the same way as in Claude Code: a few questions with clickable answers (including anything in your slides that doesn't add up), a plan with costs for you to approve, chapter 1 for your feedback, then the rest. Each finished chapter appears as a file to download, with its `.vtt` captions.
 
 ## Good to know
 
-- **Speed.** Rendering in the cloud is slower than on a laptop: about 8 minutes for a 5-minute video.
+- **Speed.** The cloud is slower than a laptop: a 3-minute chapter is ready about 8 minutes after you approve the plan, and longer chapters take proportionally longer.
 - **Download as you go.** When the chat ends, its cloud computer is gone. If you stop partway, start a new chat, attach the same files, and run `/lesson-videos:make` again; already-finished chapters must be downloaded first.
 - **Plan limits.** A whole unit is a lot of work; on a Pro plan expect to spread it over a few sessions.
 
