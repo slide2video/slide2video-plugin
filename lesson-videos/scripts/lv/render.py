@@ -69,7 +69,9 @@ def serve(routes: list[tuple[str, Path]]):
 
 def _local_only(ctx, port: int, logs: list[str]) -> None:
     """The page may load only what the local server serves (and data:/blob: URLs it makes itself): scenes.js is
-    written by Claude, so a fetch, image or socket to any other address is stopped before it leaves the Mac."""
+    written by Claude, so a fetch or image to any other address is stopped and logged. This is the second layer:
+    the browser itself has no network beyond the loopback (chromium.launch), which also stops WebSockets and WebRTC.
+    WebSockets are deliberately not routed here: a Playwright WebSocket route fakes an open socket."""
     local = f"http://127.0.0.1:{port}/"
 
     def gate(route):
@@ -80,11 +82,7 @@ def _local_only(ctx, port: int, logs: list[str]) -> None:
             logs.append(f"blocked: {url[:200]} (the page may only load its own files)")
             route.abort("blockedbyclient")
 
-    def no_socket(ws):  # never connect_to_server(): the socket stays inside the browser
-        logs.append(f"blocked: {ws.url[:200]} (the page may only load its own files)")
-
     ctx.route("**/*", gate)
-    ctx.route_web_socket("**/*", no_socket)
 
 
 @contextmanager

@@ -91,7 +91,86 @@ def test_page_cannot_reach_the_network(make_chapter, fake_speak, browser_ok):
         pg.wait_for_timeout(300)
         blocked = [l for l in logs if l.startswith("blocked:")]
         assert got == "blocked"
-        for url in ("https://example.com/x?leak=1", "https://example.com/beacon.png", "http://203.0.113.9/y",
-                    "wss://example.com/ws"):
+        for url in ("https://example.com/x?leak=1", "https://example.com/beacon.png", "http://203.0.113.9/y"):
             assert any(url in l for l in blocked), (url, blocked)
         assert pg.evaluate("window.__ready") is True  # the page's own files still load
+
+
+def _lan_ip():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))  # picks the outgoing interface; sends nothing
+        ip = s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+    return None if ip.startswith("127.") else ip
+
+
+def test_browser_itself_reaches_only_the_local_page_server(browser_ok):
+    """The browser layer alone (no Playwright routes): 127.0.0.1 works; this Mac's own network address, an IP
+    literal, a host name and a WebSocket all fail. The LAN server counts hits, so this needs no internet."""
+    import http.server
+    import threading
+    from playwright.sync_api import sync_playwright
+    from lv import chromium
+    hits = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            body = b"<html><body>ok</body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.ThreadingHTTPServer(("0.0.0.0", 0), H)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    lan = _lan_ip()
+    try:
+        with sync_playwright() as p:
+            browser = chromium.launch(p)
+            try:
+                pg = browser.new_page()
+                pg.goto(f"http://127.0.0.1:{port}/page")
+                assert hits == ["/page"]
+                probe = """async (url) => { try { await fetch(url); return 'reached'; } catch (e) { return 'failed'; } }"""
+                for url in ([f"http://{lan}:{port}/lan"] if lan else []) + ["http://93.184.216.34/", "http://example.com/"]:
+                    assert pg.evaluate(probe, url) == "failed", url
+                ws_urls = ([f"ws://{lan}:{port}/ws"] if lan else []) + ["ws://example.com/"]
+                states = pg.evaluate("""async (urls) => {
+                    const out = [];
+                    for (const u of urls) {
+                        const ws = new WebSocket(u); let opened = false;
+                        ws.onopen = () => { opened = true; };
+                        await new Promise(r => setTimeout(r, 1500));
+                        out.push(opened || ws.readyState === 1 ? 'open' : 'never opened');
+                    }
+                    return out; }""", ws_urls)
+                assert states == ["never opened"] * len(ws_urls)
+                assert hits == ["/page"]  # nothing but the page itself reached the server
+            finally:
+                browser.close()
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_rendering_page_websocket_never_opens(make_chapter, fake_speak, browser_ok):
+    js = ("window.__ws = new WebSocket('ws://example.com/'); window.__wsOpened = false;\n"
+          "window.__ws.onopen = () => { window.__wsOpened = true; };\n" + HELLO_JS)
+    ch = make_chapter([{"id": "hello", "min": 1}], js)
+    narrate.narrate(ch, speak_fn=fake_speak)
+    page.ensure_page(ch)
+    with render.page_for(ch) as (pg, logs):
+        pg.wait_for_timeout(1500)
+        assert pg.evaluate("window.__wsOpened") is False
+        assert pg.evaluate("window.__ws.readyState") != 1

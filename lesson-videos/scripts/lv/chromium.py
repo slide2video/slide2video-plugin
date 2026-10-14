@@ -11,7 +11,13 @@ from pathlib import Path
 from . import config
 from .util import UserError, read_text, write_text
 
-LAUNCH_ARGS = ["--use-gl=angle", "--enable-gpu-rasterization", "--ignore-gpu-blocklist"]
+# The page runs Claude-written scenes.js, so the browser gets no network beyond this Mac's loopback (the local page
+# server): host names don't resolve, everything else goes to a dead proxy, and WebRTC may not send UDP around it.
+NO_NETWORK_ARGS = ["--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",
+                   "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+                   "--webrtc-ip-handling-policy=disable_non_proxied_udp"]
+NO_NETWORK_PROXY = {"server": "http://127.0.0.1:9", "bypass": "127.0.0.1,localhost"}
+LAUNCH_ARGS = ["--use-gl=angle", "--enable-gpu-rasterization", "--ignore-gpu-blocklist", *NO_NETWORK_ARGS]
 NPM_PACKAGE = "@sparticuz/chromium"   # ships the browser inside the npm package; used where downloads are blocked
 
 
@@ -33,9 +39,9 @@ def path() -> str | None:
 
 
 def launch(p):
-    """Start headless Chromium from a sync_playwright() handle."""
+    """Start headless Chromium from a sync_playwright() handle, with no network beyond the loopback."""
     exe = path()
-    return p.chromium.launch(args=LAUNCH_ARGS, **({"executable_path": exe} if exe else {}))
+    return p.chromium.launch(args=LAUNCH_ARGS, proxy=NO_NETWORK_PROXY, **({"executable_path": exe} if exe else {}))
 
 
 def can_launch() -> str:
