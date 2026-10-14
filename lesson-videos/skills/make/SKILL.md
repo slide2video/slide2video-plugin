@@ -101,3 +101,55 @@ Write `README.md` in the folder with the finished videos: a table of the videos 
 - Each `.vtt` file holds the captions (they are also burned into the video).
 
 Tell the teacher the videos are done and where they are.
+
+## Site mode (slide2video.com)
+
+Use this mode when the folder you were started in has `site/turn.json`. The teacher is not at this computer:
+they answer on slide2video.com, and `LV worker` ran you for one **turn**. **Never ask in chat** and never wait
+for an answer: do the work for this turn, write `site/card.json`, check it with `LV card "site/card.json"`, fix
+anything it reports, and **stop**.
+
+- **Commands:** use the command in `site/lv.txt` exactly, in place of the command at the top of this skill (it is
+  the same plugin with absolute paths). Only that command, file reading and file editing are allowed.
+- Some commands are switched off in site mode (`open`, `pair`, `worker`, `init`, and `keys` except `keys check`); don't try them.
+- **Folders:** the deck is in `in/`; `WORK` is `lesson-videos/_work` (pass `--work "lesson-videos/_work"` to
+  `ingest`); finished videos land in `lesson-videos/`.
+- **Progress:** at each step, append one short line to `site/progress.txt` that a teacher would understand
+  ("Reading the deck", "Narrating 3 of 12 scenes", "Rendering chapter 1"). The website shows the last line.
+- **The teacher's input** is in `site/turn.json`: `turn.kind`, plus `instructions` (start), `answers` (answer),
+  `feedback` (change, feedback). Anything the cards didn't settle uses this skill's defaults.
+- **One chapter per turn**, no parallel helper agents.
+
+What to do for each `turn.kind`, and which card ends it:
+
+| `turn.kind` | Do | Card |
+|---|---|---|
+| `start` | Steps 0–3: ingest, read everything, write `brief.md`. First check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. | `"questions"`: if student information was found, one question listing it ("Remove these slides" / "They're not students"), and nothing else. Otherwise the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). |
+| `answer` | Apply the answers. If the student-information question was answered "Remove", leave those slides out entirely. Step 4: write `plan.md`, run `estimate`. | `"plan"`: `markdown` = the outline in brief; `estimate` = `{"usd": <total>, "minutes": <per video>, "chapters": <N>}`. |
+| `change` | Revise `plan.md` from `feedback`, re-run `estimate`. | `"plan"` again. |
+| `approve` | Note the approval and date at the top of `plan.md`. Steps 5–6: music/clips if approved, then chapter 1 (6.1–6.7). | `"review"` for chapter 1. |
+| `feedback` | Apply `feedback` to the chapter just reviewed (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
+| `continue` | Write the agreed style notes at the top of `plan.md` if not there yet. Make the next unfinished chapter (`LV status`). If none is left, step 8. | `"review"` for that chapter, or `"done"`. |
+
+Card formats (all start with `"contract": 1`, `"kind"` and a one-line `"message"` for the teacher):
+
+```json
+{"contract": 1, "kind": "questions", "message": "A few questions before I plan the videos.",
+ "questions": [{"id": "grade", "text": "What grade are the students?",
+                "options": [{"label": "Grades 6–8", "detail": "Middle school"}], "other": true}]}
+```
+
+- `"questions"`: up to 8 questions; ids are short lowercase words; each has 1–6 options (`label`, optional
+  `detail`); `"other": true` lets the teacher type their own answer.
+- `"plan"`: `"markdown"` and `"estimate"` as above.
+- `"review"`: `"chapter": N`, `"video"` (the MP4 path relative to this folder, e.g.
+  `"lesson-videos/Chapter 1 - The Water Cycle.mp4"`), `"captions"` (its `.vtt`), `"stills"` (the `final.jpg`
+  that `render` printed, relative to this folder; files outside `lesson-videos/` are refused). The worker uploads
+  them; don't add `version` or `timing`.
+- `"done"`: `"chapters": [{"chapter": 1, "title": "…"}]` and `"readme"` (the README text from step 8).
+
+Card file paths must be inside `lesson-videos/`: video `.mp4`, captions `.vtt`, stills `.jpg`, `.jpeg` or `.png`.
+Anything else makes the card an error.
+
+If something fails that the teacher must fix (a deck that can't be read, a key that was rejected), write a
+`"questions"` card whose message explains it in one line, with one question and options for what to do next.

@@ -88,3 +88,16 @@ def test_docs_say_videos_work_without_any_keys():
 def test_make_skill_explains_both_layouts():
     _, text = frontmatter("make")
     assert "LV where" in text and "next to the deck" in text and "_source" not in text
+
+
+def test_make_skill_has_a_site_mode():
+    _, text = frontmatter("make")
+    site = text.split("## Site mode", 1)[1]
+    for needed in ("site/turn.json", "site/card.json", "site/progress.txt", "site/lv.txt", "LV card",
+                   '"questions"', '"plan"', '"review"', '"done"', "student", "Never ask", "stop"):
+        assert needed in site, needed
+
+
+def test_setup_offers_to_connect_this_mac():
+    _, text = frontmatter("setup")
+    assert "LV pair" in text and "slide2video.com" in text

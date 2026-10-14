@@ -95,3 +95,10 @@ Only if the teacher asks to keep lessons in one project folder (for example a fo
 ## 8. Done
 
 Summarize: what's ready, which narrator voice will be used (the free Microsoft voice unless they added an ElevenLabs key; `doctor`'s Narration line says which voices work right now), what was skipped, and the cost per video ($0 with the free voice; with ElevenLabs about 5,000–6,000 characters; Gemini about $0.40 per clip plus $0.08 for music). Tell them the next step: open Claude Code in the folder that holds their slide deck and run `/lesson-videos:make`.
+
+## Connect this Mac to slide2video.com (optional)
+
+Only if the teacher was invited to slide2video.com and wants this Mac to make videos for lessons they upload
+there. On a Mac, run `LV pair`. It prints a short code and the website address: the teacher signs in there (on
+any computer), chooses **Add a Mac** and types the code. Then run `LV worker --status` to confirm the
+connection. For now, run `LV worker --once` whenever the website says a lesson is waiting for this Mac.
