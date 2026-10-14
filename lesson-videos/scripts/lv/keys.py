@@ -138,8 +138,8 @@ def paste(service: str, run=subprocess.run, platform: str = sys.platform) -> str
     try:
         r = run(read, capture_output=True, encoding="utf-8", errors="replace", timeout=10)
     except (OSError, subprocess.TimeoutExpired):
-        raise UserError("Couldn't read the clipboard on this computer. Run `keys` and paste the key into the file "
-                        "that opens instead.") from None
+        raise UserError("Couldn't read the clipboard here. In a Cowork chat, attach your keys file zipped and use "
+                        "`keys load`; on your own computer, run `keys` and paste the key into the file that opens.") from None
     value = clean(r.stdout or "")
     if r.returncode or not re.fullmatch(_KEY[var], value):
         raise UserError(f"The clipboard doesn't hold {label}. Click Copy next to the key on the website, "

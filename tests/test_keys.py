@@ -194,3 +194,17 @@ def test_load_reads_zip_attachment(tmp_path):
 def test_load_missing_file():
     with pytest.raises(keys.UserError):
         keys.load(keys.config.home() / "nope.txt")
+
+
+def test_blocked_hint_allows_for_an_outage(monkeypatch):
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+    hint = net.blocked_hint("api.elevenlabs.io")
+    assert "if you haven't already" in hint.lower() and "try again later" in hint
+
+
+def test_paste_without_clipboard_points_cowork_users_to_keys_load():
+    def no_tool(cmd, **kw):
+        raise FileNotFoundError(cmd[0])
+    with pytest.raises(keys.UserError) as e:
+        keys.paste("elevenlabs", run=no_tool, platform="linux")
+    assert "keys load" in str(e.value)

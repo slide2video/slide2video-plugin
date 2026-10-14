@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use once per computer before making lesson videos, or whenever lesson-videos says a tool or key is missing. Installs uv, the renderer and ffmpeg, then helps the teacher choose a narrator voice (a free one needs no account) and optionally create ElevenLabs and Gemini API keys, checking them without ever showing them in chat.
+description: Use once per computer before making lesson videos, or whenever lesson-videos says a tool or key is missing. Installs uv, the renderer and ffmpeg, then helps the teacher choose a narrator voice (a free one needs no account) and optionally create ElevenLabs and Gemini API keys, checking them without ever showing them in chat. Also use it when the teacher says they copied a key and wants it saved.
 ---
 
 # lesson-videos setup

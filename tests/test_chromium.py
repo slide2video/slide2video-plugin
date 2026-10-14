@@ -95,3 +95,30 @@ def test_install_npm_copies_binary(tmp_path):
     assert dest.read_text(encoding="utf-8") == "#!/bin/sh\n"
     assert seen[0][:2] == ["npm", "install"] and chromium.NPM_PACKAGE in seen[0]
     assert seen[1][0] == "node"
+
+
+def test_ensure_explains_why_a_downloaded_browser_wont_start(monkeypatch):
+    monkeypatch.setattr(sys, "platform", "darwin")
+    with pytest.raises(UserError, match="crashed on start"):
+        chromium.ensure(probe=lambda: "crashed on start", playwright_install=lambda: None)
+
+
+def test_ensure_names_lv_chromium_when_it_is_the_broken_one(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "platform", "darwin")
+    exe = write_text(tmp_path / "my chrome", "")
+    monkeypatch.setenv("LV_CHROMIUM", str(exe))
+    with pytest.raises(UserError, match="LV_CHROMIUM"):
+        chromium.ensure(probe=lambda: "bad binary", playwright_install=lambda: None)
+
+
+def test_npm_browser_is_not_saved_when_it_wont_start(tmp_path, monkeypatch):
+    monkeypatch.delenv("LV_CHROMIUM", raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(chromium.shutil, "which", lambda name: f"/usr/bin/{name}")
+    exe = write_text(tmp_path / "npm chrome", "")
+
+    def pw_fail():
+        raise UserError("403 from cdn.playwright.dev")
+    with pytest.raises(UserError):
+        chromium.ensure(probe=lambda: "missing libs", playwright_install=pw_fail, npm_install=lambda: exe)
+    assert not chromium.saved_file().exists()

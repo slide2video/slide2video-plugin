@@ -12,6 +12,7 @@ uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"
 ```
 
 **Rules for the whole skill**
+- **Claude Code on the teacher's own computer only.** In a Cowork chat on claude.ai, `keys paste` can't reach their clipboard: point them to the keys file guide `${CLAUDE_SKILL_DIR}/../../docs/keys/keys-file.md` instead and stop.
 - You never type passwords, create accounts, accept terms, or enter payment details. The teacher does those in the tab; you wait.
 - Ask the teacher before clicking the final **Create** button.
 - **Key secrecy:** from the moment the new key is shown until the teacher tells you they clicked **Copy** and closed that dialog, take **no screenshots** and **do not read the page** of that tab (no read_page, get_page_text, find or zoom). Then save it with `LV keys paste elevenlabs`.

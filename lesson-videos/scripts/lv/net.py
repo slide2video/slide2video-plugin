@@ -28,8 +28,9 @@ def behind_proxy() -> bool:
 def blocked_hint(host: str) -> str:
     if not behind_proxy():
         return ""
-    return (f"blocked by Claude's network setting: in claude.ai open Settings → Capabilities → Additional allowed "
-            f"domains, add {host}, then start a new session")
+    return (f"can't be reached. If you haven't already, in claude.ai open Settings → Capabilities → Additional "
+            f"allowed domains, add {host} and start a new chat; if you already did, the service may be down, "
+            "so try again later")
 
 
 def _open(req, timeout):

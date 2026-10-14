@@ -79,13 +79,21 @@ def install_npm(run=subprocess.run) -> Path:
 
 def ensure(probe=can_launch, playwright_install=None, npm_install=None) -> str:
     """Make a working Chromium available and say which. Tries the existing one before downloading anything."""
-    if not probe():
+    err = probe()
+    if not err:
         return f"ready ({path() or 'Playwright browser'})"
+    chosen = path()
+    if chosen and chosen == os.environ.get("LV_CHROMIUM", "").strip():
+        raise UserError(f"The browser in LV_CHROMIUM ({chosen}) won't start: {err}. Fix or unset LV_CHROMIUM.")
+    if chosen:  # a saved browser that stopped working: forget it and get a fresh one
+        saved_file().unlink(missing_ok=True)
     errors = []
     try:
         (playwright_install or install_playwright)()
-        if not probe():
+        err = probe()
+        if not err:
             return "ready (downloaded)"
+        errors.append(f"the downloaded Chromium won't start: {err}")
     except UserError as e:
         errors.append(str(e))
     if sys.platform.startswith("linux") and shutil.which("npm") and shutil.which("node"):
@@ -95,7 +103,8 @@ def ensure(probe=can_launch, playwright_install=None, npm_install=None) -> str:
             err = probe()
             if not err:
                 return f"ready (from npm {NPM_PACKAGE})"
+            saved_file().unlink(missing_ok=True)
             errors.append(f"the npm Chromium won't start: {err}")
         except UserError as e:
             errors.append(str(e))
-    raise UserError(errors[0] if errors else "Chromium won't start. Run `doctor` again.")
+    raise UserError("\n".join(errors))

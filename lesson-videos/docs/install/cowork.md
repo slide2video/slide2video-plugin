@@ -14,7 +14,7 @@ On claude.ai open **Customize** → **Plugins** → **Add** → **Add marketplac
 
 ## 2. Allow the voice website (once)
 
-Claude's cloud computers can only reach a few package websites unless you allow more. Open **Settings** → **Capabilities** → **Additional allowed domains** and add:
+Claude's cloud computers can only reach a few package websites unless you allow more. Open **Settings** → **Capabilities**, make sure **Allow network egress** is on, then under **Additional allowed domains** add:
 
 - `speech.platform.bing.com`: the free Microsoft voice. Without it, videos have captions but no voice.
 - Only if you use them: `api.elevenlabs.io` (ElevenLabs voice) and `generativelanguage.googleapis.com` (music and AI clips).

@@ -25,5 +25,5 @@ ElevenLabs gives the most natural narration voice. Without it, lesson-videos use
 
 ## Save it
 
-- **In Claude Code:** right after clicking Copy, ask Claude to "save my ElevenLabs key from the clipboard". It runs `keys paste elevenlabs`, which saves the key without showing it and clears your clipboard. Or run `/lesson-videos:setup`, which opens a small file to paste the key into.
+- **In Claude Code:** right after clicking Copy, type `/lesson-videos:setup` and tell Claude you copied your ElevenLabs key. It saves it with `keys paste elevenlabs` without ever showing it, and clears your clipboard. (Don't paste the key into the chat.)
 - **In Cowork:** paste it into your keys file and attach it zipped. See [the keys file](keys-file.md).
