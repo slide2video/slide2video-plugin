@@ -32,8 +32,12 @@ class KeychainStore:
         return (r.stdout.strip() or None) if r.returncode == 0 else None
 
     def set(self, site: str, token: str) -> None:
-        subprocess.run(["security", "add-generic-password", "-U", "-s", self.service, "-a", site, "-w", token],
-                       capture_output=True, check=True)
+        # The token goes in on stdin (security -i), never in argv, so ps and error messages cannot show it.
+        line = f"add-generic-password -U -s {self.service} -a {site} -w {token}\n"
+        r = subprocess.run(["security", "-i"], input=line, capture_output=True, encoding="utf-8")
+        if r.returncode != 0 or "error" in (r.stderr or "").lower():
+            raise UserError("Couldn't save the connection in the macOS Keychain. Unlock the Keychain (or allow access "
+                            "when macOS asks) and run the pairing again.") from None
 
     def delete(self, site: str) -> None:
         subprocess.run(["security", "delete-generic-password", "-s", self.service, "-a", site], capture_output=True)

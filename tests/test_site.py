@@ -58,6 +58,36 @@ def test_cli_pair_and_status(fake_site, monkeypatch, capsys):
     assert "teacher@example.org" in capsys.readouterr().out
 
 
+class _Done:
+    def __init__(self, returncode=0, stderr=""):
+        self.returncode, self.stderr, self.stdout = returncode, stderr, ""
+
+
+def test_keychain_set_keeps_the_token_out_of_argv(monkeypatch):
+    calls = []
+
+    def fake_run(argv, **kw):
+        calls.append((argv, kw))
+        return _Done()
+
+    monkeypatch.setattr(site.subprocess, "run", fake_run)
+    site.KeychainStore().set("https://slide2video.com", "s2v_secret-token")
+    argv, kw = calls[0]
+    assert not any("s2v_secret-token" in a for a in argv)
+    assert "s2v_secret-token" in kw["input"]
+
+
+def test_keychain_set_failure_does_not_show_the_token(monkeypatch):
+    def fake_run(argv, **kw):
+        return _Done(returncode=1, stderr="error: keychain locked s2v_secret-token")
+
+    monkeypatch.setattr(site.subprocess, "run", fake_run)
+    with pytest.raises(UserError) as e:
+        site.KeychainStore().set("https://slide2video.com", "s2v_secret-token")
+    assert "Keychain" in str(e.value)
+    assert "s2v_secret-token" not in str(e.value)
+
+
 def test_file_store_is_private(tmp_path, monkeypatch):
     import os
     s = site.FileStore()
