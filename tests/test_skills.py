@@ -4,7 +4,7 @@ from conftest import PLUGIN, REPO
 from lv import narrate, render, sfx
 from lv.cli import build_parser
 
-SKILLS = ["setup", "make"]
+SKILLS = ["setup", "make", "elevenlabs-get-api-key", "google-get-api-key"]
 
 
 def frontmatter(name):
@@ -25,7 +25,7 @@ def test_skills_use_only_real_commands():
         _, text = frontmatter(s)
         used = set(re.findall(r"\bLV ([a-z_][\w-]*)", text))
         assert used and used <= choices, used - choices
-        assert "${CLAUDE_PLUGIN_ROOT}/scripts/lesson-videos.py" in text
+        assert "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py" in text
 
 
 def test_guide_sfx_names_exist():
@@ -69,7 +69,7 @@ def test_references_need_no_substitution():
 
 
 def test_skills_mention_bash_timeout():
-    for s in SKILLS:
+    for s in ("setup", "make"):  # the skills that run long downloads and renders
         _, text = frontmatter(s)
         assert "timeout" in text
 
