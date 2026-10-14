@@ -28,8 +28,11 @@ def test_render() -> float:
 
 def narration_summary() -> str:
     """Which voices work right now. Never a failure: captions-only always works."""
+    from . import net
     parts = ["ElevenLabs (key set)"] if keys.get("ELEVENLABS_API_KEY", required=False) else []
-    for provider, works, fails in (("edge", "free Microsoft voice works", "free Microsoft voice unavailable right now"),
+    hint = net.blocked_hint(config.EDGE_HOST)
+    edge_down = f"free Microsoft voice {hint}" if hint else "free Microsoft voice unavailable right now"
+    for provider, works, fails in (("edge", "free Microsoft voice works", edge_down),
                                    ("system", "computer's own voice works", "no computer voice")):
         try:
             voices.probe(provider)

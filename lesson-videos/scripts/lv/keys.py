@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 from . import config
@@ -115,11 +116,12 @@ def check(request=None) -> list[tuple[str, bool, str]]:
             rows.append(("ElevenLabs", True, f"{mask(el)}; {left:,} characters left this month ({sub.get('tier', '?')} plan)"))
         except net.ApiError as e:
             d = e.detail.lower()
+            blocked = net.blocked_hint(urllib.parse.urlparse(config.ELEVEN_ROOT).netloc) if e.status == 0 else ""
             if "permission" in d:  # the key authenticated; it just can't read the account
                 rows.append(("ElevenLabs", True, f"{mask(el)}; key works, but can't show your remaining credits "
                                                  "(to see them, edit the key at elevenlabs.io and allow User → Read)"))
             else:
-                hint = "the key was rejected: create a new one and paste it again" if e.status == 401 else str(e)
+                hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status == 401 else str(e))
                 rows.append(("ElevenLabs", False, f"{mask(el)}; {hint}"))
     gm = get("GEMINI_API_KEY", required=False)
     if not gm:
@@ -129,6 +131,7 @@ def check(request=None) -> list[tuple[str, bool, str]]:
             request(f"{config.GEMINI_ROOT}/models?pageSize=1", headers={"x-goog-api-key": gm}, timeout=30)
             rows.append(("Gemini", True, f"{mask(gm)}; key works. Billing is checked the first time music or a clip is made."))
         except net.ApiError as e:
-            hint = "the key was rejected: create a new one and paste it again" if e.status in (400, 401, 403) else str(e)
+            blocked = net.blocked_hint(urllib.parse.urlparse(config.GEMINI_ROOT).netloc) if e.status == 0 else ""
+            hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status in (400, 401, 403) else str(e))
             rows.append(("Gemini", False, f"{mask(gm)}; {hint}"))
     return rows

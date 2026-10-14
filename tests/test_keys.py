@@ -87,3 +87,21 @@ def test_check_missing_permission(monkeypatch):
     rows = keys.check(request=fake)
     assert rows[0][1] is True  # authenticated: narration still works, only the credit count is hidden
     assert "User → Read" in rows[0][2] and "credits" in rows[0][2]
+
+
+def test_check_names_blocked_domain_behind_proxy(monkeypatch):
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+    monkeypatch.setenv("ELEVENLABS_API_KEY", EL)
+    def fake(url, headers=None, timeout=None, **kw):
+        raise net.ApiError(0, "Tunnel connection failed: 403 Forbidden", url)
+    msg = keys.check(request=fake)[0][2]
+    assert "api.elevenlabs.io" in msg and "Settings → Capabilities" in msg and EL not in msg
+
+
+def test_check_has_no_hint_without_proxy(monkeypatch):
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.setenv("ELEVENLABS_API_KEY", EL)
+    def fake(url, headers=None, timeout=None, **kw):
+        raise net.ApiError(0, "timed out", url)
+    assert "Capabilities" not in keys.check(request=fake)[0][2]

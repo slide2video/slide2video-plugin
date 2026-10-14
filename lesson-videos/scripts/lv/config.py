@@ -23,6 +23,7 @@ VOICE_SETTINGS = {"stability": 0.45, "similarity_boost": 0.8, "style": 0.3, "use
 DEFAULT_VOICE = "cgSgspJ2msm6clMCkdW9"     # Jessica: playful, bright, warm (premade voice)
 NARRATION_WORKERS = 2                      # the ElevenLabs free plan allows 2 concurrent requests
 EDGE_VOICE = "en-US-AvaMultilingualNeural"  # free Microsoft voice used when there is no ElevenLabs key
+EDGE_HOST = "speech.platform.bing.com"     # the free Microsoft voice's server
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 VEO_MODEL = "veo-3.1-lite-generate-preview"
