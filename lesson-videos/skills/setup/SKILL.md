@@ -13,6 +13,8 @@ In this skill, **LV** means this command (keep the quotes):
 uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"
 ```
 
+If that path doesn't exist (in some claude.ai sessions `${CLAUDE_SKILL_DIR}` comes through empty), the plugin is under `/root/.claude/plugins/synced/`: use the `lesson-videos/scripts/lesson-videos.py` you find there.
+
 **Never ask for an API key in chat, never read or print `keys.env`.** If the teacher pastes a key into the chat anyway, tell them it's safest to delete that key on the website and create a new one, then continue.
 
 ## 1. uv
