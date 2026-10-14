@@ -39,6 +39,8 @@ Every line should start with ✓. For each ✗, do what the message says. Common
 
 ## 3. Narrator voice: free, or ElevenLabs
 
+**If Claude in Chrome is connected** (`mcp__claude-in-chrome__tabs_context_mcp` answers), offer to do the clicking: for ElevenLabs follow `/lesson-videos:elevenlabs-get-api-key`, for Gemini `/lesson-videos:google-get-api-key`; both save the key with `LV keys paste`, so skip step 5 for that key. Otherwise use the steps below; the teacher can also follow the illustrated guides in `${CLAUDE_SKILL_DIR}/../../docs/keys/`.
+
 Videos work with **no accounts and no keys at all**. Explain the two choices in plain words:
 - **Free Microsoft voice** (default): a natural-sounding voice from Microsoft Edge's Read Aloud feature. No account and no cost. It is an unofficial Microsoft service, fine for classroom use but not for commercial videos, and the narration text is sent to Microsoft. If it's ever unavailable, the computer's own voice is used instead (offline, more robotic), and if even that fails the video is made with captions only, so something is always produced.
 - **ElevenLabs** (optional): the most natural voice, and the one used for the example videos. It needs an account and a key.
@@ -74,6 +76,8 @@ Run:
 LV keys
 ```
 It opens a small text file in TextEdit (Mac) or Notepad (Windows). Tell the teacher: paste the ElevenLabs key right after `ELEVENLABS_API_KEY=` and, if they made one, the Gemini key after `GEMINI_API_KEY=`, with no spaces, then **save and close** the file. Wait for them to say they've done it.
+
+If the teacher prefers, they can click **Copy** on the website and you run `LV keys paste elevenlabs` (or `gemini`) instead of using the file.
 
 ## 6. Check
 
