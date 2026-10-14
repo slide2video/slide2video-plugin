@@ -41,3 +41,12 @@ def test_cli_help_runs(capsys):
     except SystemExit as e:
         assert e.code == 0
     assert "lesson-videos" in capsys.readouterr().out
+
+
+def test_skills_use_skill_dir_not_plugin_root():
+    offenders = [str(f.relative_to(REPO)) for f in (PLUGIN / "skills").rglob("*.md")
+                 if "CLAUDE_PLUGIN_ROOT" in f.read_text(encoding="utf-8")]
+    assert offenders == []
+    for name in ("make", "setup"):
+        text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        assert 'uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"' in text

@@ -10,7 +10,7 @@ You are helping a teacher who may never have used a terminal. Explain each step 
 In this skill, **LV** means this command (keep the quotes):
 
 ```
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/lesson-videos.py"
+uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"
 ```
 
 **Never ask for an API key in chat, never read or print `keys.env`.** If the teacher pastes a key into the chat anyway, tell them it's safest to delete that key on the website and create a new one, then continue.

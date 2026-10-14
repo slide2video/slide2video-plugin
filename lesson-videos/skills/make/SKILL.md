@@ -8,12 +8,12 @@ description: Use when a teacher wants narrated study videos made from their slid
 In this skill, **LV** means this command (keep the quotes):
 
 ```
-uv run "${CLAUDE_PLUGIN_ROOT}/scripts/lesson-videos.py"
+uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"
 ```
 
 If `uv` isn't found, or any command says a tool or key is missing, run the `setup` skill first.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/make/references/guide.md` before writing any `script.json` or `scenes.js`. The sample chapter in `${CLAUDE_PLUGIN_ROOT}/skills/make/references/sample/` shows every idiom.
+Read `${CLAUDE_SKILL_DIR}/references/guide.md` before writing any `script.json` or `scenes.js`. The sample chapter in `${CLAUDE_SKILL_DIR}/references/sample/` shows every idiom.
 
 **Folders.** Run `LV where` in the current folder first.
 - If it says there is no project folder, everything goes next to the deck: for a deck at `<folder>/<deck>.pptx`, finished videos in `<folder>/lesson-videos/` and working files in `<folder>/lesson-videos/_work/` (`deck/`, `brief.md`, `plan.md`, `music/`, `clips/`, `ch1/`, `ch2/`…). Call `<folder>/lesson-videos/_work` **WORK**.
@@ -24,6 +24,11 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/make/references/guide.md` before writing any 
 - Nothing that costs money (narration, music, clips) happens before the teacher approves the plan in step 4.
 - Nothing is uploaded or published.
 - Keep the teacher informed in plain words; they don't need to see commands.
+
+**In a Cowork cloud session** (claude.ai on the web: a fresh Linux computer each time, the teacher's files arrive under `/root/.claude/uploads/`):
+- Run `LV doctor --no-keys` once at the start. It installs what's missing (a browser from npm if the normal download is blocked) and names any website the teacher must allow under Settings → Capabilities → Additional allowed domains; tell them in plain words and that they need to start a new chat afterwards.
+- Keys come as an attached **.zip** of their keys file. Run `LV keys load "<path of the attached .zip>"`. **Never open, unzip, read or `cat` it yourself**; `keys load` prints only which keys it found. If the teacher attached the keys file unzipped (a plain text file whose contents you can already see), don't use or repeat the keys: tell them to delete those keys on the websites, make new ones, and attach them zipped next time ([guide](../../docs/keys/keys-file.md)).
+- The deck is among the attached files; use its folder as `<folder>` above. When a chapter is rendered, share the MP4 and its `.vtt` as downloadable files; that's not publishing. A file over 30 MB can't be downloaded: re-render that chapter with `--fps 24` and say so.
 
 ## 0. Resume?
 
