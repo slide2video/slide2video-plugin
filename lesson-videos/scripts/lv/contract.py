@@ -1,5 +1,5 @@
 """The job contract with slide2video.com. Canonical schemas live in lesson-videos/site-contract/; the site keeps
-a pinned copy and checks the version every device call sends."""
+a pinned copy. contract.json names the plugin version the site is built for; its major is the contract version."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -8,7 +8,8 @@ from . import config
 from .util import read_json
 
 CONTRACT_DIR = config.PLUGIN_ROOT / "site-contract"
-VERSION: int = read_json(CONTRACT_DIR / "contract.json")["version"]
+PLUGIN: str = read_json(CONTRACT_DIR / "contract.json")["plugin"]
+VERSION: int = int(PLUGIN.split(".")[0])
 
 
 @lru_cache(maxsize=None)
