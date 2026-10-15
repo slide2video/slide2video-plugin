@@ -71,7 +71,8 @@ again.
 |---|---|
 | "The code expired before it was entered" | Run `/lesson-videos:setup` again and choose to connect; you get a new code. |
 | "This computer isn't connected to slide2video.com" | It was removed under **Devices**, or never connected. Connect it again (step 2). |
-| "Update the lesson-videos plugin on this computer" | In Claude Code, type `/plugin update lesson-videos`, then run `/lesson-videos:serve` again. |
+| "Update the lesson-videos plugin on this computer" or "slide2video.com needs …" | In Claude Code, type `/plugin update lesson-videos`, then close and reopen Claude Code, then run `/lesson-videos:serve`. |
+| "slide2video.com hasn't caught up with lesson-videos …" | Nothing to do on this computer: the website gets updated soon. Try again later. |
 | "Your Claude plan's usage limit was reached" | Nothing to do: the lesson continues by itself after the limit resets. |
 | The lesson keeps saying **Waiting for your computer** | Run `/lesson-videos:serve` on your home computer and leave it open. If it was asleep or offline mid-step, the step starts over. |
 | "The device this lesson was on was removed" | That computer was removed under **Devices**, so the lesson can't continue. Delete it and upload the deck again. |
