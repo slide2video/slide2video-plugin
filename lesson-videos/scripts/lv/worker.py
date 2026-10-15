@@ -75,15 +75,17 @@ def lv_command() -> str:
 
 
 def claude_command(lv: str) -> list[str]:
-    """Claude Code pinned to this job: no user, project or local settings (so no hooks, extra allow rules or
-    permission mode of the teacher's own), no MCP servers, this plugin loaded explicitly, and anything not allowed
-    below is refused without asking (nobody is there to answer)."""
+    """Claude Code pinned to this job: one model (config.CLAUDE_MODEL), no user, project or local settings (so no
+    hooks, extra allow rules or permission mode of the teacher's own), no MCP servers, this plugin loaded explicitly,
+    and anything not allowed below is refused without asking (nobody is there to answer)."""
     claude = shutil.which("claude")
     if not claude:
         raise UserError("Claude Code isn't installed on this computer (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
     plugin = str(config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
-    return [claude, "-p", PROMPT, "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
+    model = os.environ.get("LV_CLAUDE_MODEL") or config.CLAUDE_MODEL
+    return [claude, "-p", PROMPT, "--model", model,
+            "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
             "--plugin-dir", str(config.PLUGIN_ROOT),
             "--allowedTools", f"Bash({lv}:*)", "Read(./**)", f"Read(//{plugin}/**)", "Edit(./**)", "Write(./**)",
             "--disallowedTools", *DENIED]

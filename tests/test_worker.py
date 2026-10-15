@@ -297,10 +297,18 @@ def test_claude_command_limits_tools(monkeypatch):
         assert bare not in cmd  # a bare tool name would allow it anywhere on the Mac
 
 
+def test_claude_command_model_can_be_overridden_for_comparisons(monkeypatch):
+    monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
+    monkeypatch.setenv("LV_CLAUDE_MODEL", "sonnet")
+    assert _flag(worker.claude_command('"/usr/bin/uv" run "/p/lesson-videos.py"'), "--model") == ["sonnet"]
+
+
 def test_claude_command_pins_claude_codes_configuration(monkeypatch):
+    monkeypatch.delenv("LV_CLAUDE_MODEL", raising=False)
     monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
     cmd = worker.claude_command('"/usr/bin/uv" run "/p/lesson-videos.py"')
     assert _flag(cmd, "--permission-mode") == ["dontAsk"]
+    assert _flag(cmd, "--model") == ["opus"]  # never the account's default of the day
     assert _flag(cmd, "--setting-sources") == [""]  # no user, project or local settings (hooks, allow rules, modes)
     assert _flag(cmd, "--plugin-dir") == [str(worker.config.PLUGIN_ROOT)]
     assert "--strict-mcp-config" in cmd and "--mcp-config" not in cmd
