@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give slide2video.com the approved "Study notebook" identity and flows, a public landing page with an animated
-diagram, and four optional details the computer reports (cost breakdown, progress fraction, suggested answer, slide
+diagram, usage numbers for each teacher and the admin, and four optional details the computer reports (cost breakdown, progress fraction, suggested answer, slide
 count), shipped as site first, then plugin lesson-videos 0.6.0.
 
 **Architecture:** Two repos. `~/Projects/plugins` (Tier B, branch `slide2video-design-pass`) owns the job contract
@@ -35,6 +35,8 @@ screen", `Main.dc.html`, `Landing.dc.html`).
 - Colour tokens exactly as spec §2.1 (light and dark).
 - Contract stays version 1; the new fields are optional: `estimate.items` (≤ 8 of `{label 1–80, usd ≥ 0, detail
   ≤ 120}`), option `recommended: boolean`, card `slides` (integer 1–500), heartbeat `fraction` (number 0–1).
+- Usage rows hold numbers only (no titles, names, answers or file names); kept on lesson deletion; ids dropped on
+  account deletion.
 - Addresses: lessons list at `/lessons`; `/` is the public landing page. Pairing `verify_url` stays `/devices`.
 - Copy: plain words a teacher would use; "computer"/"device", never "Mac", in anything a teacher sees.
 - Plugin: Engine API frozen; `estimate` text output unchanged; model IDs and prices only in `lv/config.py`; every
@@ -2042,7 +2044,460 @@ git add src test
 git commit -m "slide2video: public landing page with the animated round-trip diagram"
 ```
 
-### Task B10: Whole-site check in a browser (local)
+### Task B10: Usage numbers: recording
+
+**Files:**
+- Create: `migrations/0003_usage.sql`, `src/usage.ts`
+- Modify: `src/turns.ts` (claim sets `started_at`; `TurnRow` gains `started_at: number | null`), `src/device.ts`
+  (finish records usage), `src/teacher-api.ts` (start and teacher actions record usage), `src/deletion.ts`
+  (`closeAccount` drops the ids), `src/export.ts` (`data.json` gains `usage`), `src/legal.ts` (Privacy line)
+- Test: `test/usage.test.ts` (new), `test/pages.test.ts` (Privacy line)
+
+**Interfaces:**
+- Produces (`src/usage.ts`): `type Metric = "deck" | "slides" | "video" | "video_seconds" | "turn_seconds" | "error" |
+  "limit_pause" | "lesson_done" | "answer" | "plan_change" | "approve" | "feedback" | "continue" | "wait_seconds"`;
+  `type UsageRow = { metric: Metric; value?: number; detail?: string | null }`;
+  `usageRow(db, teacherId, lessonId, row: UsageRow): D1PreparedStatement`;
+  `usageIfHeld(db, turnId, deviceId, teacherId, lessonId, row: UsageRow, at: number): D1PreparedStatement`.
+  Task B11 reads the `usage` table.
+
+- [ ] **Step 1: Write the failing tests**
+
+`test/usage.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import { unzipSync } from "fflate";
+import { PLAN, QUESTIONS, asTeacher, claim, finish, newLesson, pairDevice, seedTeacher, upload } from "./helpers";
+
+type Row = { metric: string; value: number; detail: string | null };
+const rows = (lessonId: string) => env.DB.prepare("SELECT metric, value, detail FROM usage WHERE lesson_id = ? ORDER BY id")
+  .bind(lessonId).all<Row>().then((r) => r.results);
+const pick = (r: Row[], metric: string) => r.filter((x) => x.metric === metric);
+const post = (email: string, path: string, body: object = {}) => asTeacher(email, path, { method: "POST", body: JSON.stringify(body) });
+const enc = (s: string) => new TextEncoder().encode(s);
+
+/** One lesson through every step: questions, plan, a chapter, a change, the changed chapter, done. */
+export async function fullLesson() {
+  const t = await seedTeacher();
+  const mac = await pairDevice(t.email);
+  const id = await newLesson(t.email);
+  let turn = await claim(mac.token);
+  await finish(mac.token, turn.turn.id, { ...QUESTIONS, slides: 9 });
+  await post(t.email, `/api/lessons/${id}/answer`, { answers: [{ question: "grade", choice: "Grades 6–8", other: null }] });
+  turn = await claim(mac.token);
+  await finish(mac.token, turn.turn.id, { ...PLAN, slides: 9, estimate: { usd: 0.84, minutes: 3, chapters: 1 } });
+  await post(t.email, `/api/lessons/${id}/approve`);
+  turn = await claim(mac.token);
+  await upload(mac.token, turn.turn.id, "out/ch1/v1/a.mp4", enc("video"));
+  await upload(mac.token, turn.turn.id, "out/ch1/v1/timing.json", enc(JSON.stringify({ duration: 192.5, scenes: [] })), "application/json");
+  await finish(mac.token, turn.turn.id, { contract: 1, kind: "review", message: "Chapter 1", chapter: 1, version: 1,
+    video: "out/ch1/v1/a.mp4", timing: "out/ch1/v1/timing.json" });
+  await post(t.email, `/api/lessons/${id}/feedback`, { feedback: "Slower, please" });
+  turn = await claim(mac.token);
+  await upload(mac.token, turn.turn.id, "out/ch1/v2/a.mp4", enc("video 2"));
+  await finish(mac.token, turn.turn.id, { contract: 1, kind: "review", message: "Chapter 1 again", chapter: 1, version: 2,
+    video: "out/ch1/v2/a.mp4" });
+  await post(t.email, `/api/lessons/${id}/continue`);
+  turn = await claim(mac.token);
+  await finish(mac.token, turn.turn.id, { contract: 1, kind: "done", message: "Done", chapters: [{ chapter: 1, title: "One" }] });
+  return { t, mac, id };
+}
+
+describe("usage recording", () => {
+  it("records each step of a lesson once, as numbers only", async () => {
+    const { id } = await fullLesson();
+    const r = await rows(id);
+    expect(pick(r, "deck").length).toBe(1);
+    expect(pick(r, "slides").map((x) => x.value)).toEqual([9]); // the first card's count only
+    expect(pick(r, "video").map((x) => x.detail)).toEqual(["ch1v1", "ch1v2"]);
+    expect(pick(r, "video_seconds").map((x) => [x.value, x.detail])).toEqual([[192.5, "ch1v1"]]); // v2 had no timing file
+    expect(pick(r, "turn_seconds").map((x) => x.detail)).toEqual(["start", "answer", "approve", "feedback", "continue"]);
+    for (const m of ["answer", "feedback", "continue", "lesson_done"]) expect(pick(r, m).length, m).toBe(1);
+    expect(pick(r, "approve").map((x) => x.value)).toEqual([0.84]);
+    expect(pick(r, "wait_seconds").map((x) => x.detail)).toEqual(["answer", "approve", "feedback", "continue"]);
+  });
+
+  it("counts errors and plan-limit pauses with the step they ended", async () => {
+    const t = await seedTeacher();
+    const mac = await pairDevice(t.email);
+    const id = await newLesson(t.email);
+    let turn = await claim(mac.token);
+    await finish(mac.token, turn.turn.id, { contract: 1, kind: "error", message: "Limit",
+      retry_after: new Date(Date.now() + 3600e3).toISOString() });
+    await env.DB.prepare("UPDATE turns SET not_before = 0 WHERE lesson_id = ?").bind(id).run();
+    turn = await claim(mac.token);
+    await finish(mac.token, turn.turn.id, { contract: 1, kind: "error", message: "Broke" });
+    const r = await rows(id);
+    expect(pick(r, "limit_pause").map((x) => x.detail)).toEqual(["start"]);
+    expect(pick(r, "error").map((x) => x.detail)).toEqual(["start"]);
+  });
+
+  it("times a step from its last claim", async () => {
+    const t = await seedTeacher();
+    const mac = await pairDevice(t.email);
+    const id = await newLesson(t.email);
+    const turn = await claim(mac.token);
+    await env.DB.prepare("UPDATE turns SET started_at = 1000, lease_until = 0 WHERE id = ?").bind(turn.turn.id).run();
+    expect((await claim(mac.token)).turn.id).toBe(turn.turn.id);
+    await finish(mac.token, turn.turn.id, QUESTIONS);
+    expect(pick(await rows(id), "turn_seconds")[0].value).toBeLessThan(60);
+  });
+
+  it("keeps a deleted lesson's numbers, and drops both ids when the account is deleted", async () => {
+    const { t, id } = await fullLesson();
+    await asTeacher(t.email, `/api/lessons/${id}`, { method: "DELETE" });
+    expect((await rows(id)).length).toBeGreaterThan(10);
+    await asTeacher(t.email, "/api/account", { method: "DELETE", body: JSON.stringify({ confirm: t.email }) });
+    expect((await rows(id)).length).toBe(0);
+    const anon = await env.DB.prepare("SELECT COUNT(*) AS n FROM usage WHERE teacher_id IS NULL AND lesson_id IS NULL AND metric = 'deck'")
+      .first<{ n: number }>();
+    expect(anon!.n).toBeGreaterThan(0);
+  });
+
+  it("puts the teacher's own usage rows in the export, without ids", async () => {
+    const { t } = await fullLesson();
+    const zip = unzipSync(new Uint8Array(await (await asTeacher(t.email, "/api/account/export")).arrayBuffer()));
+    const data = JSON.parse(new TextDecoder().decode(zip["data.json"]));
+    expect(data.usage.some((u: any) => u.metric === "video_seconds" && u.value === 192.5)).toBe(true);
+    expect(Object.keys(data.usage[0]).sort()).toEqual(["created_at", "detail", "metric", "value"]);
+  });
+});
+```
+
+In `test/pages.test.ts`'s public-pages test add
+`expect(privacy).toContain("Usage numbers: how many decks, slides and videos");`.
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run: `npx vitest run test/usage.test.ts`
+Expected: FAIL (`no such table: usage`).
+
+- [ ] **Step 3: Migration and `src/usage.ts`**
+
+`migrations/0003_usage.sql`:
+
+```sql
+-- usage numbers (spec §4.13): numbers only, kept when a lesson is deleted, ids dropped when the account is
+CREATE TABLE usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, teacher_id TEXT, lesson_id TEXT, metric TEXT NOT NULL,
+  value REAL NOT NULL DEFAULT 1, detail TEXT, created_at INTEGER NOT NULL
+);
+CREATE INDEX usage_metric_time ON usage(metric, created_at);
+CREATE INDEX usage_teacher ON usage(teacher_id, created_at);
+CREATE INDEX usage_lesson ON usage(lesson_id);
+ALTER TABLE turns ADD COLUMN started_at INTEGER;
+```
+
+`src/usage.ts`:
+
+```ts
+import { now } from "./util";
+
+export type Metric = "deck" | "slides" | "video" | "video_seconds" | "turn_seconds" | "error" | "limit_pause" | "lesson_done"
+  | "answer" | "plan_change" | "approve" | "feedback" | "continue" | "wait_seconds";
+export type UsageRow = { metric: Metric; value?: number; detail?: string | null };
+
+const INSERT = "INSERT INTO usage (teacher_id, lesson_id, metric, value, detail, created_at)";
+
+/** One usage row: numbers only, never titles or content. */
+export const usageRow = (db: D1Database, teacherId: string, lessonId: string, u: UsageRow) =>
+  db.prepare(`${INSERT} VALUES (?, ?, ?, ?, ?, ?)`).bind(teacherId, lessonId, u.metric, u.value ?? 1, u.detail ?? null, now());
+
+/** A usage row for a computer's result, written in the same batch and only while that computer still holds the turn. */
+export const usageIfHeld = (db: D1Database, turnId: string, deviceId: string, teacherId: string, lessonId: string,
+  u: UsageRow, at: number) =>
+  db.prepare(`${INSERT} SELECT ?3, ?4, ?5, ?6, ?7, ?8
+              WHERE EXISTS (SELECT 1 FROM turns WHERE id = ?1 AND device_id = ?2 AND state = 'running')`)
+    .bind(turnId, deviceId, teacherId, lessonId, u.metric, u.value ?? 1, u.detail ?? null, at);
+```
+
+- [ ] **Step 4: Record**
+
+`src/turns.ts`: in the claim's first `UPDATE turns SET state = 'running', …` add `, started_at = ?4` (the claim binds
+`?4` to the current time); add `started_at: number | null` to `TurnRow`.
+
+`src/device.ts`: import `{ usageIfHeld, type UsageRow }` from `./usage` and `Env` from `./env`; add:
+
+```ts
+/** A review's video length, from the timing file the computer uploaded with it (0.5.x plugins upload it too). */
+async function videoSeconds(env: Env, lessonId: string, timingPath: unknown): Promise<number | null> {
+  if (typeof timingPath !== "string" || !timingPath) return null;
+  const f = await env.DB.prepare("SELECT r2_key FROM files WHERE lesson_id = ? AND path = ? AND kind = 'timing'")
+    .bind(lessonId, timingPath).first<{ r2_key: string }>();
+  const obj = f ? await env.FILES.get(f.r2_key) : null;
+  if (!obj) return null;
+  try {
+    const d = (JSON.parse(await obj.text()) as { duration?: unknown }).duration;
+    return typeof d === "number" && Number.isFinite(d) && d > 0 && d <= 7200 ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What a computer's result adds to the usage numbers: the step's time, and what its card brings. */
+async function finishUsage(env: Env, turn: TurnRow, card: Record<string, any>, paused: boolean, at: number): Promise<UsageRow[]> {
+  const rows: UsageRow[] = [];
+  if (turn.started_at) rows.push({ metric: "turn_seconds", value: Math.max(0, at - turn.started_at), detail: turn.kind });
+  if (card.kind === "error") rows.push({ metric: paused ? "limit_pause" : "error", detail: turn.kind });
+  if (typeof card.slides === "number") {
+    const l = await env.DB.prepare("SELECT slides FROM lessons WHERE id = ?").bind(turn.lesson_id).first<{ slides: number | null }>();
+    if (l && l.slides === null) rows.push({ metric: "slides", value: card.slides });
+  }
+  if (card.kind === "review") {
+    const detail = `ch${card.chapter}v${card.version ?? 1}`;
+    rows.push({ metric: "video", detail });
+    const secs = await videoSeconds(env, turn.lesson_id, card.timing);
+    if (secs !== null) rows.push({ metric: "video_seconds", value: secs, detail });
+  }
+  if (card.kind === "done") rows.push({ metric: "lesson_done" });
+  return rows;
+}
+```
+
+In the finish handler, just before the batch:
+
+```ts
+  const usage = turn.kind === "delete" ? [] : await finishUsage(c.env, turn, card, retryAt !== null, t);
+```
+
+and the batch becomes (the card insert first, the usage rows next, both still guarded by the held turn, then the
+turn update and the lesson update):
+
+```ts
+  const results = await db.batch([
+    db.prepare(`INSERT INTO cards (id, teacher_id, lesson_id, turn_id, kind, body, created_at)
+                SELECT ?3, ?4, ?5, ?1, ?6, ?7, ?8 WHERE EXISTS (SELECT 1 FROM turns WHERE ${HELD})`)
+      .bind(turn.id, d.id, newId("crd"), turn.teacher_id, turn.lesson_id, card.kind, JSON.stringify(stored), t),
+    ...usage.map((u) => usageIfHeld(db, turn.id, d.id, turn.teacher_id, turn.lesson_id, u, t)),
+    update,
+    db.prepare("UPDATE lessons SET updated_at = ?1, slides = COALESCE(?2, slides) WHERE id = ?3")
+      .bind(t, typeof card.slides === "number" ? card.slides : null, turn.lesson_id),
+  ]);
+  const done = results[1 + usage.length];
+```
+
+`src/teacher-api.ts`: import `{ usageRow }` from `./usage` and `now` from `./util`. In `/lessons/:id/start`, after the
+`queueTurn` check and before `return c.body(null, 204)`:
+
+```ts
+  await usageRow(c.env.DB, t.id, lesson.id, { metric: "deck" }).run();
+```
+
+In the action route, after a successful `answerCard` and before `return c.body(null, 204)`:
+
+```ts
+  const metric = ({ answer: "answer", approve: "approve", change: "plan_change", continue: "continue", feedback: "feedback" } as const)[
+    c.req.param("action") as "answer" | "approve" | "change" | "continue" | "feedback"];
+  const value = metric === "approve" ? Number(JSON.parse(card.body).estimate?.usd) || 0 : 1;
+  await db.batch([
+    usageRow(db, t.id, lesson.id, { metric, value }),
+    usageRow(db, t.id, lesson.id, { metric: "wait_seconds", value: Math.max(0, now() - card.created_at), detail: action.turn }),
+  ]);
+```
+
+`src/deletion.ts` `closeAccount`: add to its batch
+`db.prepare("UPDATE usage SET teacher_id = NULL, lesson_id = NULL WHERE teacher_id = ?").bind(teacherId),`.
+
+`src/export.ts` `exportZip`: add
+`const usage = await q("SELECT metric, value, detail, created_at FROM usage WHERE teacher_id = ?1 ORDER BY id");` and
+`usage` to `data`.
+
+`src/legal.ts`, Privacy, "What is stored" list: add before the action-log item:
+
+```html
+<li>Usage numbers: how many decks, slides and videos, how many minutes of video, and how long each step took. They hold
+no titles or content. They stay when you delete a lesson; when you delete your account they are kept without your name.</li>
+```
+
+- [ ] **Step 5: Run the gate**
+
+Run: `npm run check && npm test`
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add migrations/0003_usage.sql src test
+git commit -m "slide2video: record usage numbers (decks, slides, videos, minutes, step times, teacher actions)"
+```
+
+### Task B11: Usage numbers: Account and Admin
+
+**Files:**
+- Modify: `src/usage.ts` (summaries), `src/pages.ts` (`/account` "Your numbers", `/admin` "Usage"), `src/client.ts`
+  (`.stats`, `.num` styles)
+- Test: `test/usage.test.ts`
+
+**Interfaces:**
+- Consumes: the `usage` table (B10), `fullLesson()` (B10's test helper, same file).
+- Produces: `usageSummary(db, opts?: { teacherId?: string; since?: number }): Promise<Summary>`,
+  `usageByTeacher(db)`, `usageByMonth(db)`, `fmtSeconds(s: number | null): string`, `ratio(a, b): number | null`.
+
+- [ ] **Step 1: Write the failing tests** (append to `test/usage.test.ts`)
+
+```ts
+describe("usage numbers on the pages", () => {
+  it("shows a teacher their own numbers only", async () => {
+    const { t } = await fullLesson();
+    const other = await seedTeacher();
+    const page = await (await asTeacher(t.email, "/account")).text();
+    expect(page).toContain("<h2>Your numbers</h2>");
+    expect(page).toContain("<dt>Decks</dt><dd>1</dd>");
+    expect(page).toContain("<dt>Slides</dt><dd>9</dd>");
+    expect(page).toContain("<dt>Chapter videos</dt><dd>1</dd>");
+    expect(page).toContain("<dt>Minutes of video</dt><dd>3.2</dd>");
+    expect(page).toContain("<dt>Changes you asked for</dt><dd>1</dd>");
+    const theirs = await (await asTeacher(other.email, "/account")).text();
+    expect(theirs).toContain("<dt>Decks</dt><dd>0</dd>");
+    expect(theirs).toContain("<dt>Computer time per minute of video</dt><dd>—</dd>");
+  });
+
+  it("shows the admin the measures, each teacher and each month; nobody else", async () => {
+    const { t } = await fullLesson();
+    const page = await (await asTeacher("admin@example.org", "/admin")).text();
+    expect(page).toContain("<h2>Usage</h2>");
+    expect(page).toContain("<td>Computer time per minute of video</td>");
+    expect(page).toContain("<th>Last 30 days</th><th>All time</th>");
+    expect(page).toContain(`<td>${t.email}</td>`);
+    expect(page).toContain(`<td>${new Date().toISOString().slice(0, 7)}</td>`);
+    expect(await (await asTeacher(t.email, "/admin")).text()).not.toContain("<h2>Usage</h2>");
+  });
+});
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run: `npx vitest run test/usage.test.ts -t "on the pages"`
+Expected: FAIL.
+
+- [ ] **Step 3: Summaries** (append to `src/usage.ts`)
+
+```ts
+export type Summary = { decks: number; slides: number; chapters: number; videos: number; videoSeconds: number;
+  readSeconds: number; makeSeconds: number; feedback: number; approvedUsd: number; finished: number; errors: number;
+  pauses: number; waitAvg: number | null; teachers: number };
+
+const MEASURES = `SUM(metric = 'deck') AS decks,
+  COALESCE(SUM(CASE WHEN metric = 'slides' THEN value END), 0) AS slides,
+  SUM(metric = 'video' AND detail LIKE '%v1') AS chapters,
+  SUM(metric = 'video') AS videos,
+  COALESCE(SUM(CASE WHEN metric = 'video_seconds' THEN value END), 0) AS videoSeconds`;
+
+/** Totals over every teacher, or one (`teacherId`), from `since` (unix seconds) on. */
+export async function usageSummary(db: D1Database, opts: { teacherId?: string; since?: number } = {}): Promise<Summary> {
+  const where: string[] = [];
+  const binds: unknown[] = [];
+  if (opts.teacherId) { where.push("teacher_id = ?"); binds.push(opts.teacherId); }
+  if (opts.since) { where.push("created_at >= ?"); binds.push(opts.since); }
+  const r = await db.prepare(`SELECT ${MEASURES},
+    COALESCE(SUM(CASE WHEN metric = 'turn_seconds' AND detail = 'start' THEN value END), 0) AS readSeconds,
+    COALESCE(SUM(CASE WHEN metric = 'turn_seconds' AND detail IN ('approve', 'continue', 'feedback') THEN value END), 0) AS makeSeconds,
+    SUM(metric = 'feedback') AS feedback,
+    COALESCE(SUM(CASE WHEN metric = 'approve' THEN value END), 0) AS approvedUsd,
+    SUM(metric = 'lesson_done') AS finished, SUM(metric = 'error') AS errors, SUM(metric = 'limit_pause') AS pauses,
+    AVG(CASE WHEN metric = 'wait_seconds' THEN value END) AS waitAvg,
+    COUNT(DISTINCT teacher_id) AS teachers
+    FROM usage${where.length ? ` WHERE ${where.join(" AND ")}` : ""}`).bind(...binds).first<Record<string, number | null>>();
+  const n = (k: string) => Number(r?.[k] ?? 0);
+  return { decks: n("decks"), slides: n("slides"), chapters: n("chapters"), videos: n("videos"), videoSeconds: n("videoSeconds"),
+    readSeconds: n("readSeconds"), makeSeconds: n("makeSeconds"), feedback: n("feedback"), approvedUsd: n("approvedUsd"),
+    finished: n("finished"), errors: n("errors"), pauses: n("pauses"), waitAvg: r?.waitAvg ?? null, teachers: n("teachers") };
+}
+
+export type TeacherUsage = { email: string | null; decks: number; slides: number; chapters: number; videoSeconds: number; last: number };
+
+/** One row per teacher (deleted accounts together, with no email), most recently active first. */
+export const usageByTeacher = (db: D1Database) => db.prepare(`SELECT t.email AS email, ${MEASURES}, MAX(u.created_at) AS last
+  FROM usage u LEFT JOIN teachers t ON t.id = u.teacher_id AND t.deleted_at IS NULL
+  GROUP BY u.teacher_id ORDER BY last DESC`).all<TeacherUsage>().then((r) => r.results);
+
+export type MonthUsage = { month: string; decks: number; chapters: number; videoSeconds: number };
+
+/** The last 12 months with any usage, newest first. */
+export const usageByMonth = (db: D1Database) => db.prepare(`SELECT strftime('%Y-%m', created_at, 'unixepoch') AS month,
+  SUM(metric = 'deck') AS decks, SUM(metric = 'video' AND detail LIKE '%v1') AS chapters,
+  COALESCE(SUM(CASE WHEN metric = 'video_seconds' THEN value END), 0) AS videoSeconds
+  FROM usage GROUP BY month ORDER BY month DESC LIMIT 12`).all<MonthUsage>().then((r) => r.results);
+
+export const ratio = (a: number, b: number): number | null => (b > 0 ? a / b : null);
+export const fmtSeconds = (s: number | null): string => s === null || !Number.isFinite(s) ? "—"
+  : s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+export const fmtMinutes = (s: number) => (s / 60).toFixed(1);
+```
+
+- [ ] **Step 4: Show them** (`src/pages.ts`; import the new names from `./usage`)
+
+`/account`: after the "Your data" section add
+
+```ts
+  const u = await usageSummary(c.env.DB, { teacherId: t.id });
+  const tile = (label: string, value: string | number) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`;
+  const numbers = html`<section class="card"><h2>Your numbers</h2><dl class="stats">
+${tile("Decks", u.decks)}${tile("Slides", u.slides)}${tile("Chapter videos", u.chapters)}${tile("Minutes of video", fmtMinutes(u.videoSeconds))}
+${tile("Changes you asked for", u.feedback)}${tile("Computer time per minute of video", fmtSeconds(ratio(u.makeSeconds, u.videoSeconds / 60)))}</dl></section>`;
+```
+
+and put `${numbers}` between the "Your data" and "Good to know" sections.
+
+`/admin`: after the teachers table and before the invite form, add `${usageSection}`:
+
+```ts
+  const since = now() - 30 * 86400;
+  const [all, recent, people, months] = await Promise.all([
+    usageSummary(c.env.DB), usageSummary(c.env.DB, { since }), usageByTeacher(c.env.DB), usageByMonth(c.env.DB)]);
+  const measures: [string, (s: Summary) => string][] = [
+    ["Teachers active", (s) => String(s.teachers)],
+    ["Decks", (s) => String(s.decks)],
+    ["Slides", (s) => String(s.slides)],
+    ["Chapter videos", (s) => String(s.chapters)],
+    ["Video versions (with changes)", (s) => String(s.videos)],
+    ["Minutes of video", (s) => fmtMinutes(s.videoSeconds)],
+    ["Lessons finished", (s) => String(s.finished)],
+    ["Changes asked per chapter", (s) => { const r = ratio(s.feedback, s.chapters); return r === null ? "—" : r.toFixed(1); }],
+    ["Computer time reading per slide", (s) => fmtSeconds(ratio(s.readSeconds, s.slides))],
+    ["Computer time per minute of video", (s) => fmtSeconds(ratio(s.makeSeconds, s.videoSeconds / 60))],
+    ["Average time teachers take to answer", (s) => fmtSeconds(s.waitAvg)],
+    ["Paid extras approved", (s) => `$${s.approvedUsd.toFixed(2)}`],
+    ["Errors", (s) => String(s.errors)],
+    ["Plan-limit pauses", (s) => String(s.pauses)],
+  ];
+  const usageSection = html`<section class="card"><h2>Usage</h2>
+<div class="scroll"><table><tr><th>Measure</th><th>Last 30 days</th><th>All time</th></tr>
+${measures.map(([label, f]) => html`<tr><td>${label}</td><td class="num">${f(recent)}</td><td class="num">${f(all)}</td></tr>`)}</table></div>
+<h3>By teacher</h3><div class="scroll"><table><tr><th>Teacher</th><th>Decks</th><th>Slides</th><th>Chapter videos</th><th>Minutes of video</th><th>Last active</th></tr>
+${people.map((p) => html`<tr><td>${p.email ?? "Deleted accounts"}</td><td class="num">${p.decks}</td><td class="num">${p.slides}</td>
+<td class="num">${p.chapters}</td><td class="num">${fmtMinutes(p.videoSeconds)}</td><td>${when(p.last)}</td></tr>`)}</table></div>
+<h3>By month</h3><div class="scroll"><table><tr><th>Month</th><th>Decks</th><th>Chapter videos</th><th>Minutes of video</th></tr>
+${months.map((m) => html`<tr><td>${m.month}</td><td class="num">${m.decks}</td><td class="num">${m.chapters}</td><td class="num">${fmtMinutes(m.videoSeconds)}</td></tr>`)}</table></div></section>`;
+```
+
+(`/admin` keeps its "Admins only" 403 for anyone else, before any of this runs.)
+
+`src/client.ts`, append inside `APP_CSS` before the `@media (max-width:600px)` line:
+
+```css
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0}
+.stats div{background:var(--paper);border-radius:12px;padding:12px 14px}
+.stats dt{font-size:.85rem;font-weight:700;color:var(--muted)}
+.stats dd{margin:0;font-size:1.6rem;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+```
+
+- [ ] **Step 5: Run the gate**
+
+Run: `npm run check && npm test`
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src test
+git commit -m "slide2video: usage numbers on Account (your numbers) and Admin (measures, by teacher, by month)"
+```
+
+### Task B12: Whole-site check in a browser (local)
 
 **Files:** none (fixes found go into the task that owns the code, as a follow-up commit)
 
@@ -2058,12 +2513,12 @@ npx wrangler dev --port 8787
 - [ ] **Step 2: Look at every page** at 1280px and 400px wide, light and dark (`prefers-color-scheme`), with Chrome:
   `/` (watch one full 14 s loop; then turn on "reduce motion" in the OS and reload: nothing moves, the laptop shows
   "Slower here"), `/lessons` (empty), `/lessons/new` (pick a file: the row appears and the title fills), `/devices`
-  (Copy copies), `/account`, `/terms`, `/privacy`. Check the browser console shows no CSP violations.
+  (Copy copies), `/account` (Your numbers), `/admin` (Usage), `/terms`, `/privacy`. Check the browser console shows no CSP violations.
 
 - [ ] **Step 3: Fix what's off** in the owning file, run the gate, commit
   (`git commit -m "slide2video: design pass fixes from the browser check"`), and delete `.dev.vars`.
 
-### Task B11: Deploy, switch Access, smoke test
+### Task B13: Deploy, switch Access, smoke test
 
 **Files:** none in the repo (Cloudflare configuration); the ledger records the before/after.
 
@@ -2075,7 +2530,7 @@ npx wrangler d1 migrations apply slide2video --remote
 npx wrangler deploy
 ```
 
-Expected: migration `0002_design_pass.sql` applied; a new Worker version on slide2video.com. The site still sits
+Expected: migrations `0002_design_pass.sql` and `0003_usage.sql` applied; a new Worker version on slide2video.com. The site still sits
 entirely behind Access at this point, which is harmless.
 
 - [ ] **Step 2: Record the current Access setup** (Zero Trust dashboard → Access → Applications, team
@@ -2438,7 +2893,7 @@ Expected: FAIL.
 Run: `uv run pytest -q`
 Expected: PASS (including `tests/test_packaging.py`).
 
-- [ ] **Step 6: Commit, merge and publish** (only after Task B11 is done: the site must already accept the fields)
+- [ ] **Step 6: Commit, merge and publish** (only after Task B13 is done: the site must already accept the fields)
 
 ```bash
 git add lesson-videos .claude-plugin tests/test_skills.py
