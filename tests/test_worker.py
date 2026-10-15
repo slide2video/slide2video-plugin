@@ -458,3 +458,31 @@ def test_worker_skips_a_slide_count_that_doesnt_fit(paired, lessons, slides):
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     assert worker.run_once(claude=_claude_writing(QUESTIONS, also=_with_deck_json(slides))) == 0
     assert paired.finished == [("trn_0123456789abcdefghijkl", QUESTIONS)]
+
+
+@pytest.mark.parametrize("line,text,fraction", [
+    ("Narrating scenes [3/12]", "Narrating scenes", 0.25),
+    ("Rendering chapter 1 [1/1]", "Rendering chapter 1", 1.0),
+    ("Starting [0/4]", "Starting", 0.0),
+    ("Narrating [5/3]", "Narrating [5/3]", None),
+    ("Narrating [0/0]", "Narrating [0/0]", None),
+    ("Narrating [a/b]", "Narrating [a/b]", None),
+    ("Reading the deck", "Reading the deck", None),
+])
+def test_progress_line_and_fraction(tmp_path, line, text, fraction):
+    f = tmp_path / "progress.txt"
+    write_text(f, f"Starting\n{line}\n")
+    assert worker._progress(f) == (text, fraction)
+
+
+def test_heartbeat_sends_the_fraction(paired, lessons, monkeypatch):
+    monkeypatch.setattr(worker, "HEARTBEAT", 0.05)
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+
+    def slow(cwd):
+        import time
+        write_text(cwd / "site" / "progress.txt", "Reading the deck\nNarrating scenes [3/12]\n")
+        time.sleep(0.3)
+    assert worker.run_once(claude=_claude_writing(QUESTIONS, also=slow)) == 0
+    assert {"progress": "Narrating scenes", "fraction": 0.25} in paired.heartbeat_bodies

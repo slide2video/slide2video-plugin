@@ -12,6 +12,7 @@ import pytest
 class FakeSite:
     def __init__(self):
         self.turns, self.files, self.uploads, self.finished, self.heartbeats = [], {}, {}, [], []
+        self.heartbeat_bodies = []
         self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 1
         self.fail_uploads = False
         self.finish_statuses = []   # statuses to answer finish with, one per call, before accepting
@@ -64,7 +65,9 @@ class FakeSite:
                 if parts[:3] == ["api", "device", "turns"] and len(parts) == 5:
                     tid, action = parts[3], parts[4]
                     if action == "heartbeat":
-                        site.heartbeats.append((tid, json.loads(self._body())["progress"]))
+                        body = json.loads(self._body())
+                        site.heartbeats.append((tid, body["progress"]))
+                        site.heartbeat_bodies.append(body)
                         return self._send(204)
                     if action == "files" and method == "PUT":
                         if site.fail_uploads:

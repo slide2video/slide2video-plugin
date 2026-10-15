@@ -161,6 +161,18 @@ def _last_line(f: Path) -> str:
     return lines[-1][:200] if lines else ""
 
 
+_COUNT = re.compile(r"^(.*?)\s*\[(\d+)/(\d+)\]\s*$")
+
+
+def _progress(f: Path) -> tuple[str, float | None]:
+    """The last progress line for the website, and its share done when it ends with ` [done/total]`."""
+    line = _last_line(f)
+    m = _COUNT.match(line)
+    if m and int(m.group(3)) > 0 and int(m.group(2)) <= int(m.group(3)) and m.group(1).strip():
+        return m.group(1).strip(), int(m.group(2)) / int(m.group(3))
+    return line, None
+
+
 class _Heartbeat(threading.Thread):
     def __init__(self, turn_id: str, progress: Path):
         super().__init__(daemon=True)
@@ -169,7 +181,9 @@ class _Heartbeat(threading.Thread):
     def run(self):
         while not self.done.wait(HEARTBEAT):
             try:
-                site.call(f"/api/device/turns/{self.turn_id}/heartbeat", {"progress": _last_line(self.progress)})
+                text, fraction = _progress(self.progress)
+                body = {"progress": text} if fraction is None else {"progress": text, "fraction": fraction}
+                site.call(f"/api/device/turns/{self.turn_id}/heartbeat", body)
             except Exception:  # noqa: BLE001  a missed heartbeat only shortens the lease
                 pass
 
