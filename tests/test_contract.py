@@ -54,3 +54,29 @@ def test_card_command(tmp_path, capsys):
     bad.write_text(json.dumps({"contract": 1, "kind": "plan", "message": "x"}), encoding="utf-8")
     assert cli.main(["card", str(bad)]) == 1
     assert "markdown" in capsys.readouterr().out
+
+
+def test_new_optional_fields_are_checked():
+    plan = _ex("card-plan.json")
+    plan["estimate"]["items"] = [{"label": "", "usd": 1}]
+    assert any("items" in p for p in contract.problems("card", plan))
+    plan["estimate"]["items"] = [{"label": "Music", "usd": -1}]
+    assert any("items" in p for p in contract.problems("card", plan))
+    q = _ex("card-questions.json")
+    q["slides"] = 0
+    assert any("slides" in p for p in contract.problems("card", q))
+    q = _ex("card-questions.json")
+    q["questions"][0]["options"][0]["recommended"] = "yes"
+    assert any("recommended" in p for p in contract.problems("card", q))
+
+
+def test_cards_without_the_new_fields_stay_valid():
+    plan = _ex("card-plan.json")
+    plan["estimate"].pop("items")
+    q = _ex("card-questions.json")
+    q.pop("slides")
+    for question in q["questions"]:
+        for o in question["options"]:
+            o.pop("recommended", None)
+    assert contract.problems("card", plan) == []
+    assert contract.problems("card", q) == []

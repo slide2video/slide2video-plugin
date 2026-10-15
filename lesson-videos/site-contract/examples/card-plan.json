@@ -1,3 +1,4 @@
 {"contract": 1, "kind": "plan", "message": "Here's the plan. Nothing that costs money happens until you approve it.",
  "markdown": "## Chapter 1 – The Water Cycle (~3 min)\n- Hook: the essential question\n- Evaporation\n- Condensation (trap: clouds are liquid)\n- Precipitation\n- Collection\n- Quiz (3 questions)\n- Recap",
- "estimate": {"usd": 0, "minutes": 3, "chapters": 1}}
+ "estimate": {"usd": 0, "minutes": 3, "chapters": 1,
+              "items": [{"label": "Narration (free voice)", "usd": 0}]}}

@@ -7,7 +7,8 @@
   "properties": {
     "contract": {"const": 1},
     "kind": {"enum": ["questions", "plan", "review", "done", "error"]},
-    "message": {"type": "string", "maxLength": 2000}
+    "message": {"type": "string", "maxLength": 2000},
+    "slides": {"type": "integer", "minimum": 1, "maximum": 500}
   },
   "allOf": [
     {
@@ -30,7 +31,8 @@
                     "required": ["label"],
                     "properties": {
                       "label": {"type": "string", "minLength": 1, "maxLength": 120},
-                      "detail": {"type": "string", "maxLength": 300}
+                      "detail": {"type": "string", "maxLength": 300},
+                      "recommended": {"type": "boolean"}
                     }
                   }
                 },
@@ -53,7 +55,19 @@
             "properties": {
               "usd": {"type": "number", "minimum": 0},
               "minutes": {"type": "number", "minimum": 0},
-              "chapters": {"type": "integer", "minimum": 1}
+              "chapters": {"type": "integer", "minimum": 1},
+              "items": {
+                "type": "array", "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "required": ["label", "usd"],
+                  "properties": {
+                    "label": {"type": "string", "minLength": 1, "maxLength": 80},
+                    "usd": {"type": "number", "minimum": 0},
+                    "detail": {"type": "string", "maxLength": 120}
+                  }
+                }
+              }
             }
           }
         }
