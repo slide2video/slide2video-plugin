@@ -8,13 +8,15 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
+import time
 import urllib.parse
 from pathlib import Path
 
-from . import config, contract, keys, narrate, net, paths, site
+from . import awake, config, contract, keys, narrate, net, paths, site
 from .util import UserError, read_json, read_text, safe_name, write_json, write_text
 
 PROMPT = "Run /lesson-videos:make in site mode for this folder."
@@ -33,6 +35,9 @@ DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Write(./.claude/**)", 
 # Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
 DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
+POLL = 30                      # seconds between checks while no lesson is waiting
+BACKOFF = (30, 60, 120, 300)   # seconds after network or server errors, capped at the last
+IDLE, RAN, STOP = "idle", "ran", "stop"
 
 
 def lessons_root() -> Path:
@@ -134,9 +139,9 @@ def timing_for(ch_dir: Path) -> dict | None:
          "first_words": " ".join(say.get(s["id"], "").split()[:8])} for s in T["scenes"]]}
 
 
-def _lock(root: Path) -> Path | None:
+def _lock(root: Path, name: str = ".worker.lock") -> Path | None:
     root.mkdir(parents=True, exist_ok=True)
-    f = root / ".worker.lock"
+    f = root / name
     try:
         fd = os.open(f, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
@@ -147,7 +152,7 @@ def _lock(root: Path) -> Path | None:
             return None                      # alive, owned by someone else
         except (ValueError, ProcessLookupError, OSError):
             f.unlink(missing_ok=True)        # stale
-            return _lock(root)
+            return _lock(root, name)
     os.write(fd, str(os.getpid()).encode())
     os.close(fd)
     return f
@@ -348,22 +353,88 @@ def _run_turn(turn: dict, claude, out) -> int:
     return 1 if card["kind"] == "error" else 0
 
 
-def run_once(claude=None, out=print) -> int:
+def _once(claude, out, start: bool = False) -> tuple[str, int]:
     root = lessons_root()
     lock = _lock(root)
     if lock is None:
         out("Another worker run is still going.")
-        return 0
+        return IDLE, 0
     try:
-        turn = site.call("/api/device/next")
+        turn = site.call("/api/device/next" + ("?start=1" if start else ""))
         if not turn:
-            return 0
+            return IDLE, 0
+        if turn.get("stop") is True:
+            return STOP, 0
         bad = contract.problems("turn", turn)
         if bad:
             tid = (turn.get("turn") or {}).get("id")
             if tid:
                 _finish(tid, error_card("This job doesn't match what this plugin understands: " + "; ".join(bad[:3]), ""))
-            return 1
-        return _run_turn(turn, claude or run_claude, out)
+            return RAN, 1
+        return RAN, _run_turn(turn, claude or run_claude, out)
     finally:
         lock.unlink(missing_ok=True)
+
+
+def run_once(claude=None, out=print) -> int:
+    return _once(claude, out)[1]
+
+
+def _sigterm_as_interrupt():
+    """Claude Code stops a background task with SIGTERM: turn it into KeyboardInterrupt so `finally` cleans up.
+    Returns the previous handler (None if none was set), for `_restore_sigterm`."""
+    def raise_interrupt(signum, frame):
+        raise KeyboardInterrupt
+    try:
+        return signal.signal(signal.SIGTERM, raise_interrupt)
+    except (ValueError, AttributeError, OSError):  # not the main thread, or no SIGTERM here
+        return None
+
+
+def _restore_sigterm(previous) -> None:
+    if previous is not None:
+        try:
+            signal.signal(signal.SIGTERM, previous)
+        except (ValueError, AttributeError, OSError):
+            pass
+
+
+def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release) -> int:
+    """`worker --watch`: run every step this computer is given, one after another, until the website says stop
+    (Disconnect), the pairing is gone, or the process is stopped. Keeps the computer awake meanwhile."""
+    root = lessons_root()
+    guard = _lock(root, ".worker-watch.lock")
+    if guard is None:
+        out("This computer is already making videos for slide2video.com (another window is running it).")
+        return 0
+    handle = previous = None
+    try:
+        previous = _sigterm_as_interrupt()
+        handle = awake_on(out=out)
+        out(f"Making videos for {site.site_url()}. Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
+        start, failures = True, 0
+        while True:
+            try:
+                state, _ = _once(claude, out, start=start)
+            except UserError as e:          # 401 (not connected) or 426 (update the plugin)
+                out(str(e))
+                return 1
+            except net.ApiError as e:       # network down or the site busy: wait longer each time
+                wait = BACKOFF[min(failures, len(BACKOFF) - 1)]
+                failures += 1
+                out(f"Can't reach the website ({e.status or 'no connection'}); trying again in {wait} s.")
+                sleep(wait)
+                continue
+            start, failures = False, 0
+            if state == STOP:
+                out("Disconnected from the website. To start again, run /lesson-videos:serve.")
+                return 0
+            if state == IDLE:
+                sleep(POLL)
+    except KeyboardInterrupt:
+        out("Stopped. This computer no longer makes videos for the website.")
+        return 0
+    finally:
+        awake_off(handle)
+        _restore_sigterm(previous)
+        guard.unlink(missing_ok=True)

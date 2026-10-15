@@ -15,6 +15,7 @@ class FakeSite:
         self.heartbeat_bodies = []
         self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 1
         self.fail_uploads = False
+        self.stop_next, self.next_queries, self.fail_next = False, [], 0
         self.finish_statuses = []   # statuses to answer finish with, one per call, before accepting
         self.token = "s2v_test-token-0123456789"
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
@@ -57,6 +58,15 @@ class FakeSite:
                 if u.path == "/api/device/status":
                     return self._send(200, {"teacher_email": "teacher@example.org", "device_name": "Test Mac", "contract": 1})
                 if u.path == "/api/device/next":
+                    site.next_queries.append(u.query)
+                    if u.query == "start=1":       # like the real site: a fresh watcher clears a stale stop
+                        site.stop_next = False
+                    if site.fail_next > 0:
+                        site.fail_next -= 1
+                        return self._send(503, {"error": "busy"})
+                    if site.stop_next:
+                        site.stop_next = False
+                        return self._send(200, {"stop": True})
                     return self._send(200, site.turns.pop(0)) if site.turns else self._send(204)
                 parts = u.path.strip("/").split("/")
                 if parts[:3] == ["api", "device", "files"]:

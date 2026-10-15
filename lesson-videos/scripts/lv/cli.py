@@ -74,8 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
     pr = sub.add_parser("pair", help="connect this computer to slide2video.com (shows a code to type on the website)")
     pr.add_argument("--name", help="what the website calls this computer (default: its computer name)")
     wk = sub.add_parser("worker", help="take this computer's next job from slide2video.com and run it")
-    wk.add_argument("--once", action="store_true", help="run at most one job, then exit (the default)")
-    wk.add_argument("--status", action="store_true", help="show which account this computer is connected to")
+    mode = wk.add_mutually_exclusive_group()
+    mode.add_argument("--once", action="store_true", help="run at most one job, then exit (the default)")
+    mode.add_argument("--watch", action="store_true",
+                      help="keep running jobs as they come, keeping the computer awake, until stopped or disconnected")
+    mode.add_argument("--status", action="store_true", help="show which account this computer is connected to")
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -188,6 +191,8 @@ def dispatch(args) -> int:
             print(f"Connected to {site.site_url()} as {s['teacher_email']} (this device: {s['device_name']}).")
             return 0
         from . import worker
+        if args.watch:
+            return worker.watch()
         return worker.run_once()
     if args.cmd == "open":
         import webbrowser
