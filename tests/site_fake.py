@@ -15,6 +15,7 @@ class FakeSite:
         self.heartbeat_bodies = []
         self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 1
         self.fail_uploads = False
+        self.latest, self.plugin_headers, self.refuse = None, [], None
         self.stop_next, self.next_queries, self.fail_next = False, [], 0
         self.finish_statuses = []   # statuses to answer finish with, one per call, before accepting
         self.token = "s2v_test-token-0123456789"
@@ -33,6 +34,8 @@ class FakeSite:
                 body = raw if raw is not None else (json.dumps(obj).encode() if obj is not None else b"")
                 self.send_response(code)
                 self.send_header("Content-Length", str(len(body)))
+                if site.latest and code != 426:
+                    self.send_header("X-LV-Latest", site.latest)
                 self.end_headers()
                 self.wfile.write(body)
 
@@ -41,6 +44,9 @@ class FakeSite:
 
             def _route(self, method):
                 u = urllib.parse.urlparse(self.path)
+                site.plugin_headers.append(self.headers.get("X-LV-Plugin"))
+                if site.refuse:
+                    return self._send(426, {"error": site.refuse})
                 if self.headers.get("X-LV-Contract") != str(site.contract):
                     return self._send(426, {"error": "Update the lesson-videos plugin on this computer: run /plugin update lesson-videos"})
                 if u.path == "/api/device/pair/start":

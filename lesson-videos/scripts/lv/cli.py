@@ -187,8 +187,14 @@ def dispatch(args) -> int:
     if args.cmd == "worker":
         from . import site
         if args.status:
+            import lv
+            from . import version
             s = site.status()
-            print(f"Connected to {site.site_url()} as {s['teacher_email']} (this device: {s['device_name']}).")
+            print(f"Connected to {site.site_url()} as {s['teacher_email']} "
+                  f"(this device: {s['device_name']}, lesson-videos {lv.__version__}).")
+            line = version.update_line(site.LATEST)
+            if line:
+                print(line)
             return 0
         from . import worker
         if args.watch:

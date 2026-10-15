@@ -1,5 +1,7 @@
 import pytest
 
+import lv
+
 from lv import cli, net, site
 from lv.util import UserError
 
@@ -149,3 +151,45 @@ def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_pa
     finally:
         p.kill()
         p.wait()
+
+
+def test_call_sends_its_version_and_the_old_contract_header(paired):
+    site.call("/api/device/status")
+    assert paired.plugin_headers[-1] == lv.__version__ == "1.0.0"
+    assert paired.contract == 1  # the fake still checks X-LV-Contract: 1, as today's website does
+
+
+def test_call_remembers_the_websites_version(paired, monkeypatch):
+    monkeypatch.setattr(site, "LATEST", None)
+    site.call("/api/device/status")
+    assert site.LATEST is None  # an older website sends none
+    paired.latest = "1.1.0"
+    site.call("/api/device/next")  # 204 answers carry it too
+    assert site.LATEST == "1.1.0"
+
+
+def test_a_refusal_prints_the_websites_own_words(paired):
+    paired.refuse = "slide2video.com hasn't caught up with lesson-videos 1.0.0 yet. Nothing to do on this computer; try again later."
+    with pytest.raises(UserError) as e:
+        site.call("/api/device/status")
+    assert str(e.value) == paired.refuse
+
+
+def test_the_fallback_update_message_says_to_reopen_claude_code():
+    assert site.UPDATE == ("Update the lesson-videos plugin on this computer: run /plugin update lesson-videos, "
+                           "then close and reopen Claude Code, then run /lesson-videos:serve.")
+
+
+def test_status_names_the_version_and_an_available_update(paired, capsys, monkeypatch):
+    monkeypatch.setattr(site, "LATEST", None)
+    assert cli.main(["worker", "--status"]) == 0
+    out = capsys.readouterr().out
+    assert "(this device: Test Mac, lesson-videos 1.0.0)." in out and "newer" not in out
+    paired.latest = "1.1.0"
+    assert cli.main(["worker", "--status"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[1] == ("A newer lesson-videos (1.1.0) is available. To update: run /plugin update lesson-videos, "
+                      "then close and reopen Claude Code, then run /lesson-videos:serve.")
+    paired.latest = "1.0.0"
+    assert cli.main(["worker", "--status"]) == 0
+    assert "newer" not in capsys.readouterr().out
