@@ -121,7 +121,8 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   land in `lesson-videos/`.
 - **Progress:** at each step, rewrite `site/progress.txt` with its lines plus one new line at the end, a line a
   teacher would understand ("Reading the deck", "Narrating 3 of 12 scenes", "Rendering chapter 1"). You can only
-  read and write files, so write the whole file each time. The website shows the last line.
+  read and write files, so write the whole file each time. The website shows the last line. When a step counts through items (scenes narrated, chapters rendered),
+  end the line with ` [done/total]`, for example `Narrating scenes [3/12]`; the website shows it as a progress bar.
 - **Input:** the kind is the `kind` inside `turn` in `site/turn.json`. `instructions` (start) and `feedback`
   (change, feedback) are the teacher's words. `answers` (answer) are entries shaped like
   `{"question": "<id>", "choice": "<option label or null>", "other": "<typed text or null>"}`; `other` holds the
@@ -145,9 +146,9 @@ What to do for each `turn.kind`, and which card ends it:
 
 | `turn.kind` | Do | Card |
 |---|---|---|
-| `start` | Step 1 (ingest and read every slide). Then check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. If found, write the flagged slide numbers to `student-info.md` and don't write `brief.md` yet (the `answer` turn writes it after the teacher's decision). If none was found, steps 2–3: write `brief.md`. | If student information was found: `"questions"` with one question whose `"id"` is `"students"`, options labelled exactly "Remove these slides" and "They're not students", and nothing else. Otherwise: the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). |
-| `answer` | Check the answers in this order. (1) An answer to `"question": "problem"` (see the failure paragraph below): act on it and continue from where the work stopped. (2) An answer to `"question": "students"`: append `Decision: remove` (for "Remove these slides") or `Decision: not students` (for "They're not students") as the last line of `student-info.md`; if the decision is `remove`, leave the flagged slides out everywhere (with `not students`, keep them); if `brief.md` doesn't exist yet, write it now (steps 2–3). (3) The interview: if `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (grade, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and there are no interview answers, send the interview card and stop: no planning in this turn. Otherwise (`interview.md` exists or was just written in this turn), step 4: read `student-info.md` if it exists, write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = `{"usd": <total>, "minutes": <per video>, "chapters": <N>}`. |
-| `change` | Revise `plan.md` from `feedback`, re-run `estimate`. | `"plan"` again. |
+| `start` | Step 1 (ingest and read every slide). Then check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. If found, write the flagged slide numbers to `student-info.md` and don't write `brief.md` yet (the `answer` turn writes it after the teacher's decision). If none was found, steps 2–3: write `brief.md`. | If student information was found: `"questions"` with one question whose `"id"` is `"students"`, options labelled exactly "Remove these slides" and "They're not students", and nothing else. Otherwise: the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). Give the possible-issue questions the ids `issue-1`, `issue-2`, …. |
+| `answer` | Check the answers in this order. (1) An answer to `"question": "problem"` (see the failure paragraph below): act on it and continue from where the work stopped. (2) An answer to `"question": "students"`: append `Decision: remove` (for "Remove these slides") or `Decision: not students` (for "They're not students") as the last line of `student-info.md`; if the decision is `remove`, leave the flagged slides out everywhere (with `not students`, keep them); if `brief.md` doesn't exist yet, write it now (steps 2–3). (3) The interview: if `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (grade, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and there are no interview answers, send the interview card and stop: no planning in this turn. Otherwise (`interview.md` exists or was just written in this turn), step 4: read `student-info.md` if it exists, write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = the JSON that `LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music] --json` prints (`"usd"` and `"items"`), plus `"minutes": <per video>` and `"chapters": <N>`. |
+| `change` | Revise `plan.md` from `feedback`, re-run `estimate` (with `--json`, as in the `answer` row). | `"plan"` again, its `estimate` built as in the `answer` row. |
 | `approve` | Note the approval and date at the top of `plan.md`. Steps 5–6 (music and clips only as the approval rule above allows), then chapter 1 (6.1–6.7). | `"review"` for chapter 1. |
 | `feedback` | Read `review.md` for the chapter under review. Apply `feedback` to that chapter (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
 | `continue` | Read `review.md` for the last chapter shown. Write the agreed style notes at the top of `plan.md` if not there yet. Make the next unfinished chapter after it (`LV status`). If none is left, step 8. | `"review"` for that chapter, or `"done"`. |
@@ -157,11 +158,13 @@ Card formats (all start with `"contract": 1`, `"kind"` and a one-line `"message"
 ```json
 {"contract": 1, "kind": "questions", "message": "A few questions before I plan the videos.",
  "questions": [{"id": "grade", "text": "What grade are the students?",
-                "options": [{"label": "Grades 6–8", "detail": "Middle school"}], "other": true}]}
+                "options": [{"label": "Grades 6–8", "detail": "Middle school", "recommended": true}], "other": true}]}
 ```
 
 - `"questions"`: up to 8 questions; ids are short lowercase words; each has 1–6 options (`label`, optional
-  `detail`); `"other": true` lets the teacher type their own answer.
+  `detail`); `"other": true` lets the teacher type their own answer. Mark the option you'd choose by default with
+  `"recommended": true` (at most one per question); the website shows it as Claude's suggestion and never picks it for
+  the teacher.
 - `"plan"`: `"markdown"` and `"estimate"` as above.
 - `"review"`: `"chapter": N`, `"video"` (the MP4 path relative to this folder, e.g.
   `"lesson-videos/Chapter 1 - The Water Cycle.mp4"`), `"captions"` (its `.vtt`), `"stills"` (the `final.jpg`

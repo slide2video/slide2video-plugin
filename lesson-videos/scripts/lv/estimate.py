@@ -30,3 +30,16 @@ def report(chars: int, clips: int, music: bool, paid_voice: bool = True) -> str:
         + (f", plus music ${config.LYRIA_PRICE:.2f})." if music else ", no music)."),
     ]
     return "\n".join(lines)
+
+
+def breakdown(chars: int, clips: int, music: bool, paid_voice: bool = True) -> dict:
+    """The plan card's estimate as data: the dollar total and one line per part (the same numbers as `report`)."""
+    clip_usd = config.VEO_SECONDS * config.VEO_PRICE_PER_SECOND
+    items = [{"label": "Narration (ElevenLabs)", "usd": 0, "detail": f"about {chars:,} characters of your ElevenLabs plan"}
+             if paid_voice else {"label": "Narration (free voice)", "usd": 0}]
+    if music:
+        items.append({"label": "Background music", "usd": round(config.LYRIA_PRICE, 2)})
+    if clips:
+        items.append({"label": f"{clips} short animated clip{'' if clips == 1 else 's'}", "usd": round(clips * clip_usd, 2),
+                      "detail": f"{config.VEO_SECONDS:g} seconds each"})
+    return {"usd": gemini_usd(clips, music), "items": items}
