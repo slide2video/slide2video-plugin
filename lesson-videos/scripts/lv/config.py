@@ -25,6 +25,10 @@ NARRATION_WORKERS = 2                      # the ElevenLabs free plan allows 2 c
 EDGE_VOICE = "en-US-AvaMultilingualNeural"  # free Microsoft voice used when there is no ElevenLabs key
 EDGE_HOST = "speech.platform.bing.com"     # the free Microsoft voice's server
 SITE_URL = "https://slide2video.com"      # the website; LV_SITE_URL overrides it (tests, previews)
+# The model every website job runs on, as a Claude Code alias so it follows the newest Opus without a release.
+# Without it a job gets whatever default the account has that day (one lesson ran half on Fable, ~2.5x the cost).
+# LV_CLAUDE_MODEL overrides it (comparisons).
+CLAUDE_MODEL = "opus"
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 VEO_MODEL = "veo-3.1-lite-generate-preview"

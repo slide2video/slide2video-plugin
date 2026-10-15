@@ -155,7 +155,7 @@ def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_pa
 
 def test_call_sends_its_version_and_the_old_contract_header(paired):
     site.call("/api/device/status")
-    assert paired.plugin_headers[-1] == lv.__version__ == "1.0.0"
+    assert paired.plugin_headers[-1] == lv.__version__
     assert paired.contract == 1  # the fake still checks X-LV-Contract: 1, as today's website does
 
 
@@ -184,7 +184,7 @@ def test_status_names_the_version_and_an_available_update(paired, capsys, monkey
     monkeypatch.setattr(site, "LATEST", None)
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out
-    assert "(this device: Test Mac, lesson-videos 1.0.0)." in out and "newer" not in out
+    assert f"(this device: Test Mac, lesson-videos {lv.__version__})." in out and "newer" not in out
     paired.latest = "1.1.0"
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out.splitlines()
