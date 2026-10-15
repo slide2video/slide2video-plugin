@@ -11,12 +11,14 @@ import subprocess
 import sys
 import time
 
-from . import config, contract, net
+import lv
+from . import config, contract, net, version
 from .util import UserError, read_json, write_json
 
 NOT_PAIRED = ("This computer isn't connected to slide2video.com (or it was removed there). Run /lesson-videos:setup "
               "and choose to connect this computer.")
-UPDATE = "Update the lesson-videos plugin on this computer: run /plugin update lesson-videos"
+UPDATE = f"Update the lesson-videos plugin on this computer: {version.STEPS}."
+LATEST: str | None = None  # the plugin version the website said it is built for (X-LV-Latest), last seen
 BAD_CODE = "The website sent a connection code this plugin can't use. Run the pairing again."
 _TOKEN_RE = re.compile(r"s2v_[A-Za-z0-9_-]{20,200}")
 _SITE_RE = re.compile(r"[A-Za-z0-9:/._-]+")
@@ -93,8 +95,16 @@ def _error_message(detail: str) -> str:
         return ""
 
 
+def _note_latest(headers) -> None:
+    global LATEST
+    value = headers.get("X-LV-Latest")
+    if value:
+        LATEST = value
+
+
 def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, timeout=120, retries=2):
-    h = {"X-LV-Contract": str(contract.VERSION), **(headers or {})}
+    # X-LV-Contract only for websites deployed before 1.0.0; drop it in a later release
+    h = {"X-LV-Plugin": lv.__version__, "X-LV-Contract": str(contract.VERSION), **(headers or {})}
     if auth:
         token = store.get(site_url())
         if not token:
@@ -102,7 +112,7 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
         h["Authorization"] = f"Bearer {token}"
     try:
         return net.request(site_url() + path, data=data, headers=h, method=method, raw=raw, timeout=timeout,
-                           retries=retries)
+                           retries=retries, on_headers=_note_latest)
     except net.ApiError as e:
         if e.status == 426:
             raise UserError(_error_message(e.detail) or UPDATE) from None

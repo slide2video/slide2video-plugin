@@ -38,7 +38,8 @@ def _open(req, timeout):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
-def request(url, data=None, headers=None, method=None, timeout=120, retries=2, raw=False, sleep=time.sleep):
+def request(url, data=None, headers=None, method=None, timeout=120, retries=2, raw=False, sleep=time.sleep,
+            on_headers=None):
     h = {"User-Agent": config.USER_AGENT, **(headers or {})}
     body = data
     if isinstance(data, (dict, list)):
@@ -49,6 +50,8 @@ def request(url, data=None, headers=None, method=None, timeout=120, retries=2, r
         req = urllib.request.Request(url, data=body, headers=h, method=method or ("POST" if body is not None else "GET"))
         try:
             with _open(req, timeout) as r:
+                if on_headers is not None:
+                    on_headers(r.headers)
                 payload = r.read()
             return payload if raw else (json.loads(payload) if payload else {})
         except urllib.error.HTTPError as e:

@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from lv import worker
+from lv import site, worker
 from test_worker import DECK, QUESTIONS, _claude_writing, _turn, lessons, lv_pid  # noqa: F401  (fixtures)
 
 
@@ -118,7 +118,7 @@ def test_watch_start_line_names_the_site_teacher_and_computer(paired, lessons):
     a, lines = Awake(), []
     code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
     assert code == 0
-    assert lines[0] == (f"Making videos for {paired.url} as teacher@example.org on Test Mac. "
+    assert lines[0] == (f"Making videos for {paired.url} as teacher@example.org on Test Mac with lesson-videos 1.0.0. "
                         "Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
     assert paired.next_queries[0] == "start=1"  # status is not /next: the first /next still says start=1
 
@@ -132,7 +132,14 @@ def test_watch_stops_when_not_paired(paired, lessons):
     assert not (lessons / ".worker-watch.lock").exists()
 
 
-def test_watch_stops_on_contract_mismatch(paired, lessons):
+def test_watch_stops_with_the_websites_refusal(paired, lessons):
+    paired.refuse = ("This computer has lesson-videos 1.0.0; slide2video.com needs 2.x. To update: run /plugin update "
+                     "lesson-videos, then close and reopen Claude Code, then run /lesson-videos:serve.")
+    code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
+    assert code == 1 and lines[-1] == paired.refuse and a.on == 0
+
+
+def test_watch_stops_on_contract_mismatch_from_an_older_website(paired, lessons):
     paired.contract = 2
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
     assert code == 1 and "Update the lesson-videos plugin" in lines[-1] and a.on == 0
@@ -224,3 +231,53 @@ def test_cli_worker_watch_is_wired(monkeypatch):
     seen = {}
     monkeypatch.setattr(worker, "watch", lambda **kw: seen.setdefault("called", 0) or 0)
     assert cli.main(["worker", "--watch"]) == 0 and "called" in seen
+
+
+UPDATE_11 = ("A newer lesson-videos (1.1.0) is available. To update: run /plugin update lesson-videos, then close "
+             "and reopen Claude Code, then run /lesson-videos:serve.")
+
+
+def test_watch_says_once_that_an_update_is_available_and_keeps_working(paired, lessons, monkeypatch):
+    monkeypatch.setattr(site, "LATEST", None)
+    paired.latest = "1.1.0"
+    polls = []
+
+    def sleep(s):  # three idle polls, then Disconnect
+        polls.append(s)
+        if len(polls) == 3:
+            paired.stop_next = True
+    a, lines = Awake(), []
+    assert worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep,
+                        awake_on=a.keep, awake_off=a.release) == 0
+    assert lines[1] == UPDATE_11 and lines.count(UPDATE_11) == 1
+    assert lines[-1].startswith("Disconnected from the website")
+
+
+def test_watch_says_it_again_when_the_website_moves_on_while_it_runs(paired, lessons, monkeypatch):
+    monkeypatch.setattr(site, "LATEST", None)
+    polls = []
+
+    def sleep(s):
+        polls.append(s)
+        if len(polls) == 1:
+            paired.latest = "1.1.0"
+        if len(polls) == 3:
+            paired.latest = "1.2.0"
+        if len(polls) == 5:
+            paired.stop_next = True
+    a, lines = Awake(), []
+    worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
+    updates = [l for l in lines if l.startswith("A newer lesson-videos")]
+    assert [u.split(")")[0] for u in updates] == ["A newer lesson-videos (1.1.0", "A newer lesson-videos (1.2.0"]
+
+
+def test_watch_says_nothing_when_the_plugin_is_as_new_or_newer(paired, lessons, monkeypatch):
+    monkeypatch.setattr(site, "LATEST", None)
+    for latest in ("1.0.0", "0.9.0", "2.0.0", "junk"):
+        paired.latest, paired.stop_next = latest, False
+
+        def sleep(s):
+            paired.stop_next = True
+        a, lines = Awake(), []
+        worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
+        assert not any("newer lesson-videos" in l for l in lines), latest

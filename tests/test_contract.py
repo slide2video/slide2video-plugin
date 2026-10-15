@@ -12,7 +12,8 @@ def _ex(name):
     return json.loads((EXAMPLES / name).read_text(encoding="utf-8"))
 
 
-def test_version_is_an_integer():
+def test_contract_version_is_the_plugin_major():
+    assert contract.PLUGIN == "1.0.0"
     assert contract.VERSION == 1
 
 

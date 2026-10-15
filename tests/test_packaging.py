@@ -4,6 +4,7 @@ import tomllib
 
 import lv
 from conftest import PLUGIN, REPO
+from lv import contract, version
 
 
 def test_versions_agree():
@@ -13,6 +14,12 @@ def test_versions_agree():
     assert plugin["version"] == entry["version"] == lv.__version__
     assert entry["source"] == "./lesson-videos"
     assert market["name"] == "daniellandi"
+
+
+def test_site_contract_matches_the_plugin_major_and_is_not_newer():
+    have, site = version.parse(lv.__version__), version.parse(contract.PLUGIN)
+    assert have and site
+    assert site[0] == have[0] and site <= have
 
 
 def test_inline_deps_match_pyproject():

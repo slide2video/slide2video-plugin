@@ -181,3 +181,18 @@ def test_site_mode_sends_the_new_card_details():
     assert '"recommended": true' in site                   # Claude's suggested option
     assert "issue-1" in site                               # possible-issue question ids
     assert "[3/12]" in site                                # counted progress lines
+
+
+STEPS = "/plugin update lesson-videos`, then close and reopen Claude Code"
+
+
+def test_serve_update_says_to_reopen_claude_code():
+    _, text = frontmatter("serve")
+    assert STEPS in text
+    assert "hasn't caught up" in text and "nothing to do on this computer" in text.lower()
+    assert "A newer lesson-videos" in text
+
+
+def test_install_guide_update_row_says_to_reopen_claude_code():
+    guide = (PLUGIN / "docs/install/slide2video.md").read_text(encoding="utf-8")
+    assert STEPS in guide and "hasn't caught up" in guide

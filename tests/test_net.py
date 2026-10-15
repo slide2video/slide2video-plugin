@@ -46,3 +46,12 @@ def test_api_error_redacts_key_shapes():
 def test_gemini_error_billing():
     msg = str(net.gemini_error(net.ApiError(429, "RESOURCE_EXHAUSTED quota", "https://g.test"), "music"))
     assert "billing" in msg and "without music" in msg
+
+
+def test_on_headers_sees_the_response_headers(monkeypatch):
+    class WithHeaders(Resp):
+        headers = {"X-LV-Latest": "1.2.0"}
+    monkeypatch.setattr(net, "_open", lambda req, timeout: WithHeaders(b"{}"))
+    seen = []
+    net.request("https://x.test/a", on_headers=seen.append, sleep=lambda s: None)
+    assert seen == [{"X-LV-Latest": "1.2.0"}]

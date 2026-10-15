@@ -23,7 +23,8 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from . import awake, config, contract, keys, narrate, net, paths, site
+import lv
+from . import awake, config, contract, keys, narrate, net, paths, site, version
 from .util import UserError, read_json, read_text, safe_name, write_json, write_text
 
 PROMPT = "Run /lesson-videos:make in site mode for this folder."
@@ -487,8 +488,17 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
         except (net.ApiError, KeyError, TypeError):  # can't reach the website yet: the loop below backs off
             as_who = ""
         handle, awake = awake_on(out=out), True
-        out(f"Making videos for {site.site_url()}{as_who}. Waiting for lessons… "
-            "(stop with Ctrl-C, or Disconnect on the website)")
+        out(f"Making videos for {site.site_url()}{as_who} with lesson-videos {lv.__version__}. "
+            "Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
+        told = None
+
+        def tell_update():                  # once per website version that is newer than this plugin
+            nonlocal told
+            line = version.update_line(site.LATEST)
+            if line and site.LATEST != told:
+                told = site.LATEST
+                out(line)
+        tell_update()
         start, failures, said_busy = True, 0, False
 
         def once_out(line):                 # say "still going" once per busy stretch, not every poll
@@ -508,6 +518,7 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
                 sleep(wait)
                 continue
             failures = 0
+            tell_update()
             if state == BUSY:               # a --once run holds the lock: no call made, so keep `start` for the first real one
                 said_busy = True
                 sleep(POLL)
