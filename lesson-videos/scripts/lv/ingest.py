@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 from . import paths
-from .util import UserError, write_text
+from .util import UserError, write_json, write_text
 
 EXPORT_HELP = ("export it as PowerPoint (.pptx) first. Keynote: File → Export To → PowerPoint. "
                "Google Slides: File → Download → Microsoft PowerPoint (.pptx). Old .ppt or .odp: open it and Save As .pptx.")
@@ -30,6 +30,7 @@ def ingest(deck: Path, work: Path) -> Path:
     media.mkdir(parents=True, exist_ok=True)
     slides = _pptx(deck, media) if ext == ".pptx" else _pdf(deck, out)
     write_text(out / "slides.md", _markdown(deck.name, slides))
+    write_json(out / "deck.json", {"slides": len(slides)})
     images = sorted(media.iterdir())
     sheets = contact_sheets(images, out)
     print(f"{len(slides)} slides, {len(images)} unique images, {len(sheets)} contact sheet(s) → {out}")

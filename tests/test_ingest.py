@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 
 from lv import ingest
-from lv.util import UserError, read_text
+from lv.util import UserError, read_json, read_text
 
 
 def png(color, size=(400, 300)):
@@ -143,3 +143,10 @@ def test_smartart_text_from_data_part():
            b'<dgm:pt><dgm:t><a:p><a:r><a:t>Condensation</a:t></a:r></a:p></dgm:t></dgm:pt>'
            b'</dgm:ptLst></dgm:dataModel>')
     assert ingest._smartart_text(xml) == "Evaporation / Condensation"
+
+
+def test_ingest_writes_the_slide_count(tmp_path):
+    deck = tmp_path / "deck.pptx"
+    make_pptx(deck)
+    out = ingest.ingest(deck, tmp_path / "work")
+    assert read_json(out / "deck.json") == {"slides": 2}

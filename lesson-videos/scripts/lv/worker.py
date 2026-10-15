@@ -233,6 +233,18 @@ def _publish(card: dict, folder: Path, turn_id: str) -> dict:
     return card
 
 
+def _with_slides(card: dict, folder: Path) -> dict:
+    """Add the deck's slide count (written by ingest) to a card that has none, for the website's lesson header."""
+    f = folder / "lesson-videos" / "_work" / "deck" / "deck.json"
+    if "slides" in card or not f.is_file():
+        return card
+    try:
+        n = read_json(f).get("slides")
+    except (OSError, ValueError, AttributeError):
+        return card
+    return {**card, "slides": n} if isinstance(n, int) and not isinstance(n, bool) and 1 <= n <= 500 else card
+
+
 def _redacted(v):
     if isinstance(v, str):
         return keys.redact(v)
@@ -301,6 +313,7 @@ def _run_turn(turn: dict, claude, out) -> int:
             beat = _Heartbeat(tid, sitedir / "progress.txt")
             beat.start()
             card = _claude_turn(turn, folder, sitedir, log, claude)
+            card = _with_slides(card, folder)
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
     except ValueError as e:  # card.json that isn't JSON

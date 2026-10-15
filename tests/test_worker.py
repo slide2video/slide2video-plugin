@@ -435,3 +435,26 @@ def test_claude_always_runs_on_the_subscription(monkeypatch, tmp_path):
                 "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"):
         assert var not in env, var
     assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "subscription-login"
+
+
+def _with_deck_json(slides):
+    def write(cwd):
+        f = cwd / "lesson-videos" / "_work" / "deck" / "deck.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        write_json(f, {"slides": slides})
+    return write
+
+
+def test_worker_adds_the_slide_count_to_the_card(paired, lessons):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(QUESTIONS, also=_with_deck_json(9))) == 0
+    assert paired.finished == [("trn_0123456789abcdefghijkl", {**QUESTIONS, "slides": 9})]
+
+
+@pytest.mark.parametrize("slides", [0, 501, "9", None])
+def test_worker_skips_a_slide_count_that_doesnt_fit(paired, lessons, slides):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(QUESTIONS, also=_with_deck_json(slides))) == 0
+    assert paired.finished == [("trn_0123456789abcdefghijkl", QUESTIONS)]
