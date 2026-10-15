@@ -1,7 +1,8 @@
 # slide2video.com design pass: identity, screens and four new details from the computer
 
 **Status:** approved screens (2026-10-14), spec for review. Revised the same day: no handwriting font in the
-site (the audience is high school), and a public landing page (§4.11).
+site (the audience is high school), a public landing page (§4.11), and usage numbers for each teacher and the
+admin (§4.13).
 **Issue:** DanielLandi/slide2video#11 (Design pass: UX, visual design, graphics and logo).
 **Approved mockups:** Claude Design canvas "slide2video design" (https://claude.ai/artifact/JhS3KPdkNu5YJovbJ7Pyc7),
 section "Direction A: every screen", the lesson page `Main.dc.html` with its three states, and `Landing.dc.html`.
@@ -200,12 +201,14 @@ Every screen follows its approved artboard. Copy below is the copy to use.
 ### 4.9 Account (`/account`)
 
 - "Signed in as …". **Your data:** "N lessons · X MB of files and videos · N devices", "Download everything (.zip)".
+- **Your numbers:** the teacher's own usage (§4.13): decks, slides, chapter videos, minutes of video, changes asked
+  for, and computer time per minute of video.
 - **Good to know:** the site never runs Claude and never sends lessons to anyone else's computer; Terms · Privacy.
 - **Delete my account** in a danger-bordered section, unchanged behaviour.
 
 ### 4.10 Admin, Terms, Privacy, not invited
 
-No artboards: they take the header, type and components above. Terms and Privacy keep their text, set at 65
+No artboards: they take the header, type and components above. Admin also gets the usage section of §4.13. Terms and Privacy keep their text, set at 65
 characters per line. The not-invited page gets the logo and its existing text.
 
 ### 4.11 Landing page (`/`, public)
@@ -247,6 +250,46 @@ Follows `Landing.dc.html`.
   address stays (`/lessons/new`, `/lessons/:id`, `/devices`, `/account`, `/admin`, `/api/...`). The pairing
   `verify_url` stays `/devices`.
 - "Sign in" anywhere links to `/lessons`, which starts the Access sign-in.
+
+### 4.13 Usage numbers
+
+**Recorded:** a `usage` table of numbers only (no titles, file names, answers or other content):
+`usage(id, teacher_id, lesson_id, metric, value, detail, created_at)`. The site writes one row when each of these
+happens:
+
+| Metric | When | Value | Detail |
+|---|---|---|---|
+| `deck` | a lesson starts (deck uploaded, `start`) | 1 | |
+| `slides` | the first card that carries `slides` (§5.4) | the slide count | |
+| `video` | a review card arrives | 1 | `ch<N>v<K>` |
+| `video_seconds` | a review card arrives with its timing file | the video's length (the `duration` in the uploaded `timing.json`) | `ch<N>v<K>` |
+| `turn_seconds` | a computer finishes a step | seconds from the claim to the finish | the turn kind |
+| `error` / `limit_pause` | a step ends with an error card / is paused for a plan limit | 1 | the turn kind |
+| `lesson_done` | the done card arrives | 1 | |
+| `answer`, `plan_change`, `feedback`, `continue` | the teacher answers, asks for plan changes, asks for chapter changes, accepts a chapter | 1 | |
+| `approve` | the teacher approves a plan | the plan's estimated dollars | |
+| `wait_seconds` | any of the teacher's answers above | seconds from the card arriving to the answer | the action |
+
+Steps get a `started_at` time when a computer claims them (a re-claim after a lost computer restarts the clock).
+Video length works with 0.5.x plugins too, since they already upload `timing.json`; versions without one count as
+videos with no minutes. Nothing is backfilled for lessons made before this ships.
+
+**Kept:** usage rows stay when a lesson is deleted (they hold only numbers). Deleting an account removes the
+teacher and lesson ids from its rows, so the totals stay but no longer point to anyone. The account export
+(`data.json`) includes the teacher's own usage rows. The Privacy page says this (§6).
+
+**Shown to each teacher** (Account, "Your numbers", as number tiles): decks, slides, chapter videos (first versions),
+minutes of video (every version), changes asked for (chapter feedback), and computer time per minute of video.
+
+**Shown to the admin** (Admin, "Usage"):
+- a table of measures, for the last 30 days and all time: teachers active, decks, slides, chapter videos, video
+  versions (with changes), minutes of video, lessons finished, changes asked per chapter, computer time reading per
+  slide (`start` steps ÷ slides), computer time per minute of video (chapter-making steps ÷ video minutes), average
+  time teachers take to answer, paid extras approved ($), errors, plan-limit pauses;
+- per teacher: email (or "Deleted accounts"), decks, slides, chapter videos, minutes of video, last active;
+- by month (last 12): decks, chapter videos, minutes of video.
+
+A measure whose denominator is zero shows "—".
 
 ## 5. Four details from the computer
 
@@ -310,6 +353,10 @@ site's `contract/` in the same change set, as today.
   `api/device/*` open for computers. The Worker still requires a valid Access assertion on every teacher route (it
   already does), so a path missing from the list is refused (401), never exposed. The 401 page gets the logo and
   a "Sign in" link to `/lessons`.
+- **Privacy page:** "What is stored" gains: "Usage numbers: how many decks, slides and videos, how many minutes of
+  video, and how long each step took. They hold no titles or content. They stay when you delete a lesson; when you
+  delete your account they are kept without your name." (Changing `src/legal.ts` needs Daniel's approval; approving
+  this spec is that approval.)
 - **Check after the change** (`curl` without a cookie): `/`, `/terms`, `/privacy`, `/app.css`, `/fonts/...`,
   `/health` answer 200; `/lessons`, `/devices`, `/account`, `/admin`, `/api/lessons` redirect to the Access sign-in;
   `/api/device/pair/start` (POST) reaches the Worker. The previous configuration is recorded before the change so
@@ -334,7 +381,11 @@ site's `contract/` in the same change set, as today.
   - heartbeat `fraction`: stored, cleared on claim, wrong types rejected; bar shown only with a fraction;
   - `slides` stored from a card and shown; absent without it;
   - cards from a 0.5.x plugin (no new fields) render as before;
-  - `/fonts/*`, `/logo.svg`, `/favicon.svg` served with the security headers and long cache.
+  - `/fonts/*`, `/logo.svg`, `/favicon.svg` served with the security headers and long cache;
+  - usage: one full lesson records each metric of §4.13 once (slides only the first time), video seconds come from
+    the timing file, a step that is lost and re-claimed is timed from the re-claim, a deleted lesson keeps its rows,
+    a deleted account's rows lose both ids, a teacher sees only their own numbers, only the admin sees the Usage
+    section, and the export includes the teacher's rows.
 - **Plugin** (`uv run pytest -q`): `estimate --json` numbers match the text report; worker strips ` [a/b]`, sends
   the fraction, rejects bad fractions; worker adds `slides` from `deck.json`; `ingest` writes `deck.json`; schema
   examples include the new fields and still validate; packaging versions agree.
