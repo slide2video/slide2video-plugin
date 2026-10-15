@@ -233,7 +233,7 @@ def _watch(claude, **kw):
 
 def test_watch_runs_queued_turns_back_to_back_then_stops(paired, lessons):
     for i in range(2):
-        paired.turns.append(_turn(tid=f"trn_{i}123456789abcdefghijk"))
+        paired.turns.append(_turn(tid=f"trn_{i}123456789abcdefghijkl"))
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     paired.stop_next = False
     fake = _claude_writing(QUESTIONS)
