@@ -47,7 +47,7 @@ def test_skills_use_skill_dir_not_plugin_root():
     offenders = [str(f.relative_to(REPO)) for f in (PLUGIN / "skills").rglob("*.md")
                  if "CLAUDE_PLUGIN_ROOT" in f.read_text(encoding="utf-8")]
     assert offenders == []
-    for name in ("make", "setup"):
+    for name in ("make", "setup", "serve"):
         text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
         assert 'uv run "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py"' in text
 
@@ -73,6 +73,6 @@ def test_edge_tts_floor_has_the_v2_token_fix():
 
 def test_skills_say_where_to_find_the_scripts_when_skill_dir_is_empty():
     """Seen in a claude.ai session: ${CLAUDE_SKILL_DIR} came through empty and the skill copy lived elsewhere."""
-    for name in ("make", "setup"):
+    for name in ("make", "setup", "serve"):
         text = (PLUGIN / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
         assert "/root/.claude/plugins/synced/" in text

@@ -2,6 +2,8 @@ import datetime as dt
 import hashlib
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -40,6 +42,15 @@ def _claude_writing(card, also=None, code=0, log="ok\n"):
         return code
     fake.calls = calls
     return fake
+
+
+@pytest.fixture
+def lv_pid():
+    """A live process whose command line names lesson-videos, like a real worker run."""
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", "lesson-videos.py", "worker"])
+    yield p.pid
+    p.kill()
+    p.wait()
 
 
 QUESTIONS = {"contract": 1, "kind": "questions", "message": "Questions",
@@ -170,9 +181,9 @@ def test_delete_turn_removes_the_folder_without_claude(paired, lessons):
     assert paired.finished[0][1]["kind"] == "done"
 
 
-def test_live_lock_makes_a_second_run_exit(paired, lessons):
+def test_live_lock_makes_a_second_run_exit(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
-    (lessons / ".worker.lock").write_text(str(os.getpid()), encoding="utf-8")
+    (lessons / ".worker.lock").write_text(str(lv_pid), encoding="utf-8")
     paired.turns.append(_turn())
     assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
     assert paired.finished == [] and len(paired.turns) == 1
@@ -185,6 +196,72 @@ def test_stale_lock_is_taken_over(paired, lessons):
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
     assert len(paired.finished) == 1 and not (lessons / ".worker.lock").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX liveness check")
+def test_lock_held_by_a_live_process_that_isnt_lesson_videos_is_stale(paired, lessons):
+    # the pid in an old lock file was reused by some other program: the lock is stale
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+    try:
+        lessons.mkdir(parents=True)
+        (lessons / ".worker.lock").write_text(str(other.pid), encoding="utf-8")
+        paired.turns.append(_turn())
+        paired.files["fil_0123456789abcdefghijkl"] = DECK
+        assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
+        assert len(paired.finished) == 1 and not (lessons / ".worker.lock").exists()
+    finally:
+        other.kill()
+        other.wait()
+
+
+def test_alive_on_posix_trusts_kill_and_then_ps(monkeypatch):
+    monkeypatch.setattr(worker.os, "kill", lambda pid, sig: None)
+    ps = lambda out, code=0: (lambda cmd, **kw: subprocess.CompletedProcess(cmd, code, out, ""))
+    assert worker._alive(42, platform="darwin", run=ps("/usr/bin/python3 /x/lesson-videos.py worker --watch\n"))
+    assert not worker._alive(42, platform="darwin", run=ps("/Applications/Safari.app/Contents/MacOS/Safari\n"))
+    assert worker._alive(42, platform="darwin", run=ps("", 1))          # ps failed: can't tell, so alive
+
+    def no_ps(cmd, **kw):
+        raise FileNotFoundError("ps")
+    assert worker._alive(42, platform="darwin", run=no_ps)                # no ps: alive
+
+    def gone(pid, sig):
+        raise ProcessLookupError
+    monkeypatch.setattr(worker.os, "kill", gone)
+    assert not worker._alive(42, platform="darwin", run=ps("lesson-videos"))
+
+
+class FakeKernel32:
+    """OpenProcess / GetExitCodeProcess / CloseHandle, for the Windows branch of _alive."""
+    def __init__(self, handle=7, exit_code=259, last_error=0):
+        self.handle, self.exit_code, self.last_error, self.opened, self.closed = handle, exit_code, last_error, [], []
+
+    def OpenProcess(self, access, inherit, pid):
+        self.opened.append((access, inherit, pid))
+        return self.handle
+
+    def GetExitCodeProcess(self, handle, ref):
+        ref._obj.value = self.exit_code
+        return 1
+
+    def GetLastError(self):
+        return self.last_error
+
+    def CloseHandle(self, handle):
+        self.closed.append(handle)
+        return 1
+
+
+def test_alive_on_windows_asks_the_kernel_and_never_signals(monkeypatch):
+    def no_kill(pid, sig):  # os.kill(pid, 0) on Windows sends Ctrl-C to the process
+        raise AssertionError("os.kill on Windows")
+    monkeypatch.setattr(worker.os, "kill", no_kill)
+    k = FakeKernel32()
+    assert worker._alive(42, platform="win32", kernel32=k)
+    assert k.opened == [(0x1000, False, 42)] and k.closed == [7]
+    assert not worker._alive(42, platform="win32", kernel32=FakeKernel32(exit_code=0))       # exited
+    assert not worker._alive(42, platform="win32", kernel32=FakeKernel32(handle=0, last_error=87))  # no such process
+    assert worker._alive(42, platform="win32", kernel32=FakeKernel32(handle=0, last_error=5))  # access denied: alive
 
 
 def test_heartbeat_sends_the_progress_line(paired, lessons, monkeypatch):
@@ -243,6 +320,8 @@ def test_run_claude_removes_planted_claude_config_and_cleans_the_env(monkeypatch
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "parent")
+    monkeypatch.setenv("CLAUDE_EFFORT", "high")
+    monkeypatch.setenv("CLAUDE_PID", "4242")
     seen = {}
 
     def fake_run(cmd, **kw):
@@ -254,6 +333,7 @@ def test_run_claude_removes_planted_claude_config_and_cleans_the_env(monkeypatch
     assert seen["left"] == ["in"]
     env = seen["env"]
     assert "CLAUDECODE" not in env and not any(k.startswith("CLAUDE_CODE_") for k in env)
+    assert "CLAUDE_EFFORT" not in env and "CLAUDE_PID" not in env
     assert env["BASH_DEFAULT_TIMEOUT_MS"] == env["BASH_MAX_TIMEOUT_MS"] == "3600000"
 
 
