@@ -79,7 +79,7 @@ Defined once in `app.css` as custom properties; every rule uses tokens. Light is
 - **Mark:** two rounded slides, teal behind and navy in front, with a sun-yellow play triangle on the front one
   (the mockup's 48×40 SVG). Served as `/logo.svg`; also inline in the header.
 - **Wordmark:** "slide2video" in Nunito 800, the **2** in a sun-yellow circle.
-- **Favicon:** `/favicon.svg` (the mark alone) and a 32px PNG fallback, `<link rel="icon">` on every page.
+- **Favicon:** `/favicon.svg` (the mark alone), `<link rel="icon">` on every page.
 
 ### 2.4 Shape and spacing
 
@@ -147,8 +147,8 @@ Every screen follows its approved artboard. Copy below is the copy to use.
 - **Status panel**, one of:
   - **Your turn** (questions, plan, review, actionable error): the card itself (§4.4–4.7), with a "Your turn"
     line in the your-turn style.
-  - **Working:** "Your computer is making …" with the step's text, how long ago it started, and the progress bar
-    when a fraction was sent. "You can close this page; it shows up here when it's ready."
+  - **Working:** "Your computer is working" with the step's text and the progress bar when a fraction was sent
+    (the site doesn't record when a step started, so no elapsed time). "You can close this page; it shows up here when it's ready."
   - **Waiting for the computer:** the computer drawing, "Waiting for your computer", when it was last seen, "On that
     computer, run the line from setup in Terminal.", and a link to the connection guide.
   - **Paused for the plan limit**, **removed device**, **being removed**, **couldn't remove**: the existing texts
