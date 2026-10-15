@@ -123,3 +123,12 @@ def test_site_mode_plans_only_after_the_interview():
     assert "if the decision is `remove`, leave the flagged slides out everywhere" in row
     start = next(l for l in site.splitlines() if l.startswith("| `start`"))
     assert "don't write `brief.md` yet" in start
+
+
+def test_site_mode_sends_the_new_card_details():
+    text = (PLUGIN / "skills" / "make" / "SKILL.md").read_text(encoding="utf-8")
+    site = text.split("## Site mode (slide2video.com)", 1)[1]
+    assert '--json' in site and '"items"' in site          # cost items from estimate --json
+    assert '"recommended": true' in site                   # Claude's suggested option
+    assert "issue-1" in site                               # possible-issue question ids
+    assert "[3/12]" in site                                # counted progress lines
