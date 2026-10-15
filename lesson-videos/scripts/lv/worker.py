@@ -37,7 +37,7 @@ DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "ANTHROPIC_API_KEY", "ANTH
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
 POLL = 30                      # seconds between checks while no lesson is waiting
 BACKOFF = (30, 60, 120, 300)   # seconds after network or server errors, capped at the last
-IDLE, RAN, STOP = "idle", "ran", "stop"
+IDLE, RAN, STOP, BUSY = "idle", "ran", "stop", "busy"
 
 
 def lessons_root() -> Path:
@@ -353,12 +353,15 @@ def _run_turn(turn: dict, claude, out) -> int:
     return 1 if card["kind"] == "error" else 0
 
 
+BUSY_LINE = "Another worker run is still going."
+
+
 def _once(claude, out, start: bool = False) -> tuple[str, int]:
     root = lessons_root()
     lock = _lock(root)
     if lock is None:
-        out("Another worker run is still going.")
-        return IDLE, 0
+        out(BUSY_LINE)
+        return BUSY, 0
     try:
         turn = site.call("/api/device/next" + ("?start=1" if start else ""))
         if not turn:
@@ -412,10 +415,15 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
         previous = _sigterm_as_interrupt()
         handle = awake_on(out=out)
         out(f"Making videos for {site.site_url()}. Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
-        start, failures = True, 0
+        start, failures, said_busy = True, 0, False
+
+        def once_out(line):                 # say "still going" once per busy stretch, not every poll
+            if line == BUSY_LINE and said_busy:
+                return
+            out(line)
         while True:
             try:
-                state, _ = _once(claude, out, start=start)
+                state, _ = _once(claude, once_out, start=start)
             except UserError as e:          # 401 (not connected) or 426 (update the plugin)
                 out(str(e))
                 return 1
@@ -425,7 +433,12 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
                 out(f"Can't reach the website ({e.status or 'no connection'}); trying again in {wait} s.")
                 sleep(wait)
                 continue
-            start, failures = False, 0
+            failures = 0
+            if state == BUSY:               # a --once run holds the lock: no call made, so keep `start` for the first real one
+                said_busy = True
+                sleep(POLL)
+                continue
+            start, said_busy = False, False
             if state == STOP:
                 out("Disconnected from the website. To start again, run /lesson-videos:serve.")
                 return 0

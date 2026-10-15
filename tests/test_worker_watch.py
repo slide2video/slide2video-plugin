@@ -52,6 +52,25 @@ def test_watch_first_call_sends_start_so_a_stale_stop_is_ignored(paired, lessons
     assert code == 0 and paired.next_queries == ["start=1", ""]  # did not stop on the stale mark
 
 
+def test_watch_waits_on_a_once_run_and_still_sends_start_first(paired, lessons):
+    lessons.mkdir(parents=True)
+    lock = lessons / ".worker.lock"
+    lock.write_text(str(os.getpid()), encoding="utf-8")  # a live `worker --once` holds the lock
+    paired.stop_next = True  # stale Disconnect mark
+    n, lines = {"n": 0}, []
+
+    def sleep(s):
+        n["n"] += 1
+        if n["n"] == 1:
+            lock.unlink()
+        elif n["n"] == 3:
+            paired.stop_next = True  # a real Disconnect ends the run
+    a = Awake()
+    code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
+    assert code == 0 and paired.next_queries[0] == "start=1" and n["n"] == 3
+    assert lines.count("Another worker run is still going.") == 1
+
+
 def test_watch_idles_with_the_poll_interval(paired, lessons):
     calls = {"n": 0}
 
@@ -78,6 +97,7 @@ def test_watch_backs_off_on_network_errors_and_recovers(paired, lessons, monkeyp
     code = worker.watch(claude=_claude_writing(QUESTIONS), out=lambda l: None, sleep=sleep, awake_on=a.keep, awake_off=a.release)
     assert code == 0
     assert waits[:6] == [30, 60, 120, 300, 300, worker.POLL]  # back-off caps at 300, then the normal poll again
+    assert paired.next_queries[:6] == ["start=1"] * 6  # start stays set across back-offs
 
 
 def _no_retry(request):
