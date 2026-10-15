@@ -120,3 +120,32 @@ def test_pair_refuses_a_malformed_token_and_stores_nothing(fake_site):
         site.pair(name="Test Mac", sleep=lambda s: None, out=lambda s: None)
     assert "bad token" not in str(e.value)
     assert site.store.get(fake_site.url) is None
+
+
+def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_path):
+    """Claude Code runs `pair` in the background with its output in a pipe: the code line must arrive while it still
+    waits, not when it exits (issue #4)."""
+    import os
+    import queue
+    import subprocess
+    import sys
+    import threading
+
+    from conftest import PLUGIN
+
+    fake_site.pair_polls_pending = 10**6  # never typed: the command keeps waiting
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONUNBUFFERED"}
+    env.update(LV_SITE_URL=fake_site.url, LESSON_VIDEOS_HOME=str(tmp_path / "home"))
+    p = subprocess.Popen([sys.executable, str(PLUGIN / "scripts/lesson-videos.py"), "pair", "--name", "Test Mac"],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, encoding="utf-8")
+    lines = queue.Queue()
+    threading.Thread(target=lambda: lines.put(p.stdout.readline()), daemon=True).start()
+    try:
+        first = lines.get(timeout=30)
+        assert p.poll() is None  # still waiting for the code
+        assert "KQ7-4M2" in first
+    except queue.Empty:
+        raise AssertionError("no pairing code within 30 s: stdout is buffered") from None
+    finally:
+        p.kill()
+        p.wait()
