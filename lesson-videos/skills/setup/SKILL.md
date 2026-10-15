@@ -98,7 +98,7 @@ slide2video.com is a website where invited teachers upload a lesson and this com
 Today this works on a Mac (Windows support is on the way).
 
 First run `LV worker --status`. If it says "Connected to …", this computer is already connected: tell the teacher
-which account it's connected to and skip to the worker line below. If it says this computer isn't connected,
+which account it's connected to and skip to the `/lesson-videos:serve` paragraph below. If it says this computer isn't connected,
 ask the teacher one plain question, even if they never mentioned the website:
 
 > Were you invited to slide2video.com? Do you want this computer to make the videos for lessons you upload there?
@@ -110,18 +110,9 @@ computer), open **Devices** and type the code. When the background command finis
 connected to …"; then run `LV worker --status` to confirm the connection. If the code expired, run `LV pair` again
 for a new one.
 
-Don't run `worker --once` yourself: one lesson step can take an hour or more, far longer than a command may run
-here, so it would be stopped halfway. Instead, give the teacher the exact line to paste into the Terminal app
-whenever the website says a lesson is waiting for this computer: the `LV` line with the real paths filled in (the
-`uv` you used in step 1 and the full path of `lesson-videos.py`, no `${CLAUDE_SKILL_DIR}`), then `worker --once`.
-It looks like this, with this computer's paths:
-
-```
-uv run "<full path on this computer>/lesson-videos/scripts/lesson-videos.py" worker --once
-```
-
-Tell them to open Terminal (Applications ▸ Utilities ▸ Terminal), paste the line, press Return, and leave the
-window open until it says what it sent back.
+To make videos, the teacher (or you, now) runs `/lesson-videos:serve` in Claude Code: it keeps this computer
+working on the website's lessons, one step after another, while that Claude Code window stays open. Offer to start
+it now.
 
 ## 9. Done
 

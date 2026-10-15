@@ -4,7 +4,7 @@ from conftest import PLUGIN, REPO
 from lv import narrate, render, sfx
 from lv.cli import build_parser
 
-SKILLS = ["setup", "make", "elevenlabs-get-api-key", "google-get-api-key"]
+SKILLS = ["setup", "make", "serve", "elevenlabs-get-api-key", "google-get-api-key"]
 
 
 def frontmatter(name):
@@ -112,11 +112,29 @@ def _setup_section(title):
     return m.group(1)
 
 
-def test_setup_hands_the_worker_command_to_the_teacher():
+def test_setup_points_to_serve_after_pairing():
     connect = _setup_section("Connect this computer to slide2video.com")
-    assert "worker --once" in connect and "Terminal" in connect
-    assert "run `LV worker --once`" not in connect  # Claude's Bash tool would stop it after 10 minutes
-    assert "don't run" in connect.lower() or "do not run" in connect.lower()
+    assert "/lesson-videos:serve" in connect
+    assert "worker --once" not in connect and "Terminal" not in connect
+
+
+def test_serve_runs_the_watching_worker_in_the_background():
+    fm, text = frontmatter("serve")
+    assert "LV worker --watch" in text and "run_in_background" in text
+    assert "LV worker --status" in text.split("LV worker --watch", 1)[0]  # checks the connection first
+    low = text.lower()
+    assert "keep this claude code window open" in low
+    assert "disconnect" in low and "stop" in low
+    assert "/root/.claude/plugins/synced/" in text
+
+
+def test_serve_explains_autostart_is_intentionally_not_built():
+    _, text = frontmatter("serve")
+    section = text.split("## Start automatically", 1)[1]
+    low = section.lower()
+    assert "on purpose" in low or "intentionally" in low
+    assert "launchagent" in low and "task scheduler" in low
+    assert "never set it up unasked" in low or "only if the teacher asks" in low
 
 
 def test_setup_asks_about_slide2video_and_pairs_in_the_background():
