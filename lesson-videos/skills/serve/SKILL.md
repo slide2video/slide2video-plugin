@@ -53,7 +53,7 @@ Then tell the teacher:
   run this skill again (the worker keeps its old code until Claude Code is reopened); "hasn't caught up" means the
   website isn't updated yet: nothing to do on this computer, try again later.
 - A line "A newer lesson-videos (…) is available" is only advice: the worker keeps making videos. Tell the teacher
-  in plain words and offer the same three steps for when no step is in progress.
+  in plain words and suggest updating (the same three steps) once nothing is being worked on, since reopening Claude Code stops the worker.
 
 ## Start automatically
 

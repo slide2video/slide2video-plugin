@@ -21,8 +21,9 @@ teacher-visible change; `tests/test_packaging.py` checks the three agree.
 release changes anything the website or the worker relies on (the job contract, device calls, card or turn fields,
 what the website shows about computers), set `plugin` to the new version, copy `site-contract/` to slide2video's
 `contract/`, and deploy the website. A breaking change to the contract is a **major** bump (and bumps the schemas'
-`const`). Releases that touch neither need no website deploy: a computer newer than the website, within its major,
-is fine.
+`const`). Releases that change none of these need no website deploy: a computer newer than the website, within its major,
+is fine. Publish the plugin release first (merge and push this repo), then deploy the website; never the reverse: a
+website deployed first with a new major refuses every computer until the plugin ships.
 
 ## Rules
 
