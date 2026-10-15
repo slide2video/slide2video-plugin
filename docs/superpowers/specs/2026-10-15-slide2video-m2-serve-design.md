@@ -98,16 +98,16 @@ check or stop it.
 
 Migration `0004_disconnect.sql`: `ALTER TABLE devices ADD COLUMN stop_requested_at INTEGER;`
 
-### 3.2 Device API (backward compatible; contract stays version 1)
+### 3.2 Device API (contract stays version 1; no compatibility needed with plugin versions before 0.7.0, which nobody runs)
 
 - `GET /api/device/next`: after the existing `last_seen` update, if the device has `stop_requested_at` set,
-  clear it and answer **204 with header `X-LV-Stop: 1`** instead of claiming a turn. Workers before 0.7.0 ignore
-  the header (they already treat 204 as "nothing to do"), so nothing breaks.
+  clear it and answer **200 with `{"stop": true}`** instead of claiming a turn. The worker checks for `stop` before
+  validating a turn, so the existing HTTP helper (which returns only the JSON body) needs no change.
 - **A fresh start clears an old mark:** a watcher's first call is `GET /api/device/next?start=1`, which clears any
   `stop_requested_at` left from a Disconnect pressed while the computer was offline, and then works as a normal
   `/next`. Without this, starting `/lesson-videos:serve` after such a Disconnect would stop at once.
 - The heartbeat is unchanged (the running step finishes; §1).
-- Document the header in `plugins/lesson-videos/site-contract/` (a short `README.md` there) and the pinned copy.
+- Document `{"stop": true}` and `?start=1` in `plugins/lesson-videos/site-contract/README.md` (new) and the pinned copy.
 
 ### 3.3 Teacher API and Devices page
 
@@ -129,11 +129,11 @@ Migration `0004_disconnect.sql`: `ALTER TABLE devices ADD COLUMN stop_requested_
 ## 4. Testing
 
 - **Plugin (pytest, fake site):** watch loop runs queued turns back to back, idles with the poll interval (time
-  and sleep injected), stops on `X-LV-Stop`, exits 1 on 401 and 426, backs off on network errors; second watcher
+  and sleep injected), stops on `{"stop": true}`, exits 1 on 401 and 426, backs off on network errors; second watcher
   refused; keep-awake called with the right command on macOS and the Windows call faked; release on exit. Skill
   tests: serve skill exists, runs `worker --watch` in the background, covers stop, status and the autostart
   answer; setup step 8 points to serve. Packaging 0.7.0.
-- **Site (Vitest):** migration; `/next` returns 204 + `X-LV-Stop` once and clears the mark; `/next?start=1`
+- **Site (Vitest):** migration; `/next` returns `{"stop": true}` once and clears the mark; `/next?start=1`
   clears a stale mark and answers normally; a device without the mark is unaffected; disconnect route scoping (other teacher, revoked device → 404); Devices page shows Online /
   Stopping / Offline and the button only when Online; waiting-panel copy.
 - **End to end (Daniel's Mac):** run `/lesson-videos:serve`, confirm `caffeinate` is running
