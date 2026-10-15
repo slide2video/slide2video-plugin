@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -52,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--minutes", type=float, default=5)
     e.add_argument("--clips", type=int, default=0)
     e.add_argument("--music", action="store_true")
+    e.add_argument("--json", action="store_true", help="print the plan card's estimate (total and parts) as JSON")
     st = sub.add_parser("status", help="which chapters are done and what each needs next")
     st.add_argument("work", type=Path)
     m = sub.add_parser("music", help="one Lyria music bed (~$0.08) into _work/music/bed.mp3")
@@ -211,7 +213,11 @@ def dispatch(args) -> int:
     from . import estimate, status
     if args.cmd == "estimate":
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
-        print(estimate.report(chars, args.clips, args.music, paid_voice=bool(keys.get("ELEVENLABS_API_KEY", required=False))))
+        paid = bool(keys.get("ELEVENLABS_API_KEY", required=False))
+        if args.json:
+            print(json.dumps(estimate.breakdown(chars, args.clips, args.music, paid_voice=paid)))
+        else:
+            print(estimate.report(chars, args.clips, args.music, paid_voice=paid))
         return 0
     if args.cmd == "status":
         print(status.report(args.work.resolve()))
