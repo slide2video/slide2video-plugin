@@ -105,12 +105,27 @@ def test_setup_offers_to_connect_this_mac():
     assert "LV pair" in text and "slide2video.com" in text
 
 
-def test_setup_hands_the_worker_command_to_the_teacher():
+def _setup_section(title):
     _, text = frontmatter("setup")
-    connect = text.split("## Connect this computer to slide2video.com", 1)[1].split("\n## ", 1)[0]
+    m = re.search(rf"^## \d+\. {re.escape(title)}.*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
+    assert m, f"setup has no numbered step '{title}'"
+    return m.group(1)
+
+
+def test_setup_hands_the_worker_command_to_the_teacher():
+    connect = _setup_section("Connect this computer to slide2video.com")
     assert "worker --once" in connect and "Terminal" in connect
     assert "run `LV worker --once`" not in connect  # Claude's Bash tool would stop it after 10 minutes
     assert "don't run" in connect.lower() or "do not run" in connect.lower()
+
+
+def test_setup_asks_about_slide2video_and_pairs_in_the_background():
+    connect = _setup_section("Connect this computer to slide2video.com")
+    assert "ask the teacher" in connect and "invited" in connect and "?" in connect  # not "only if they bring it up"
+    assert "LV worker --status" in connect.split("ask the teacher", 1)[0]  # skip the question when already connected
+    assert "LV pair" in connect and "run_in_background" in connect     # pair waits for the code to be typed
+    done = _setup_section("Done")
+    assert "slide2video.com" in done
 
 
 def test_site_mode_plans_only_after_the_interview():
