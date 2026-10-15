@@ -128,6 +128,22 @@ def test_serve_runs_the_watching_worker_in_the_background():
     assert "/root/.claude/plugins/synced/" in text
 
 
+def test_serve_quotes_the_workers_own_words():
+    _, text = frontmatter("serve")
+    worker_src = (PLUGIN / "scripts/lv/worker.py").read_text(encoding="utf-8")
+    for line in ("Making videos for", "already making videos", "Disconnected from the website", "Working on"):
+        assert f'"{line}' in text, line          # the skill quotes it…
+        assert line in worker_src, line          # …and the worker prints it
+
+
+def test_serve_stop_explains_a_step_in_progress_starts_over():
+    _, text = frontmatter("serve")
+    stop = text.split("**\"Stop\"**", 1)[1].split("\n- ", 1)[0]
+    low = stop.lower()
+    assert "stop the background bash task" in low
+    assert "working on" in low and "starts over" in low and "disconnect" in low
+
+
 def test_serve_explains_autostart_is_intentionally_not_built():
     _, text = frontmatter("serve")
     section = text.split("## Start automatically", 1)[1]

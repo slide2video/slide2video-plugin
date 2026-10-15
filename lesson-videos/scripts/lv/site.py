@@ -93,7 +93,7 @@ def _error_message(detail: str) -> str:
         return ""
 
 
-def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, timeout=120):
+def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, timeout=120, retries=2):
     h = {"X-LV-Contract": str(contract.VERSION), **(headers or {})}
     if auth:
         token = store.get(site_url())
@@ -101,7 +101,8 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
             raise UserError(NOT_PAIRED)
         h["Authorization"] = f"Bearer {token}"
     try:
-        return net.request(site_url() + path, data=data, headers=h, method=method, raw=raw, timeout=timeout)
+        return net.request(site_url() + path, data=data, headers=h, method=method, raw=raw, timeout=timeout,
+                           retries=retries)
     except net.ApiError as e:
         if e.status == 426:
             raise UserError(_error_message(e.detail) or UPDATE) from None

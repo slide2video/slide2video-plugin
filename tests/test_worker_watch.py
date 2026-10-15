@@ -1,9 +1,12 @@
+import datetime as dt
 import os
+import signal
+import sys
 
 import pytest
 
 from lv import worker
-from test_worker import DECK, QUESTIONS, _claude_writing, _turn, lessons  # noqa: F401  (fixture)
+from test_worker import DECK, QUESTIONS, _claude_writing, _turn, lessons, lv_pid  # noqa: F401  (fixtures)
 
 
 class Awake:
@@ -52,10 +55,10 @@ def test_watch_first_call_sends_start_so_a_stale_stop_is_ignored(paired, lessons
     assert code == 0 and paired.next_queries == ["start=1", ""]  # did not stop on the stale mark
 
 
-def test_watch_waits_on_a_once_run_and_still_sends_start_first(paired, lessons):
+def test_watch_waits_on_a_once_run_and_still_sends_start_first(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
     lock = lessons / ".worker.lock"
-    lock.write_text(str(os.getpid()), encoding="utf-8")  # a live `worker --once` holds the lock
+    lock.write_text(str(lv_pid), encoding="utf-8")  # a live `worker --once` holds the lock
     paired.stop_next = True  # stale Disconnect mark
     n, lines = {"n": 0}, []
 
@@ -107,21 +110,37 @@ def _no_retry(request):
     return call
 
 
+def test_watch_start_line_names_the_site_teacher_and_computer(paired, lessons):
+    paired.stop_next = True  # stale: cleared by start=1
+
+    def sleep(s):
+        paired.stop_next = True
+    a, lines = Awake(), []
+    code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
+    assert code == 0
+    assert lines[0] == (f"Making videos for {paired.url} as teacher@example.org on Test Mac. "
+                        "Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
+    assert paired.next_queries[0] == "start=1"  # status is not /next: the first /next still says start=1
+
+
 def test_watch_stops_when_not_paired(paired, lessons):
     paired.token = "something-else"  # the site no longer accepts this computer's token (Remove on the website)
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
-    assert code == 1 and "isn't connected to slide2video.com" in lines[-1] and a.off == 1
+    assert code == 1 and "isn't connected to slide2video.com" in lines[-1]
+    assert a.on == 0 and a.off == 0 and paired.next_queries == []  # found out before keep-awake started
+    assert not any(l.startswith("Making videos for") for l in lines)
+    assert not (lessons / ".worker-watch.lock").exists()
 
 
 def test_watch_stops_on_contract_mismatch(paired, lessons):
     paired.contract = 2
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
-    assert code == 1 and "Update the lesson-videos plugin" in lines[-1]
+    assert code == 1 and "Update the lesson-videos plugin" in lines[-1] and a.on == 0
 
 
-def test_second_watcher_is_refused(paired, lessons):
+def test_second_watcher_is_refused(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
-    (lessons / ".worker-watch.lock").write_text(str(os.getpid()), encoding="utf-8")
+    (lessons / ".worker-watch.lock").write_text(str(lv_pid), encoding="utf-8")
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
     assert code == 0 and "already making videos" in lines[-1] and a.on == 0 and paired.next_queries == []
 
@@ -133,6 +152,67 @@ def test_watch_cleans_up_on_sigterm_style_interrupt(paired, lessons):
     code = worker.watch(claude=_claude_writing(QUESTIONS), out=lambda l: None, sleep=interrupted,
                         awake_on=a.keep, awake_off=a.release)
     assert code == 0 and a.off == 1 and not (lessons / ".worker-watch.lock").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="no SIGTERM to send to oneself on Windows")
+def test_watch_turns_a_real_sigterm_into_a_clean_stop_and_restores_the_handler(paired, lessons):
+    def ours(signum, frame):
+        raise AssertionError("the previous handler ran while watch() was going")
+    before = signal.signal(signal.SIGTERM, ours)
+    try:
+        def terminated(seconds):
+            os.kill(os.getpid(), signal.SIGTERM)  # what Claude Code sends when it stops a background task
+        a, lines = Awake(), []
+        code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=terminated,
+                            awake_on=a.keep, awake_off=a.release)
+        assert code == 0 and a.off == 1 and lines[-1].startswith("Stopped.")
+        assert not (lessons / ".worker-watch.lock").exists()
+        assert signal.getsignal(signal.SIGTERM) is ours
+    finally:
+        signal.signal(signal.SIGTERM, before)
+
+
+def _stopped_claude(cmd, cwd, logfile):
+    logfile.write_text("making chapter 1\n", encoding="utf-8")
+    raise KeyboardInterrupt  # "Stop" in Claude Code while Claude was working on the step
+
+
+def test_stop_during_a_step_hands_the_step_back_to_start_again(paired, lessons):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    before = dt.datetime.now().astimezone()
+    code, lines, sleeps, a = _watch(_stopped_claude)
+    assert code == 0 and a.off == 1 and lines[-1].startswith("Stopped.")
+    [(tid, card)] = paired.finished
+    assert tid == "trn_0123456789abcdefghijkl" and card["kind"] == "error"
+    assert "starts again" in card["message"]
+    retry = dt.datetime.fromisoformat(card["retry_after"])
+    assert before - dt.timedelta(seconds=1) <= retry <= dt.datetime.now().astimezone() + dt.timedelta(seconds=1)
+    assert not (lessons / ".worker-watch.lock").exists() and not (lessons / ".worker.lock").exists()
+
+
+def test_stop_during_a_step_sends_once_quickly_and_never_waits_on_a_failure(paired, lessons, monkeypatch):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    paired.finish_statuses = [503]  # the site is busy just then: no retry, the lease runs out instead
+    seen, request = [], worker.net.request
+
+    def spy(url, *a, **kw):
+        if url.endswith("/finish"):
+            seen.append((kw.get("timeout"), kw.get("retries")))
+        return request(url, *a, **kw)
+    monkeypatch.setattr(worker.net, "request", spy)
+    code, lines, sleeps, a = _watch(_stopped_claude)
+    assert code == 0 and paired.finished == [] and a.off == 1
+    assert seen == [(10, 0)]
+    assert not (lessons / ".worker-watch.lock").exists() and not (lessons / ".worker.lock").exists()
+
+
+def test_run_once_says_disconnected_on_a_stop(paired, lessons):
+    paired.stop_next = True
+    lines = []
+    assert worker.run_once(claude=_claude_writing(QUESTIONS), out=lines.append) == 0
+    assert lines == ["Disconnected from the website. To start again, run /lesson-videos:serve."]
 
 
 def test_run_once_still_reports_idle_as_zero(paired, lessons):

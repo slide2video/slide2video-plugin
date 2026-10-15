@@ -1,5 +1,11 @@
-"""`worker --once`: take this computer's next turn from slide2video.com, run Claude Code on it in the lesson's folder,
-and send back the card Claude wrote (or an error card)."""
+"""The worker that makes slide2video.com's lessons on this computer.
+
+`worker --once` (the default): take this computer's next turn from the website, run Claude Code on it in the lesson's
+folder, send back the card Claude wrote (or an error card), and exit.
+`worker --watch` (what /lesson-videos:serve runs in the background): do that for every turn, one after another,
+waiting between checks while there is none, keeping the computer awake, until Disconnect on the website, the
+pairing is gone, or the process is stopped (Ctrl-C or SIGTERM; a step it was working on is handed back to start
+again)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -10,6 +16,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -33,11 +40,19 @@ DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Write(./.claude/**)", 
           "Write(./.mcp.json)", "Edit(./CLAUDE.md)", "Write(./CLAUDE.md)", "Edit(./CLAUDE.local.md)",
           "Write(./CLAUDE.local.md)"]
 # Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
-DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "ANTHROPIC_API_KEY",
+               "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
 POLL = 30                      # seconds between checks while no lesson is waiting
 BACKOFF = (30, 60, 120, 300)   # seconds after network or server errors, capped at the last
 IDLE, RAN, STOP, BUSY = "idle", "ran", "stop", "busy"
+STOP_FINISH_TIMEOUT = 10       # seconds: a stopped step is handed back once, quickly, or left to its lease
+STOPPED = ("Stopped on this computer before this step finished. It starts again when the computer is making videos "
+           "again.")
+DISCONNECTED_LINE = "Disconnected from the website. To start again, run /lesson-videos:serve."
+STILL_ACTIVE = 259             # GetExitCodeProcess: the process hasn't exited
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+ERROR_ACCESS_DENIED = 5
 
 
 def lessons_root() -> Path:
@@ -139,6 +154,36 @@ def timing_for(ch_dir: Path) -> dict | None:
          "first_words": " ".join(say.get(s["id"], "").split()[:8])} for s in T["scenes"]]}
 
 
+def _alive(pid: int, platform: str = sys.platform, kernel32=None, run=subprocess.run) -> bool:
+    """Whether the run that wrote a lock file is still going: the process exists and, where `ps` can tell, is a
+    lesson-videos one (a pid left in an old lock file may since belong to another program)."""
+    if pid <= 0:
+        return False
+    if platform == "win32":  # never os.kill(pid, 0) here: on Windows that sends Ctrl-C
+        import ctypes
+        k = kernel32 or ctypes.windll.kernel32
+        h = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not h:
+            return k.GetLastError() == ERROR_ACCESS_DENIED  # exists, but someone else's
+        try:
+            code = ctypes.c_ulong()
+            return not k.GetExitCodeProcess(h, ctypes.byref(code)) or code.value == STILL_ACTIVE
+        finally:
+            k.CloseHandle(h)
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        pass                                 # alive, owned by someone else
+    except OSError:                          # ProcessLookupError and the like: gone
+        return False
+    try:
+        r = run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return True                          # can't tell: leave the lock alone
+    return r.returncode != 0 or "lesson-videos" in r.stdout
+
+
 def _lock(root: Path, name: str = ".worker.lock") -> Path | None:
     root.mkdir(parents=True, exist_ok=True)
     f = root / name
@@ -146,13 +191,13 @@ def _lock(root: Path, name: str = ".worker.lock") -> Path | None:
         fd = os.open(f, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         try:
-            os.kill(int(read_text(f).strip()), 0)
+            pid = int(read_text(f).strip())
+        except (ValueError, OSError):
+            pid = 0
+        if _alive(pid):
             return None                      # another run is alive
-        except PermissionError:
-            return None                      # alive, owned by someone else
-        except (ValueError, ProcessLookupError, OSError):
-            f.unlink(missing_ok=True)        # stale
-            return _lock(root, name)
+        f.unlink(missing_ok=True)            # stale
+        return _lock(root, name)
     os.write(fd, str(os.getpid()).encode())
     os.close(fd)
     return f
@@ -289,6 +334,17 @@ def _finish(turn_id: str, card: dict, log: str = "") -> dict:
     return card
 
 
+def _hand_back(turn_id: str, log: str) -> None:
+    """Stopped in the middle of a step: tell the website at once, so the step waits for this computer to start again
+    instead of looking busy until its lease runs out. One quick try; a failure leaves it to the lease."""
+    card = error_card(STOPPED, log)
+    card["retry_after"] = dt.datetime.now().astimezone().isoformat()
+    try:
+        site.call(f"/api/device/turns/{turn_id}/finish", _redacted(card), timeout=STOP_FINISH_TIMEOUT, retries=0)
+    except Exception:  # noqa: BLE001  stopping must not wait on or fail because of the website
+        pass
+
+
 def _log_text(log: Path | None) -> str:
     return read_text(log) if log is not None and log.exists() else ""
 
@@ -333,6 +389,11 @@ def _run_turn(turn: dict, claude, out) -> int:
             beat.start()
             card = _claude_turn(turn, folder, sitedir, log, claude)
             card = _with_slides(card, folder)
+    except KeyboardInterrupt:  # Ctrl-C, or SIGTERM from "stop" in Claude Code: subprocess.run has killed Claude
+        if beat is not None:
+            beat.done.set()
+        _hand_back(tid, _log_text(log))
+        raise
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
     except ValueError as e:  # card.json that isn't JSON
@@ -380,7 +441,10 @@ def _once(claude, out, start: bool = False) -> tuple[str, int]:
 
 
 def run_once(claude=None, out=print) -> int:
-    return _once(claude, out)[1]
+    state, code = _once(claude, out)
+    if state == STOP:
+        out(DISCONNECTED_LINE)
+    return code
 
 
 def _sigterm_as_interrupt():
@@ -411,10 +475,20 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
         out("This computer is already making videos for slide2video.com (another window is running it).")
         return 0
     handle = previous = None
+    awake = False
     try:
         previous = _sigterm_as_interrupt()
-        handle = awake_on(out=out)
-        out(f"Making videos for {site.site_url()}. Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
+        try:
+            who = site.status()
+            as_who = f" as {who['teacher_email']} on {who['device_name']}"
+        except UserError as e:              # not connected, or the plugin needs an update: nothing to start
+            out(str(e))
+            return 1
+        except (net.ApiError, KeyError, TypeError):  # can't reach the website yet: the loop below backs off
+            as_who = ""
+        handle, awake = awake_on(out=out), True
+        out(f"Making videos for {site.site_url()}{as_who}. Waiting for lessons… "
+            "(stop with Ctrl-C, or Disconnect on the website)")
         start, failures, said_busy = True, 0, False
 
         def once_out(line):                 # say "still going" once per busy stretch, not every poll
@@ -440,7 +514,7 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
                 continue
             start, said_busy = False, False
             if state == STOP:
-                out("Disconnected from the website. To start again, run /lesson-videos:serve.")
+                out(DISCONNECTED_LINE)
                 return 0
             if state == IDLE:
                 sleep(POLL)
@@ -448,6 +522,7 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
         out("Stopped. This computer no longer makes videos for the website.")
         return 0
     finally:
-        awake_off(handle)
+        if awake:
+            awake_off(handle)
         _restore_sigterm(previous)
         guard.unlink(missing_ok=True)

@@ -42,7 +42,10 @@ Then tell the teacher:
 
 - **"Is it working?"**: read the last lines of the background task's output and say in plain words what it's doing
   (waiting for lessons, working on a lesson, or the last thing it sent back).
-- **"Stop"**: stop the background task and confirm it has ended. Starting again is running this skill again.
+- **"Stop"**: stop the background Bash task and confirm it has ended. Starting again is running this skill again.
+  First read its last line: if it is "Working on …", a step is in progress. Tell the teacher that stopping now
+  means that step starts over from the beginning when they start again, and that **Disconnect** on the website's
+  Devices page instead lets the step finish first, then stops. Stop only once they have chosen.
 - If the background task ends by itself, read its last lines: "Disconnected from the website" means someone pressed
   Disconnect; a "connect" message means the pairing was removed (offer step 1); an "Update the lesson-videos
   plugin" message means running `/plugin update lesson-videos`, then this skill again.
