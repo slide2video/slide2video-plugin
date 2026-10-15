@@ -92,12 +92,23 @@ Read the result to them in plain words. "ElevenLabs: not set" is fine: the free 
 
 Only if the teacher asks to keep lessons in one project folder (for example a folder they back up or keep in git): `LV init --path "<folder>"`. Lessons then live in `<folder>/lessons/<course>/<unit>/` as text, and finished videos, class materials and paid media in the results folder it prints. Nobody else needs this.
 
-## Connect this computer to slide2video.com (optional)
+## 8. Connect this computer to slide2video.com (optional)
 
-Only if the teacher was invited to slide2video.com and wants this computer to make videos for lessons they upload
-there. Today this works on a Mac (Windows support is on the way). Run `LV pair`. It prints a short code and the website address: the teacher signs in there (on
-any computer), opens **Devices** and types the code. Then run `LV worker --status` to confirm the
-connection.
+slide2video.com is a website where invited teachers upload a lesson and this computer makes the videos for it.
+Today this works on a Mac (Windows support is on the way).
+
+First run `LV worker --status`. If it says "Connected to …", this computer is already connected: tell the teacher
+which account it's connected to and skip to the worker line below. If it says this computer isn't connected,
+ask the teacher one plain question, even if they never mentioned the website:
+
+> Were you invited to slide2video.com? Do you want this computer to make the videos for lessons you upload there?
+
+If not, skip to step 9. If yes, run `LV pair`. It prints a short code and the website address, then **waits until
+the code is typed** (up to 10 minutes), so start it with the Bash tool's `run_in_background` and read the code
+line from its output as soon as it appears. Give the teacher the address and the code: they sign in there (on any
+computer), open **Devices** and type the code. When the background command finishes it says "This computer is
+connected to …"; then run `LV worker --status` to confirm the connection. If the code expired, run `LV pair` again
+for a new one.
 
 Don't run `worker --once` yourself: one lesson step can take an hour or more, far longer than a command may run
 here, so it would be stopped halfway. Instead, give the teacher the exact line to paste into the Terminal app
@@ -112,6 +123,6 @@ uv run "<full path on this computer>/lesson-videos/scripts/lesson-videos.py" wor
 Tell them to open Terminal (Applications ▸ Utilities ▸ Terminal), paste the line, press Return, and leave the
 window open until it says what it sent back.
 
-## 8. Done
+## 9. Done
 
-Summarize: what's ready, which narrator voice will be used (the free Microsoft voice unless they added an ElevenLabs key; `doctor`'s Narration line says which voices work right now), what was skipped, and the cost per video ($0 with the free voice; with ElevenLabs about 5,000–6,000 characters; Gemini about $0.40 per clip plus $0.08 for music). Tell them the next step: open Claude Code in the folder that holds their slide deck and run `/lesson-videos:make`.
+Summarize: what's ready, which narrator voice will be used (the free Microsoft voice unless they added an ElevenLabs key; `doctor`'s Narration line says which voices work right now), whether this computer is connected to slide2video.com (and for which account, from `LV worker --status`), what was skipped, and the cost per video ($0 with the free voice; with ElevenLabs about 5,000–6,000 characters; Gemini about $0.40 per clip plus $0.08 for music). Tell them the next step: open Claude Code in the folder that holds their slide deck and run `/lesson-videos:make`.

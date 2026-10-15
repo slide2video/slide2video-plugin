@@ -85,9 +85,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    # Line-buffered even when the output is a pipe (Claude Code's background Bash, a log file): `pair` prints its code
+    # and then waits for minutes, and `worker` prints progress, so each line must show as soon as it's printed.
     for stream in (sys.stdout, sys.stderr):
         try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
+            stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except AttributeError:
             pass
     args = build_parser().parse_args(argv)
