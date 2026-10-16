@@ -20,4 +20,4 @@
 
 - A key works like a password for that service: whoever has it can spend your credits.
 - Never paste a key into the chat with Claude. If you did, delete that key on the website and make a new one.
-- In Claude Code, keys are saved in `~/.lesson-videos/keys.env` on your computer (on Windows, `C:\Users\<you>\.lesson-videos\keys.env`).
+- In Claude Code, keys are saved in `~/.slide2video/keys.env` on your computer (on Windows, `C:\Users\<you>\.slide2video\keys.env`).

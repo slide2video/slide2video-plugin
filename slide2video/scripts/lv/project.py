@@ -16,28 +16,44 @@ from .util import UserError, read_text, write_text
 CONFIG = "config.yaml"
 
 
+def _config_base() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Preferences"
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
+
 def settings_file() -> Path:
     if value := os.environ.get("LESSON_VIDEOS_SETTINGS"):
         return Path(value).expanduser()
-    if sys.platform == "darwin":
-        base = Path.home() / "Library" / "Preferences"
-    elif sys.platform == "win32":
-        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-    else:
-        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return base / "lesson-videos" / "settings.json"
+    return _config_base() / "slide2video" / "settings.json"
+
+
+def old_settings_file() -> Path:
+    """Where lesson-videos kept it; copied once by config.migrate_home."""
+    return _config_base() / "lesson-videos" / "settings.json"
+
+
+def _named(old: Path, new: Path) -> Path:
+    """The new folder name, unless the old one exists: a project without results_dir/work_dir lines relies on it."""
+    return old if old.is_dir() else new
 
 
 def cache_dir() -> Path:
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Caches" / "lesson-videos"
+        base = Path.home() / "Library" / "Caches"
+        return _named(base / "lesson-videos", base / "slide2video")
     if sys.platform == "win32":
-        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "lesson-videos" / "Cache"
-    return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "lesson-videos"
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        return _named(base / "lesson-videos" / "Cache", base / "slide2video" / "Cache")
+    base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    return _named(base / "lesson-videos", base / "slide2video")
 
 
 def default_results() -> Path:
-    return Path.home() / ("Movies" if sys.platform == "darwin" else "Videos") / "Lesson Videos"
+    base = Path.home() / ("Movies" if sys.platform == "darwin" else "Videos")
+    return _named(base / "Lesson Videos", base / "slide2video")
 
 
 @dataclass(frozen=True)

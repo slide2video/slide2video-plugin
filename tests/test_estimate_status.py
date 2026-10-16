@@ -22,7 +22,7 @@ def test_chars_in_scripts(tmp_path):
 
 
 def test_status_stages(tmp_path):
-    work = tmp_path / "lesson-videos" / "_work"
+    work = tmp_path / "slide2video" / "_work"
     ch = work / "ch2"
     write_json(ch / "script.json", {"out": "Chapter 2 - X.mp4", "scenes": []})
     assert status.stage(ch) == "script written: run narrate"
@@ -32,7 +32,7 @@ def test_status_stages(tmp_path):
     write_text(ch / "scenes.js", "")
     assert status.stage(ch) == "scenes written: check stills, then render"
     time.sleep(0.01)
-    write_text(tmp_path / "lesson-videos/Chapter 2 - X.mp4", "x")
+    write_text(tmp_path / "slide2video/Chapter 2 - X.mp4", "x")
     assert status.stage(ch) == "done: Chapter 2 - X.mp4"
     write_json(work / "ch10/script.json", {"scenes": []})
     assert [c.name for c in status.chapters(work)] == ["ch2", "ch10"]

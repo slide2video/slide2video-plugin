@@ -60,7 +60,7 @@ class KeychainStore:
 
 
 class FileStore:
-    """Fallback where there is no Keychain: ~/.lesson-videos/site-token.json, readable only by this user."""
+    """Fallback where there is no Keychain: ~/.slide2video/site-token.json, readable only by this user."""
 
     def _file(self):
         return config.home() / "site-token.json"

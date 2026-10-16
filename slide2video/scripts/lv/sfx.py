@@ -1,4 +1,4 @@
-"""Synthesized sound effects (pops, sparkles, whooshes, plucks...), built once into ~/.lesson-videos/sfx."""
+"""Synthesized sound effects (pops, sparkles, whooshes, plucks...), built once into ~/.slide2video/sfx."""
 from __future__ import annotations
 
 import wave

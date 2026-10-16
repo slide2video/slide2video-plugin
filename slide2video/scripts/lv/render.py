@@ -225,7 +225,7 @@ def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir:
         raise UserError(f"Rendering failed in {sum(1 for c in codes if c)} of {len(codes)} worker(s); see the messages above.")
     lst = write_text(b / "parts.txt", "".join(f"file '{p.name}'\n" for p in parts))
     run(tools.ffmpeg(), "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", b / "video.mp4")
-    sfx.build()  # no-op when the library exists; rebuilds it if ~/.lesson-videos was cleared
+    sfx.build()  # no-op when the library exists; rebuilds it if ~/.slide2video was cleared
     audio = mix.mix_audio(ch, T, spec)
     out = output_path(ch, spec, out_dir)
     out.parent.mkdir(parents=True, exist_ok=True)

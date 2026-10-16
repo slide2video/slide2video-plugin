@@ -13,7 +13,42 @@ FONT_FILES = ("PatrickHand-Regular.ttf", "Nunito.ttf")
 
 def home() -> Path:
     """Per-user folder for keys, sound effects and caches."""
-    return Path(os.environ.get("LESSON_VIDEOS_HOME") or Path.home() / ".lesson-videos")
+    return Path(os.environ.get("LESSON_VIDEOS_HOME") or Path.home() / ".slide2video")
+
+
+def _copy_once(old: Path, new: Path) -> None:
+    """Copy old to new if new doesn't exist yet: into a temporary sibling first, then one rename, so an interrupted or
+    concurrent copy never leaves a half-filled `new`. Symlinks stay symlinks; file modes are kept."""
+    import shutil
+    import tempfile
+    if new.exists() or not old.exists():
+        return
+    new.parent.mkdir(parents=True, exist_ok=True)
+    for stale in new.parent.glob(new.name + ".partial-*"):
+        shutil.rmtree(stale, ignore_errors=True) if stale.is_dir() else stale.unlink(missing_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix=new.name + ".partial-", dir=new.parent))
+    try:
+        if old.is_dir():
+            shutil.copytree(old, tmp / "x", symlinks=True)
+        else:
+            shutil.copy2(old, tmp / "x")
+        try:
+            (tmp / "x").rename(new)
+        except OSError:
+            if not new.exists():            # someone else finished first: fine; anything else is a real error
+                raise
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def migrate_home() -> None:
+    """First run after the lesson-videos -> slide2video rename: copy ~/.lesson-videos and the old settings file to their
+    new names, leaving the old ones as they are. Folders that hold work are not copied (see project and worker)."""
+    from . import project
+    if not os.environ.get("LESSON_VIDEOS_HOME"):
+        _copy_once(Path.home() / ".lesson-videos", home())
+    if not os.environ.get("LESSON_VIDEOS_SETTINGS"):
+        _copy_once(project.old_settings_file(), project.settings_file())
 
 
 ELEVEN_ROOT = "https://api.elevenlabs.io/v1"

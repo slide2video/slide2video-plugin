@@ -66,7 +66,7 @@ def make_chapter(tmp_path):
     """Write a chapter folder (script.json + optional scenes.js) under a path with spaces."""
     def make(scenes, scenes_js=None, name="ch1", **top):
         from lv.util import write_json, write_text
-        ch = tmp_path / "Unit 1 – Biología" / "lesson-videos" / "_work" / name
+        ch = tmp_path / "Unit 1 – Biología" / "slide2video" / "_work" / name
         write_json(ch / "script.json", {"chapter": "TEST", "title": "Test chapter", "out": "Chapter 1 - Test.mp4", **top, "scenes": scenes})
         if scenes_js is not None:
             write_text(ch / "scenes.js", scenes_js)

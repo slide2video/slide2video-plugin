@@ -1,4 +1,4 @@
-"""API keys: environment first, then ~/.lesson-videos/keys.env. Values are never printed."""
+"""API keys: environment first, then ~/.slide2video/keys.env. Values are never printed."""
 from __future__ import annotations
 
 import io

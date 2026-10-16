@@ -104,7 +104,7 @@ def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(lesson)
     monkeypatch.setenv("LV_SITE_MODE", "1")
     for argv in (["asset", "/etc/hosts", "x.jpg"],
-                 ["render", "lesson-videos/_work/ch1", "--out", str(tmp_path / "elsewhere")],
+                 ["render", "slide2video/_work/ch1", "--out", str(tmp_path / "elsewhere")],
                  ["asset", "link.jpg", "x.jpg"],
                  ["asset", "site/card.json", str(config.PLUGIN_ROOT / "x.jpg")]):
         assert cli.main(argv) == 1

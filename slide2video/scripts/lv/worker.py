@@ -57,7 +57,12 @@ ERROR_ACCESS_DENIED = 5
 
 
 def lessons_root() -> Path:
-    return Path(os.environ.get("LV_LESSONS_DIR") or Path.home() / "Lesson Videos")
+    """Where website lessons are worked on. A ~/Lesson Videos left by lesson-videos keeps being used, so a lesson in
+    progress continues after the update."""
+    if value := os.environ.get("LV_LESSONS_DIR"):
+        return Path(value)
+    old = Path.home() / "Lesson Videos"
+    return old if old.is_dir() else Path.home() / "slide2video"
 
 
 def lesson_dir(lesson: dict) -> Path:

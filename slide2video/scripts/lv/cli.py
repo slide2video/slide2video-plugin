@@ -97,6 +97,11 @@ def main(argv=None) -> int:
             pass
     args = build_parser().parse_args(argv)
     try:
+        from . import config
+        config.migrate_home()
+    except OSError as e:                     # never block a command over the one-time copy
+        print(f"note: couldn't copy the old lesson-videos settings ({e}); they are still in place.", file=sys.stderr)
+    try:
         return dispatch(args)
     except UserError as e:
         print(f"error: {e}", file=sys.stderr)

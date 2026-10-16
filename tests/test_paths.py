@@ -7,7 +7,7 @@ from lv.util import UserError
 
 
 def test_teacher_mode_in_work_folder(tmp_path):
-    ch = tmp_path / "Unit 1" / "lesson-videos" / "_work" / "ch1"
+    ch = tmp_path / "Unit 1" / "slide2video" / "_work" / "ch1"
     p = paths.chapter(ch)
     assert (p.code, p.sources, p.build, p.voice) == (ch, ch, ch / "build", ch / "build" / "voice")
     assert p.assets == ch / "assets" and p.out == ch.parent.parent and not p.project
@@ -45,7 +45,7 @@ def test_relative_path_resolves(lv_project, monkeypatch):
 
 
 def test_outside_the_project_is_teacher_mode(lv_project, tmp_path):
-    ch = tmp_path / "Desktop" / "lesson-videos" / "_work" / "ch1"
+    ch = tmp_path / "Desktop" / "slide2video" / "_work" / "ch1"
     assert not paths.chapter(ch).project and paths.chapter(ch).build == ch / "build"
 
 
@@ -94,5 +94,5 @@ def test_case_variant_path_on_case_insensitive_disk(lv_project):
 def test_unreadable_config_above_a_deck_is_ignored(tmp_path):
     from lv.util import write_text
     write_text(tmp_path / "Documents/config.yaml", "this: [is not yaml\n")
-    ch = tmp_path / "Documents" / "Biology" / "lesson-videos" / "_work" / "ch1"
+    ch = tmp_path / "Documents" / "Biology" / "slide2video" / "_work" / "ch1"
     assert paths.chapter(ch).build == ch / "build"

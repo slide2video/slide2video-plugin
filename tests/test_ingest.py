@@ -52,7 +52,7 @@ def test_ingest_path_with_spaces_and_accents(tmp_path):
     deck = folder / "Clase 1 – Ósmosis.pptx"
     make_pptx(deck)
     out = ingest.ingest(deck, ingest.default_work(deck))
-    assert out == folder / "lesson-videos" / "_work" / "deck" and (out / "slides.md").exists()
+    assert out == folder / "slide2video" / "_work" / "deck" and (out / "slides.md").exists()
 
 
 def test_ingest_pdf(tmp_path):

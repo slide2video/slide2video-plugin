@@ -74,7 +74,7 @@ def install_playwright(run=subprocess.run) -> None:
 
 
 def install_npm(run=subprocess.run) -> Path:
-    """Install NPM_PACKAGE under ~/.lesson-videos and copy its browser to a fixed place. Linux only."""
+    """Install NPM_PACKAGE under ~/.slide2video and copy its browser to a fixed place. Linux only."""
     prefix = config.home() / "chromium-npm"
     prefix.mkdir(parents=True, exist_ok=True)
     r = run(["npm", "install", "--prefix", str(prefix), "--no-audit", "--no-fund", NPM_PACKAGE],

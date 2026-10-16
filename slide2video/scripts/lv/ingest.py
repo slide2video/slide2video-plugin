@@ -13,7 +13,10 @@ EXPORT_HELP = ("export it as PowerPoint (.pptx) first. Keynote: File → Export 
 
 
 def default_work(deck: Path) -> Path:
-    return Path(deck).resolve().parent / "lesson-videos" / "_work"
+    """Next to the deck: slide2video/_work, or the lesson-videos/_work of a run started before the rename."""
+    folder = Path(deck).resolve().parent
+    old = folder / "lesson-videos" / "_work"
+    return old if old.is_dir() else folder / "slide2video" / "_work"
 
 
 def ingest(deck: Path, work: Path) -> Path:

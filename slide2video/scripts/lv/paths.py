@@ -1,5 +1,5 @@
 """Where a lesson's files live. Teacher mode (no project, or a folder outside it): one folder per chapter next to
-the deck, as `<deck folder>/lesson-videos/_work/chN`. Project mode (a lesson inside the registered project's lessons
+the deck, as `<deck folder>/slide2video/_work/chN`. Project mode (a lesson inside the registered project's lessons
 folder): text in the project, finished videos and paid media in the results folder, rebuildable files in the cache."""
 from __future__ import annotations
 

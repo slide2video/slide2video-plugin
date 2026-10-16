@@ -40,7 +40,7 @@ def routes(p: paths.ChapterPaths) -> list[tuple[str, Path]]:
 
 
 def output_dir(ch: Path) -> Path:
-    """Teacher mode: <deck>/lesson-videos/ for chapters in _work/, else the chapter's own out/ folder. Project mode:
+    """Teacher mode: <deck>/slide2video/ for chapters in _work/, else the chapter's own out/ folder. Project mode:
     the unit's results folder."""
     return paths.chapter(ch).out
 
