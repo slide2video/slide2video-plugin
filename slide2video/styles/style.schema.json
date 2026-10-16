@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "slide2video style",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "public", "questions", "check", "brief", "outline", "clips", "music"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 40},
+    "description": {"type": "string", "minLength": 1, "maxLength": 200},
+    "public": {"type": "boolean"},
+    "questions": {"type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/question"}},
+    "check": {"$ref": "#/$defs/check"},
+    "brief": {"type": "string", "minLength": 1},
+    "outline": {"type": "string", "minLength": 1},
+    "clips": {"type": "string", "minLength": 1},
+    "music": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "qid": {
+      "type": "string", "pattern": "^[a-z0-9_-]{1,32}$",
+      "not": {"anyOf": [{"enum": ["chapters", "length", "voice", "music", "problem"]}, {"pattern": "^issue-"}]}
+    },
+    "question": {
+      "type": "object", "additionalProperties": false, "required": ["id", "text", "options"],
+      "properties": {
+        "id": {"$ref": "#/$defs/qid"},
+        "text": {"type": "string", "minLength": 1, "maxLength": 500},
+        "options": {"oneOf": [
+          {"const": "from-deck"},
+          {"type": "array", "minItems": 1, "maxItems": 6, "items": {
+            "type": "object", "additionalProperties": false, "required": ["label"],
+            "properties": {"label": {"type": "string", "minLength": 1}, "detail": {"type": "string"}}}}
+        ]},
+        "hint": {"type": "string"},
+        "other": {"type": "boolean"}
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "file", "looks_for", "remove", "keep", "keep_decision"],
+      "properties": {
+        "id": {"$ref": "#/$defs/qid"},
+        "file": {"type": "string", "pattern": "^[a-z0-9-]+\\.md$"},
+        "looks_for": {"type": "string", "minLength": 1},
+        "remove": {"type": "string", "minLength": 1},
+        "keep": {"type": "string", "minLength": 1},
+        "keep_decision": {"type": "string", "pattern": "^[a-z][a-z ]{0,31}$", "not": {"const": "remove"}}
+      }
+    }
+  }
+}

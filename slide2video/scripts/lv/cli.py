@@ -56,6 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--json", action="store_true", help="print the plan card's estimate (total and parts) as JSON")
     st = sub.add_parser("status", help="which chapters are done and what each needs next")
     st.add_argument("work", type=Path)
+    sts = sub.add_parser("styles", help="the installed styles (School, plus any in LV_STYLES_DIR)")
+    sts.add_argument("--json", action="store_true")
+    sty = sub.add_parser("style", help="one style's questions, check, brief, outline, clips, music and guide path, as JSON")
+    sty.add_argument("id")
     m = sub.add_parser("music", help="one Lyria music bed (~$0.08) into _work/music/bed.mp3")
     m.add_argument("work", type=Path)
     m.add_argument("--prompt", required=True)
@@ -220,6 +224,20 @@ def dispatch(args) -> int:
         return 0
     if args.cmd == "where":
         print(where(args.path))
+        return 0
+    if args.cmd in ("styles", "style"):
+        from . import styles
+        if args.cmd == "style":
+            s = styles.get(args.id)
+            print(json.dumps({**s.data, "guide": str(s.guide)}, ensure_ascii=False, indent=1))
+            return 0
+        rows = list(styles.installed().values())
+        if args.json:
+            print(json.dumps([{"id": s.id, "name": s.data["name"], "description": s.data["description"],
+                               "origin": s.origin} for s in rows], ensure_ascii=False))
+        else:
+            for s in rows:
+                print(f"{s.id}: {s.data['name']}: {s.data['description']} ({s.origin})")
         return 0
     from . import ingest
     if args.cmd == "asset":
