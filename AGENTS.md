@@ -7,8 +7,12 @@ Public Claude Code marketplace `slide2video`. It holds `slide2video` (narrated v
 ## Contribution flow
 
 This is a **Tier B repo** (solo dev tool): work on a short-lived branch off
-`main`, run the local test gates below, merge back to `main` directly (no PR
-needed), and push. PRs are optional and only opened when asked.
+`main`, run `uv run pytest -q` (the gate), merge to `main` with `--no-ff`, and
+push. PRs are optional and only opened when asked.
+
+**CI** (`.github/workflows/ci.yml`) runs on GitHub's macOS and Windows runners
+with a 25-minute job limit and a 5-minute per-test limit. The local gate is the
+real gate.
 
 Teachers only receive a change when `slide2video/.claude-plugin/plugin.json`
 `version` (and the matching entry in `.claude-plugin/marketplace.json` and
@@ -35,6 +39,23 @@ website deployed first with a new major refuses every computer until the plugin 
 - **Engine API is frozen** (`slide2video/engine/engine.js`): skills,
   `guide.md` and existing chapters depend on it. Add helpers, never rename.
 - **Model IDs and prices** live only in `slide2video/scripts/lv/config.py`.
+
+## Styles
+
+A public style lives only in `slide2video/styles/` (today: `school`, the public
+style). A private style is never committed here. Styles change what is asked and
+written, never the engine API or the job contract. `tests/test_styles.py`
+validates every style.
+
+## Kept names
+
+The rename to slide2video left these unchanged on purpose, because the website,
+the worker, saved projects and existing lessons depend on them: the Python
+package `lv`; env vars `LV_*` and `LESSON_VIDEOS_*`; headers `X-LV-Plugin` and
+`X-LV-Contract`; the contents and schemas of `slide2video/site-contract/`
+(`{"plugin": "1.0.0"}` stays until a contract change); the Keychain entry; and
+the `lesson-videos/` folder inside a website lesson folder (worker `_inside`,
+`_publish`, `timing_for`, `deck.json` paths). Do not rename them.
 
 ## Work tracking
 

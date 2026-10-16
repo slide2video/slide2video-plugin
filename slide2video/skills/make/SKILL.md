@@ -125,7 +125,7 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   saved in `in/`.
 - **Folders:** `WORK` is `lesson-videos/_work` (pass `--work "lesson-videos/_work"` to `ingest`); finished videos
   land in `lesson-videos/`.
-- **Style:** a website lesson is always `school` for now: on the `start` turn write `school` to `WORK/style.txt`; every turn runs `LV style school` (a lesson with no `style.txt` is `school` too).
+- **Style:** a website lesson is always `school` for now: on the `start` turn write `school` to `WORK/style.txt`; every turn runs `LV style school` (a lesson with no `style.txt` is `school` too). `check.id`, `check.file`, `check.remove`, `check.keep` and `check.keep_decision` are fields of the `check` that `LV style school` prints: use their values, never the names.
 - **Progress:** at each step, rewrite `site/progress.txt` with its lines plus one new line at the end, a line a
   teacher would understand ("Reading the deck", "Narrating 3 of 12 scenes", "Rendering chapter 1"). You can only
   read and write files, so write the whole file each time. The website shows the last line. When a step counts through items (scenes narrated, chapters rendered),

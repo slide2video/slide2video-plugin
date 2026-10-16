@@ -10,3 +10,6 @@ Install in Claude Code:
 /plugin marketplace add slide2video/slide2video-plugin
 /plugin install slide2video@slide2video
 ```
+
+School is the public style: the one this repo ships, for teachers turning lesson slides into study videos. See the
+[plugin README](./slide2video/README.md) for how it works.
