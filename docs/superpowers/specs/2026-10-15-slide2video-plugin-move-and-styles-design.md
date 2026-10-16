@@ -94,10 +94,10 @@ People see these, so they change:
 - If `~/.slide2video/` doesn't exist and `~/.lesson-videos/` does, copy it, keeping symlinks as symlinks (a
   `keys.env` symlink to a secrets folder stays a symlink). The old folder is left as it is.
 - The settings file is copied the same way (new missing, old present).
-- The cache is not copied; it rebuilds itself.
-- **Folders that hold work are not moved.** If `~/Lesson Videos/` exists, the worker keeps using it, so a lesson in
-  progress on the website continues. `~/Movies/Lesson Videos/` is only a default for new projects; registered projects
-  keep the paths in their settings. For a chat-mode run, the make skill resumes an existing
+- **Folders that hold work are not moved or copied; an existing old folder keeps being used.** If `~/Lesson Videos/`
+  exists, the worker keeps using it, so a lesson in progress on the website continues. The same goes for
+  `~/Movies/Lesson Videos/` and the old cache folder: a registered project whose `config.yaml` has no `results_dir` or
+  `work_dir` line uses these defaults, so a new name would hide its videos and extracted decks. For a chat-mode run, the make skill resumes an existing
   `<folder>/lesson-videos/_work/` if there is one, and starts new runs in `<folder>/slide2video/`.
 
 Nobody sees these, so they stay:
