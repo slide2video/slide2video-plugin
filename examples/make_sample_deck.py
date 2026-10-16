@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["python-pptx>=1.0", "pillow>=10.0"]
 # ///
-"""Build examples/water-cycle.pptx: a 6-slide, photo-free sample deck for trying lesson-videos."""
+"""Build examples/water-cycle.pptx: a 6-slide, photo-free sample deck for trying slide2video."""
 import io
 from pathlib import Path
 

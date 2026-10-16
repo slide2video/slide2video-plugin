@@ -1,9 +1,0 @@
-# lesson-videos API keys
-# Paste each key right after the = sign (no spaces, no quotes), then save and close.
-# Keep this file private. To replace a key, paste the new one over the old one.
-
-# ElevenLabs (optional, most natural narration; without it a free voice is used): https://elevenlabs.io/app/developers/api-keys
-ELEVENLABS_API_KEY=
-
-# Gemini (optional, music and AI video clips): https://aistudio.google.com/api-keys
-GEMINI_API_KEY=

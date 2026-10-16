@@ -19,7 +19,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then brew install ffmpeg; else choco install ffmpeg -y --no-progress; fi
       - name: doctor (installs Chromium + ffmpeg, renders a test video)
-        run: uv run lesson-videos/scripts/lesson-videos.py doctor --no-keys
+        run: uv run slide2video/scripts/slide2video.py doctor --no-keys
       - name: browser for the test environment
         run: uv run python -m playwright install chromium
       - name: tests

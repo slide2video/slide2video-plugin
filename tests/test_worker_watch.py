@@ -41,7 +41,7 @@ def test_watch_runs_queued_turns_back_to_back_then_stops(paired, lessons):
     a, lines = Awake(), []
     code = worker.watch(claude=fake, out=lines.append, sleep=stop_after_turns, awake_on=a.keep, awake_off=a.release)
     assert code == 0 and len(paired.finished) == 2 and len(fake.calls) == 2
-    assert any("Disconnected from the website" in l and "/lesson-videos:serve" in l for l in lines)
+    assert any("Disconnected from the website" in l and "/slide2video:serve" in l for l in lines)
     assert a.on == 1 and a.off == 1
     assert not (lessons / ".worker-watch.lock").exists() and not (lessons / ".worker.lock").exists()
 
@@ -119,7 +119,7 @@ def test_watch_start_line_names_the_site_teacher_and_computer(paired, lessons):
     a, lines = Awake(), []
     code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
     assert code == 0
-    assert lines[0] == (f"Making videos for {paired.url} as teacher@example.org on Test Mac with lesson-videos {lv.__version__}. "
+    assert lines[0] == (f"Making videos for {paired.url} as teacher@example.org on Test Mac with slide2video {lv.__version__}. "
                         "Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
     assert paired.next_queries[0] == "start=1"  # status is not /next: the first /next still says start=1
 
@@ -134,8 +134,8 @@ def test_watch_stops_when_not_paired(paired, lessons):
 
 
 def test_watch_stops_with_the_websites_refusal(paired, lessons):
-    paired.refuse = ("This computer has lesson-videos 1.0.0; slide2video.com needs 2.x. To update: run /plugin update "
-                     "lesson-videos, then close and reopen Claude Code, then run /lesson-videos:serve.")
+    paired.refuse = ("This computer has slide2video 1.0.0; slide2video.com needs 2.x. To update: run /plugin update "
+                     "slide2video, then close and reopen Claude Code, then run /slide2video:serve.")
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
     assert code == 1 and lines[-1] == paired.refuse and a.on == 0
 
@@ -143,7 +143,7 @@ def test_watch_stops_with_the_websites_refusal(paired, lessons):
 def test_watch_stops_on_contract_mismatch_from_an_older_website(paired, lessons):
     paired.contract = 2
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
-    assert code == 1 and "Update the lesson-videos plugin" in lines[-1] and a.on == 0
+    assert code == 1 and "Update the slide2video plugin" in lines[-1] and a.on == 0
 
 
 def test_second_watcher_is_refused(paired, lessons, lv_pid):
@@ -220,7 +220,7 @@ def test_run_once_says_disconnected_on_a_stop(paired, lessons):
     paired.stop_next = True
     lines = []
     assert worker.run_once(claude=_claude_writing(QUESTIONS), out=lines.append) == 0
-    assert lines == ["Disconnected from the website. To start again, run /lesson-videos:serve."]
+    assert lines == ["Disconnected from the website. To start again, run /slide2video:serve."]
 
 
 def test_run_once_still_reports_idle_as_zero(paired, lessons):
@@ -234,8 +234,8 @@ def test_cli_worker_watch_is_wired(monkeypatch):
     assert cli.main(["worker", "--watch"]) == 0 and "called" in seen
 
 
-UPDATE_11 = ("A newer lesson-videos (1.1.0) is available. To update: run /plugin update lesson-videos, then close "
-             "and reopen Claude Code, then run /lesson-videos:serve.")
+UPDATE_11 = ("A newer slide2video (1.1.0) is available. To update: run /plugin update slide2video, then close "
+             "and reopen Claude Code, then run /slide2video:serve.")
 
 
 def test_watch_says_once_that_an_update_is_available_and_keeps_working(paired, lessons, monkeypatch):
@@ -268,8 +268,8 @@ def test_watch_says_it_again_when_the_website_moves_on_while_it_runs(paired, les
             paired.stop_next = True
     a, lines = Awake(), []
     worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
-    updates = [l for l in lines if l.startswith("A newer lesson-videos")]
-    assert [u.split(")")[0] for u in updates] == ["A newer lesson-videos (1.1.0", "A newer lesson-videos (1.2.0"]
+    updates = [l for l in lines if l.startswith("A newer slide2video")]
+    assert [u.split(")")[0] for u in updates] == ["A newer slide2video (1.1.0", "A newer slide2video (1.2.0"]
 
 
 def test_watch_says_nothing_when_the_plugin_is_as_new_or_newer(paired, lessons, monkeypatch):
@@ -281,4 +281,4 @@ def test_watch_says_nothing_when_the_plugin_is_as_new_or_newer(paired, lessons, 
             paired.stop_next = True
         a, lines = Awake(), []
         worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
-        assert not any("newer lesson-videos" in l for l in lines), latest
+        assert not any("newer slide2video" in l for l in lines), latest

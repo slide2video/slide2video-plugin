@@ -46,8 +46,8 @@ def _claude_writing(card, also=None, code=0, log="ok\n"):
 
 @pytest.fixture
 def lv_pid():
-    """A live process whose command line names lesson-videos, like a real worker run."""
-    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", "lesson-videos.py", "worker"])
+    """A live process whose command line names slide2video, like a real worker run."""
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", "slide2video.py", "worker"])
     yield p.pid
     p.kill()
     p.wait()
@@ -199,9 +199,9 @@ def test_stale_lock_is_taken_over(paired, lessons):
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX liveness check")
-def test_lock_held_by_a_live_process_that_isnt_lesson_videos_is_stale(paired, lessons):
+def test_lock_held_by_a_live_process_that_isnt_a_worker_is_stale(paired, lessons):
     # the pid in an old lock file was reused by some other program: the lock is stale
-    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+    other = subprocess.Popen(["sleep", "5"])  # not sys.executable: a venv inside a slide2video checkout names it
     try:
         lessons.mkdir(parents=True)
         (lessons / ".worker.lock").write_text(str(other.pid), encoding="utf-8")
@@ -217,7 +217,8 @@ def test_lock_held_by_a_live_process_that_isnt_lesson_videos_is_stale(paired, le
 def test_alive_on_posix_trusts_kill_and_then_ps(monkeypatch):
     monkeypatch.setattr(worker.os, "kill", lambda pid, sig: None)
     ps = lambda out, code=0: (lambda cmd, **kw: subprocess.CompletedProcess(cmd, code, out, ""))
-    assert worker._alive(42, platform="darwin", run=ps("/usr/bin/python3 /x/lesson-videos.py worker --watch\n"))
+    assert worker._alive(42, platform="darwin", run=ps("/usr/bin/python3 /x/slide2video.py worker --watch\n"))
+    assert worker._alive(42, platform="darwin", run=ps("/usr/bin/python3 /x/lesson-videos.py worker --watch\n"))  # a 1.0.x worker still running
     assert not worker._alive(42, platform="darwin", run=ps("/Applications/Safari.app/Contents/MacOS/Safari\n"))
     assert worker._alive(42, platform="darwin", run=ps("", 1))          # ps failed: can't tell, so alive
 
@@ -229,6 +230,11 @@ def test_alive_on_posix_trusts_kill_and_then_ps(monkeypatch):
         raise ProcessLookupError
     monkeypatch.setattr(worker.os, "kill", gone)
     assert not worker._alive(42, platform="darwin", run=ps("lesson-videos"))
+
+
+def test_worker_prompt_and_messages_use_the_new_name():
+    assert worker.PROMPT == "Run /slide2video:make in site mode for this folder."
+    assert worker.DISCONNECTED_LINE == "Disconnected from the website. To start again, run /slide2video:serve."
 
 
 class FakeKernel32:
@@ -286,13 +292,13 @@ def _flag(cmd, name):
 
 def test_claude_command_limits_tools(monkeypatch):
     monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
-    cmd = worker.claude_command('"/usr/bin/uv" run "/p/lesson-videos.py"')
+    cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
     assert cmd[1:3] == ["-p", worker.PROMPT]
     allowed = _flag(cmd, "--allowedTools")
     plugin = str(worker.config.PLUGIN_ROOT).lstrip("/")
-    assert allowed == ['Bash("/usr/bin/uv" run "/p/lesson-videos.py":*)', "Read(./**)", f"Read(//{plugin}/**)",
+    assert allowed == ['Bash("/usr/bin/uv" run "/p/slide2video.py":*)', "Read(./**)", f"Read(//{plugin}/**)",
                        "Edit(./**)", "Write(./**)"]
-    assert not any(t.startswith("Bash") and t != 'Bash("/usr/bin/uv" run "/p/lesson-videos.py":*)' for t in cmd)
+    assert not any(t.startswith("Bash") and t != 'Bash("/usr/bin/uv" run "/p/slide2video.py":*)' for t in cmd)
     for bare in ("Read", "Write", "Edit", "Glob", "Grep", "Bash"):
         assert bare not in cmd  # a bare tool name would allow it anywhere on the Mac
 
@@ -300,13 +306,13 @@ def test_claude_command_limits_tools(monkeypatch):
 def test_claude_command_model_can_be_overridden_for_comparisons(monkeypatch):
     monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
     monkeypatch.setenv("LV_CLAUDE_MODEL", "sonnet")
-    assert _flag(worker.claude_command('"/usr/bin/uv" run "/p/lesson-videos.py"'), "--model") == ["sonnet"]
+    assert _flag(worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"'), "--model") == ["sonnet"]
 
 
 def test_claude_command_pins_claude_codes_configuration(monkeypatch):
     monkeypatch.delenv("LV_CLAUDE_MODEL", raising=False)
     monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
-    cmd = worker.claude_command('"/usr/bin/uv" run "/p/lesson-videos.py"')
+    cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
     assert _flag(cmd, "--permission-mode") == ["dontAsk"]
     assert _flag(cmd, "--model") == ["opus"]  # never the account's default of the day
     assert _flag(cmd, "--setting-sources") == [""]  # no user, project or local settings (hooks, allow rules, modes)

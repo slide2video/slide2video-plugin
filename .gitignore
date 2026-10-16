@@ -5,4 +5,4 @@ __pycache__/
 .DS_Store
 # never commit keys or class material
 *.env
-lesson-videos/**/build/
+slide2video/**/build/

@@ -44,7 +44,7 @@ def test_contract_mismatch_says_update(paired):
     paired.contract = 2
     with pytest.raises(UserError) as e:
         site.call("/api/device/status")
-    assert "/plugin update lesson-videos" in str(e.value)
+    assert "/plugin update slide2video" in str(e.value)
 
 
 def test_empty_204_is_an_empty_dict(paired):
@@ -138,7 +138,7 @@ def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_pa
     fake_site.pair_polls_pending = 10**6  # never typed: the command keeps waiting
     env = {k: v for k, v in os.environ.items() if k != "PYTHONUNBUFFERED"}
     env.update(LV_SITE_URL=fake_site.url, LESSON_VIDEOS_HOME=str(tmp_path / "home"))
-    p = subprocess.Popen([sys.executable, str(PLUGIN / "scripts/lesson-videos.py"), "pair", "--name", "Test Mac"],
+    p = subprocess.Popen([sys.executable, str(PLUGIN / "scripts/slide2video.py"), "pair", "--name", "Test Mac"],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, encoding="utf-8")
     lines = queue.Queue()
     threading.Thread(target=lambda: lines.put(p.stdout.readline()), daemon=True).start()
@@ -169,27 +169,27 @@ def test_call_remembers_the_websites_version(paired, monkeypatch):
 
 
 def test_a_refusal_prints_the_websites_own_words(paired):
-    paired.refuse = "slide2video.com hasn't caught up with lesson-videos 1.0.0 yet. Nothing to do on this computer; try again later."
+    paired.refuse = "slide2video.com hasn't caught up with slide2video 1.0.0 yet. Nothing to do on this computer; try again later."
     with pytest.raises(UserError) as e:
         site.call("/api/device/status")
     assert str(e.value) == paired.refuse
 
 
 def test_the_fallback_update_message_says_to_reopen_claude_code():
-    assert site.UPDATE == ("Update the lesson-videos plugin on this computer: run /plugin update lesson-videos, "
-                           "then close and reopen Claude Code, then run /lesson-videos:serve.")
+    assert site.UPDATE == ("Update the slide2video plugin on this computer: run /plugin update slide2video, "
+                           "then close and reopen Claude Code, then run /slide2video:serve.")
 
 
 def test_status_names_the_version_and_an_available_update(paired, capsys, monkeypatch):
     monkeypatch.setattr(site, "LATEST", None)
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out
-    assert f"(this device: Test Mac, lesson-videos {lv.__version__})." in out and "newer" not in out
+    assert f"(this device: Test Mac, slide2video {lv.__version__})." in out and "newer" not in out
     paired.latest = "1.1.0"
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[1] == ("A newer lesson-videos (1.1.0) is available. To update: run /plugin update lesson-videos, "
-                      "then close and reopen Claude Code, then run /lesson-videos:serve.")
+    assert out[1] == ("A newer slide2video (1.1.0) is available. To update: run /plugin update slide2video, "
+                      "then close and reopen Claude Code, then run /slide2video:serve.")
     paired.latest = "1.0.0"
     assert cli.main(["worker", "--status"]) == 0
     assert "newer" not in capsys.readouterr().out

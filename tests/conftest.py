@@ -7,12 +7,12 @@ import pytest
 pytest_plugins = ["site_fake"]
 
 REPO = Path(__file__).resolve().parents[1]
-PLUGIN = REPO / "lesson-videos"
+PLUGIN = REPO / "slide2video"
 
 
 @pytest.fixture(autouse=True)
 def lv_home(tmp_path, monkeypatch):
-    """Every test gets its own ~/.lesson-videos (with a space in the path), no real keys and no registered project."""
+    """Every test gets its own ~/.slide2video (with a space in the path), no real keys and no registered project."""
     home = tmp_path / "home with space"
     monkeypatch.setenv("LESSON_VIDEOS_HOME", str(home))
     monkeypatch.setenv("LESSON_VIDEOS_SETTINGS", str(tmp_path / "prefs" / "settings.json"))

@@ -2,11 +2,11 @@
 
 | Plugin | What it does |
 |---|---|
-| [`lesson-videos`](./lesson-videos) | Turns a slide deck into narrated, animated study videos, one per chapter. Start with its [README](./lesson-videos/README.md). |
+| [`slide2video`](./slide2video) | Turns a slide deck into narrated, animated videos, one per chapter. Start with its [README](./slide2video/README.md). |
 
 Install in Claude Code:
 
 ```
 /plugin marketplace add slide2video/slide2video-plugin
-/plugin install lesson-videos@slide2video
+/plugin install slide2video@slide2video
 ```

@@ -196,7 +196,7 @@ def test_load_imports_known_keys_only(tmp_path, capsys):
 
 def test_load_reads_textedit_rtf(tmp_path):
     rtf = ("{\\rtf1\\ansi\\ansicpg1252\\cocoartf2822\n{\\fonttbl\\f0\\fswiss Helvetica;}\n\\f0\\fs24 \\cf0 "
-           f"# lesson-videos API keys\\\nELEVENLABS_API_KEY={EL}\\\nGEMINI_API_KEY={GM}}}")
+           f"# slide2video API keys\\\nELEVENLABS_API_KEY={EL}\\\nGEMINI_API_KEY={GM}}}")
     f = tmp_path / "keys.rtf"
     f.write_bytes(rtf.encode("cp1252"))
     assert sorted(keys.load(f)) == ["ELEVENLABS_API_KEY", "GEMINI_API_KEY"]
@@ -204,10 +204,10 @@ def test_load_reads_textedit_rtf(tmp_path):
 
 
 def test_load_reads_zip_attachment(tmp_path):
-    z = tmp_path / "6e14e5ed-lesson-videos-keys.zip"
+    z = tmp_path / "6e14e5ed-slide2video-keys.zip"
     with zipfile.ZipFile(z, "w") as zf:
-        zf.writestr("__MACOSX/._lesson-videos-keys.txt", b"\x00\x05\x16\x07binary")
-        zf.writestr("lesson-videos-keys.txt", f"ELEVENLABS_API_KEY={EL}\nGEMINI_API_KEY=\n")
+        zf.writestr("__MACOSX/._slide2video-keys.txt", b"\x00\x05\x16\x07binary")
+        zf.writestr("slide2video-keys.txt", f"ELEVENLABS_API_KEY={EL}\nGEMINI_API_KEY=\n")
     assert keys.load(z) == ["ELEVENLABS_API_KEY"]
     assert keys.get("ELEVENLABS_API_KEY") == EL
 

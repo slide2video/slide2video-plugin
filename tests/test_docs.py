@@ -33,7 +33,7 @@ def test_docs_never_suggest_reading_the_clipboard_in_chat():
     """A Claude without the skill loaded might `pbpaste` the key into the transcript; route teachers to the skill."""
     for name in ("elevenlabs.md", "google.md"):
         text = (PLUGIN / "docs" / "keys" / name).read_text(encoding="utf-8")
-        assert "from the clipboard\"" not in text and "/lesson-videos:setup" in text
+        assert "from the clipboard\"" not in text and "/slide2video:setup" in text
 
 
 def test_cowork_guide_mentions_network_egress_toggle():

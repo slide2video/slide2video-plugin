@@ -22,6 +22,6 @@ dev = ["pytest>=8"]
 package = false
 
 [tool.pytest.ini_options]
-pythonpath = ["lesson-videos/scripts"]
+pythonpath = ["slide2video/scripts"]
 testpaths = ["tests"]
 filterwarnings = ["ignore:builtin type .* has no __module__ attribute:DeprecationWarning"]

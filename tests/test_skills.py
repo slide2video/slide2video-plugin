@@ -25,7 +25,7 @@ def test_skills_use_only_real_commands():
         _, text = frontmatter(s)
         used = set(re.findall(r"\bLV ([a-z_][\w-]*)", text))
         assert used and used <= choices, used - choices
-        assert "${CLAUDE_SKILL_DIR}/../../scripts/lesson-videos.py" in text
+        assert "${CLAUDE_SKILL_DIR}/../../scripts/slide2video.py" in text
 
 
 def test_guide_sfx_names_exist():
@@ -114,7 +114,7 @@ def _setup_section(title):
 
 def test_setup_points_to_serve_after_pairing():
     connect = _setup_section("Connect this computer to slide2video.com")
-    assert "/lesson-videos:serve" in connect
+    assert "/slide2video:serve" in connect
     assert "worker --once" not in connect and "Terminal" not in connect
 
 
@@ -183,14 +183,14 @@ def test_site_mode_sends_the_new_card_details():
     assert "[3/12]" in site                                # counted progress lines
 
 
-STEPS = "/plugin update lesson-videos`, then close and reopen Claude Code"
+STEPS = "/plugin update slide2video`, then close and reopen Claude Code"
 
 
 def test_serve_update_says_to_reopen_claude_code():
     _, text = frontmatter("serve")
     assert STEPS in text
     assert "hasn't caught up" in text and "nothing to do on this computer" in text.lower()
-    assert "A newer lesson-videos" in text
+    assert "A newer slide2video" in text
 
 
 def test_install_guide_update_row_says_to_reopen_claude_code():

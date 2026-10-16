@@ -30,7 +30,7 @@ def test_api_error_is_printed_plainly(monkeypatch, capsys):
 def test_cli_prints_unicode_on_cp1252(tmp_path):
     env = {"PYTHONIOENCODING": "cp1252", "LESSON_VIDEOS_HOME": str(tmp_path), "PATH": __import__("os").environ["PATH"],
            "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}
-    r = subprocess.run([sys.executable, str(PLUGIN / "scripts/lesson-videos.py"), "keys", "check"], capture_output=True, env=env)
+    r = subprocess.run([sys.executable, str(PLUGIN / "scripts/slide2video.py"), "keys", "check"], capture_output=True, env=env)
     assert r.returncode == 0 and "✓".encode("utf-8") in r.stdout
 
 
@@ -136,7 +136,7 @@ def test_site_mode_refuses_a_project_registered_in_settings(monkeypatch, tmp_pat
     monkeypatch.setenv("LESSON_VIDEOS_SETTINGS", str(settings))
     monkeypatch.setenv("LV_SITE_MODE", "1")
     assert cli.main(["where"]) == 1
-    assert "A lesson-videos project folder can't be used while working for slide2video.com." in capsys.readouterr().err
+    assert "A slide2video project folder can't be used while working for slide2video.com." in capsys.readouterr().err
 
 
 def test_clip_name_cannot_leave_the_clips_folder(monkeypatch, tmp_path, capsys):
