@@ -50,7 +50,7 @@ class FakeSite:
                 if self.headers.get("X-LV-Contract") != str(site.contract):
                     return self._send(426, {"error": "Update the slide2video plugin on this computer: run /plugin update slide2video"})
                 if u.path == "/api/device/pair/start":
-                    return self._send(200, {"user_code": "KQ7-4M2", "device_code": "dc_1", "expires_in": 600,
+                    return self._send(200, {"user_code": "ABC-123", "device_code": "dc_1", "expires_in": 600,
                                             "verify_url": f"{site.url}/devices"})
                 if u.path == "/api/device/pair/poll":
                     if site.pair_expired:

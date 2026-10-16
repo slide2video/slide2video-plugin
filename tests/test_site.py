@@ -16,7 +16,7 @@ def test_pair_waits_for_the_code_then_stores_the_token(fake_site):
     email = site.pair(name="Test Mac", sleep=lambda s: None, out=lines.append)
     assert email == "teacher@example.org"
     assert site.store.get(fake_site.url) == fake_site.token
-    assert any("KQ7-4M2" in l for l in lines) and any("/devices" in l for l in lines)
+    assert any("ABC-123" in l for l in lines) and any("/devices" in l for l in lines)
     assert not any(fake_site.token in l for l in lines)
 
 
@@ -145,7 +145,7 @@ def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_pa
     try:
         first = lines.get(timeout=30)
         assert p.poll() is None  # still waiting for the code
-        assert "KQ7-4M2" in first
+        assert "ABC-123" in first
     except queue.Empty:
         raise AssertionError("no pairing code within 30 s: stdout is buffered") from None
     finally:
