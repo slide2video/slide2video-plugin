@@ -132,7 +132,7 @@ def test_watch_start_line_names_the_site_teacher_and_computer(paired, lessons):
 def test_watch_stops_when_not_paired(paired, lessons):
     paired.token = "something-else"  # the site no longer accepts this computer's token (Remove on the website)
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
-    assert code == 1 and "isn't connected to slide2video.com" in lines[-1]
+    assert code == 1 and "isn't connected to 127.0.0.1" in lines[-1]
     assert a.on == 0 and a.off == 0 and paired.next_queries == []  # found out before keep-awake started
     assert not any(l.startswith("Making videos for") for l in lines)
     assert not (lessons / ".worker-watch.lock").exists()
