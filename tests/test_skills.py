@@ -221,3 +221,9 @@ def test_serve_update_says_to_reopen_claude_code():
 def test_install_guide_update_row_says_to_reopen_claude_code():
     guide = (PLUGIN / "docs/install/slide2video.md").read_text(encoding="utf-8")
     assert STEPS in guide and "hasn't caught up" in guide
+
+
+def test_setup_and_serve_pass_pro_through():
+    for name in ("setup", "serve"):
+        _, text = frontmatter(name)
+        assert "--site pro" in text and f"/slide2video:{name} pro" in text
