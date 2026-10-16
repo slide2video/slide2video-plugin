@@ -19,7 +19,7 @@ under `/root/.claude/plugins/synced/`: use the `slide2video/scripts/slide2video.
 
 **pro.slide2video.com (Daniel only, before launch):** if the person typed `pro` after the command
 (`/slide2video:serve pro`), add `--site pro` to every `LV pair` and `LV worker` command below, and say
-pro.slide2video.com wherever this skill says slide2video.com. Never suggest it otherwise.
+pro.slide2video.com wherever this skill says slide2video.com. Slash commands this skill tells the person to run (`/slide2video:serve`, `/slide2video:setup`) get ` pro` appended. Never suggest it otherwise.
 
 ## 1. Check the connection
 

@@ -84,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
                       help="keep running jobs as they come, keeping the computer awake, until stopped or disconnected")
     mode.add_argument("--status", action="store_true", help="show which account this computer is connected to")
     for sp in (pr, wk):
-        sp.add_argument("--site", choices=["pro"], help="pro.slide2video.com instead of slide2video.com (before launch)")
+        sp.add_argument("--site", choices=["pro"], help=argparse.SUPPRESS)
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
