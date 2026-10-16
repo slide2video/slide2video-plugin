@@ -1,6 +1,6 @@
 # Chapter video guide
 
-How to build one chapter video with the slide2video engine. **LV** = the full `uv run "…/scripts/slide2video.py"` command line given to you by the make skill (or by whoever handed you this chapter). A chapter is a folder `WORK/chN/` with `script.json` and `scenes.js`; its images are in `assets/` next to them, or, when lessons live in a project folder, in the `assets:` folder `LV where "WORK/chN"` prints (scenes still refer to them as `assets/<file>`). Copy the idioms in `sample/` (next to this file).
+How to build one chapter video with the slide2video engine. **LV** = the full `uv run "…/scripts/slide2video.py"` command line given to you by the make skill (or by whoever handed you this chapter). A chapter is a folder `WORK/chN/` with `script.json` and `scenes.js`; its images are in `assets/` next to them, or, when lessons live in a project folder, in the `assets:` folder `LV where "WORK/chN"` prints (scenes still refer to them as `assets/<file>`). Copy the idioms in `sample/` (next to this file). Also follow the style's guide: the `guide` path that `LV style <id>` prints (the id is in `WORK/style.txt`). It says who the videos talk to, their tone, scene order and length.
 
 ## Workflow
 1. Write `script.json`. Top level: `chapter` (small top-right label, e.g. `"CHAPTER 2 · OSMOSIS"`), `title`, `out` (e.g. `"Chapter 2 - Osmosis and the Salty Potato Lab.mp4"`), optional `"music": "../music/bed.mp3"`, optional `"voice"` (ElevenLabs voice ID), optional `"narrator"`: `"auto"` (default: ElevenLabs if a key is set, else the free Microsoft voice, else the computer's own voice, else captions only), or one of `"elevenlabs"`, `"edge"` (free Microsoft voice; `"edge_voice"` picks it, default `en-US-AvaMultilingualNeural`), `"system"` (the computer's voice; `"system_voice"` picks it), `"none"` (captions only, timed at reading speed). With the computer's voice or captions only, word times are estimated, so reveals land within about half a second of the word. `scenes`: one object per scene with `id`, `say` (narration), optional `lead` (s before speech, default 0.5), `tail` (s after, default 0.7), `hold` (extra silent s, used for quiz countdowns), `min` (minimum s).
@@ -31,11 +31,8 @@ How to build one chapter video with the slide2video engine. **LV** = the full `u
 - Palette: `C.navy, C.sea, C.teal, C.aqua, C.foam, C.coral, C.sun, C.leaf, C.purple, C.pink, C.ink, C.grey, C.water`.
 
 ## Assets
-Copy each deck image you use with `LV asset "WORK/deck/media/<file>" "WORK/chN/assets/<name>.jpg"` (straightened, at most 1600 px, transparent PNGs flattened; use a `.png` target to keep transparency). Use the contact sheets to pick them. A missing asset, clip frame or scene stops `stills` and `render` with an error naming it. Never use images of students.
+Copy each deck image you use with `LV asset "WORK/deck/media/<file>" "WORK/chN/assets/<name>.jpg"` (straightened, at most 1600 px, transparent PNGs flattened; use a `.png` target to keep transparency). Use the contact sheets to pick them. A missing asset, clip frame or scene stops `stills` and `render` with an error naming it.
 
 ## Narration style
-- Talk to "you", a student at the grade level from the interview, preparing for a test. Warm, upbeat, a little funny, never cringe or babyish. Short sentences. Contractions.
-- Every concept: the class definition (close to the teacher's wording in `brief.md`) → a picture or animation that makes it obvious → a memory hook → **how it shows up on the test** (likely question, common trap, the exact vocabulary word to use).
-- Open with a hook (15 s or less). End with a 3-question quiz (`q1`/`a1`… scenes, each `q` with `"hold": 4.5`) and a ~25 s recap that teases the next chapter.
 - Text-to-speech friendly: spell symbols as spoken ("C O two" or "carbon dioxide", "ten point three percent", "three hundred milliliters"); no abbreviations like "e.g."; no emoji in `say`. Captions show the `say` text, so keep it clean.
-- Target 4–6 minutes per chapter (about 600–850 words). Never invent facts or statistics beyond `brief.md`.
+- Never invent facts or statistics beyond `brief.md`.

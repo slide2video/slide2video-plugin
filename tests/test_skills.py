@@ -94,10 +94,35 @@ def test_make_skill_has_a_site_mode():
     _, text = frontmatter("make")
     site = text.split("## Site mode", 1)[1]
     for needed in ("site/turn.json", "site/card.json", "site/progress.txt", "site/lv.txt", "LV card",
-                   '"questions"', '"plan"', '"review"', '"done"', "student", "Never ask", "stop",
-                   "`answer`", "`approve`", "`change`", "`continue`", "`feedback`", "student-info.md",
-                   "interview.md", "review.md", '"students"', "Decision: remove", '"problem"'):
+                   '"questions"', '"plan"', '"review"', '"done"', "Never ask", "stop",
+                   "`answer`", "`approve`", "`change`", "`continue`", "`feedback`",
+                   "LV style", "`check.id`", "`check.remove`", "`check.keep`", "`check.file`", "`check.keep_decision`",
+                   "interview.md", "review.md", "Decision: remove", '"problem"', "school"):
         assert needed in site, needed
+
+
+def test_school_lives_only_in_its_style():
+    """The make skill takes every School-specific word from `LV style`, so it can't drift from styles/school."""
+    _, text = frontmatter("make")
+    for school_only in ("What grade are the students?", "They're not students", "not students", "student-info.md",
+                        "calm, light instrumental study music", "3-question quiz"):
+        assert school_only not in text, school_only
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    assert "a student at the grade level" not in guide and "Never use images of students" not in guide
+
+
+def test_make_skill_picks_and_remembers_the_style():
+    _, text = frontmatter("make")
+    assert "LV styles" in text and 'LV style' in text and "WORK/style.txt" in text
+    assert "is `school`" in text            # a WORK from before styles, and every site-mode lesson
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    assert "style's guide" in guide
+
+
+def test_helpers_get_both_guides():
+    _, text = frontmatter("make")
+    section = text.split("## 7. Remaining chapters", 1)[1].split("## 8.", 1)[0]
+    assert "guide.md" in section and "style's guide" in section
 
 
 def test_setup_offers_to_connect_this_mac():

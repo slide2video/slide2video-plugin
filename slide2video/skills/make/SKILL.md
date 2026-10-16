@@ -18,8 +18,14 @@ If `uv` isn't found, or any command says a tool or key is missing, run the `setu
 Read `${CLAUDE_SKILL_DIR}/references/guide.md` before writing any `script.json` or `scenes.js`. The sample chapter in `${CLAUDE_SKILL_DIR}/references/sample/` shows every idiom.
 
 **Folders.** Run `LV where` in the current folder first.
-- If it says there is no project folder, everything goes next to the deck: for a deck at `<folder>/<deck>.pptx`, finished videos in `<folder>/slide2video/` and working files in `<folder>/slide2video/_work/` (`deck/`, `brief.md`, `plan.md`, `music/`, `clips/`, `ch1/`, `ch2/`…). Call `<folder>/slide2video/_work` **WORK**.
+- If it says there is no project folder, everything goes next to the deck: for a deck at `<folder>/<deck>.pptx`, finished videos in `<folder>/slide2video/` and working files in `<folder>/slide2video/_work/` (`deck/`, `brief.md`, `plan.md`, `music/`, `clips/`, `ch1/`, `ch2/`…). If `<folder>/lesson-videos/_work/` already exists (a run started before the rename), use that instead, with finished videos in `<folder>/lesson-videos/`. Call the working folder **WORK**.
 - If the teacher keeps lessons in a project folder, the lesson is a folder inside its lessons folder, one per course and unit (ask for both, e.g. `lessons/biology/unit-2`); create it and call it **WORK**. `LV where "WORK"` prints where each kind of file goes: the text (`brief.md`, `plan.md`, `chN/script.json`, `chN/scenes.js`) stays in WORK; images, clips, music and narration takes go under `sources`; what `ingest` extracts goes under `work`; finished videos under `videos`. Pass WORK (or `WORK/chN`) to every command, as below; the commands put each file in its place. Copy images with `LV asset` to the `assets:` folder that `LV where "WORK/chN"` prints. Put the deck and the other class files in a `class-materials/` folder inside the `videos` folder.
+
+**Style.** Each run is made in one style, which decides the extra interview questions, the brief, the scene outline, the music and the writing guide. Once WORK is known:
+- If `WORK/style.txt` exists, its one line is the style id.
+- Otherwise, if WORK already has `brief.md` or `plan.md` (a run started before styles), the style is `school`.
+- Otherwise run `LV styles`: with one style installed, use it without asking; with more, ask the teacher which, showing each style's name and description.
+- Write the id to `WORK/style.txt`, then run `LV style <id>` and keep its output. Below, "the style's `questions`", `check`, `brief`, `outline`, `clips`, `music` and `guide` all mean fields of that output. Read the style's guide (its `guide` path) along with `guide.md` before writing any `script.json` or `scenes.js`.
 
 **Ground rules.**
 - The teacher's slides are the only source of facts. Never add facts, numbers or examples that aren't in the deck or in files the teacher points you to.
@@ -48,7 +54,7 @@ LV ingest "<deck path>" --work "WORK"
 
 ## 2. Short interview (one message, sensible defaults offered)
 
-- Grade level of the students.
+- First the style's `questions`, in order. When a question's `options` is `"from-deck"`, write the options from the deck as its `hint` says and recommend one; otherwise offer its listed options.
 - Chapters: propose a split from the deck's sections or titles (for example one video per unit/entry/lesson) and ask them to confirm or adjust.
 - Length per video: default 4–6 minutes.
 - Voice: with an ElevenLabs key (`LV keys check`), Jessica (warm, upbeat young American); without one, the free Microsoft voice (Ava), which needs no account. They can also ask for the computer's own voice (offline, more robotic) or captions only; record the choice as `"narrator"` in each `script.json` (see `guide.md`).
@@ -56,11 +62,11 @@ LV ingest "<deck path>" --work "WORK"
 
 ## 3. Content brief
 
-Write `WORK/brief.md`. Per chapter: the essential question if the deck has one; key terms with definitions **in the teacher's own wording**; examples and lab data from the slides; likely test questions; common mistakes worth a "trap" warning. Finish with a section **"Possible issues in the slides"**: contradictions between slides, typos in key terms, definitions worded two ways. Show the teacher that section and ask how to handle each item (follow the slide, follow the correction, or leave it out).
+Write `WORK/brief.md`. Per chapter: what the style's `brief` lists. Finish with a section **"Possible issues in the slides"**: contradictions between slides, typos in key terms, definitions worded two ways. Show the teacher that section and ask how to handle each item (follow the slide, follow the correction, or leave it out).
 
 ## 4. Plan and approval gate
 
-Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (hook, 6–12 content scenes, a 3-question quiz, recap for 4–6 minutes; for shorter videos scale down, e.g. one scene per key idea and a 1-question quiz), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (real photos of living things or landscapes that benefit from motion; not drawings or clip-art, which Veo turns into realistic footage partway through; never diagrams with text, never photos of students). Then run:
+Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (the style's `outline`), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (the style's `clips` says which). Then run:
 
 ```
 LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music]
@@ -70,7 +76,7 @@ Show the teacher the outline in brief and the estimate, and **ask for approval**
 
 ## 5. Music and clips (only if approved and a Gemini key is set)
 
-- Music: `LV music "WORK" --prompt "<calm, light instrumental study music, no vocals, steady gentle beat>"`. If it fails with a billing message, tell the teacher in one line and continue without music.
+- Music: `LV music "WORK" --prompt "<the style's music prompt>"`. If it fails with a billing message, tell the teacher in one line and continue without music.
 - Each clip: copy the source photo path from `WORK/deck/media/`, then `LV clip "<photo>" --work "WORK" --name <short-name> --prompt "<cinematic, realistic, slow camera move, describe the subject and its natural motion, no text>"`. Look at `WORK/clips/<name>-strip.jpg`: if the subject changes into something else partway, note how many seconds are usable and use `--max <seconds × 24>` below.
 
 ## 6. Reference chapter (chapter 1), then stop for feedback
@@ -88,7 +94,7 @@ Then **stop**. Tell the teacher where the video is (the path `render` printed) a
 
 ## 7. Remaining chapters
 
-Default: one chapter at a time, same steps as 6.1–6.7, checking in briefly after each. If the teacher asks for speed, you may hand chapters to parallel helper agents; give each the exact **LV** command line (with the real plugin path, since helpers don't get it substituted), the paths to `guide.md`, `brief.md`, `plan.md` (with the style notes), its own `WORK/chN/` folder, and the finished `WORK/ch1/` as the reference. Tell the teacher this uses much more of their Claude plan.
+Default: one chapter at a time, same steps as 6.1–6.7, checking in briefly after each. If the teacher asks for speed, you may hand chapters to parallel helper agents; give each the exact **LV** command line (with the real plugin path, since helpers don't get it substituted), the paths to `guide.md` and the style's guide, `brief.md`, `plan.md` (with the style notes), its own `WORK/chN/` folder, and the finished `WORK/ch1/` as the reference. Tell the teacher this uses much more of their Claude plan.
 
 Between chapters, `LV status "WORK"` shows what's left. If the session ends, the next `/slide2video:make` resumes from step 0.
 
@@ -119,6 +125,7 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   saved in `in/`.
 - **Folders:** `WORK` is `lesson-videos/_work` (pass `--work "lesson-videos/_work"` to `ingest`); finished videos
   land in `lesson-videos/`.
+- **Style:** a website lesson is always `school` for now: on the `start` turn write `school` to `WORK/style.txt`; every turn runs `LV style school` (a lesson with no `style.txt` is `school` too).
 - **Progress:** at each step, rewrite `site/progress.txt` with its lines plus one new line at the end, a line a
   teacher would understand ("Reading the deck", "Narrating 3 of 12 scenes", "Rendering chapter 1"). You can only
   read and write files, so write the whole file each time. The website shows the last line. When a step counts through items (scenes narrated, chapters rendered),
@@ -134,11 +141,12 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   listed them with their cost; otherwise make none. When the plan card's `markdown` includes music or clips, it
   must list them with their costs.
 - **Files between turns** (in `WORK`):
-  - `student-info.md`: the slide numbers flagged for student information (never copy student names into any file),
-    and at its end the teacher's decision, a line `Decision: remove` or `Decision: not students`. Every turn that
-    writes `brief.md`, `plan.md` or a chapter reads it first (if it exists) and leaves the flagged slides out when
-    the decision is `remove`.
-  - `interview.md`: the interview answers: grade, chapters, length, voice, and the decision for each possible issue.
+  - `WORK/<check.file>`: the slide numbers flagged by the style's check (never copy anyone's name into any file),
+    and at its end the teacher's decision, a line `Decision: remove` or `Decision: <check.keep_decision>`. Every turn
+    that writes `brief.md`, `plan.md` or a chapter reads it first (if it exists) and leaves the flagged slides out
+    when the decision is `remove`.
+  - `interview.md`: the interview answers: the style's questions, chapters, length, voice, and the decision for each
+    possible issue.
   - `review.md`: its first line is `Under review: chapter N`; write it with every `review` card.
 - **One chapter per turn**, no parallel helper agents.
 
@@ -146,8 +154,8 @@ What to do for each `turn.kind`, and which card ends it:
 
 | `turn.kind` | Do | Card |
 |---|---|---|
-| `start` | Step 1 (ingest and read every slide). Then check every slide for **student information** (names of students, class photos, graded student work): the website forbids it. If found, write the flagged slide numbers to `student-info.md` and don't write `brief.md` yet (the `answer` turn writes it after the teacher's decision). If none was found, steps 2–3: write `brief.md`. | If student information was found: `"questions"` with one question whose `"id"` is `"students"`, options labelled exactly "Remove these slides" and "They're not students", and nothing else. Otherwise: the interview (grade, chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). Give the possible-issue questions the ids `issue-1`, `issue-2`, …. |
-| `answer` | Check the answers in this order. (1) An answer to `"question": "problem"` (see the failure paragraph below): act on it and continue from where the work stopped. (2) An answer to `"question": "students"`: append `Decision: remove` (for "Remove these slides") or `Decision: not students` (for "They're not students") as the last line of `student-info.md`; if the decision is `remove`, leave the flagged slides out everywhere (with `not students`, keep them); if `brief.md` doesn't exist yet, write it now (steps 2–3). (3) The interview: if `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (grade, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and there are no interview answers, send the interview card and stop: no planning in this turn. Otherwise (`interview.md` exists or was just written in this turn), step 4: read `student-info.md` if it exists, write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = the JSON that `LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music] --json` prints (`"usd"` and `"items"`), plus `"minutes": <per video>` and `"chapters": <N>`. |
+| `start` | Step 1 (ingest and read every slide). Then the style's check: look at every slide for what `check.looks_for` names; the website forbids it. If found, write the flagged slide numbers to `WORK/<check.file>` (`check.file`) and don't write `brief.md` yet (the `answer` turn writes it after the teacher's decision). If none was found, steps 2–3: write `brief.md`. | If the check found something: `"questions"` with one question whose `"id"` is `check.id`, options labelled exactly `check.remove` and `check.keep`, and nothing else. Otherwise: the interview (the style's questions with their own ids, then chapter split, length, voice; options from step 2) plus one question per possible issue in the slides (follow the slide / follow the correction / leave it out). Give the possible-issue questions the ids `issue-1`, `issue-2`, …. |
+| `answer` | Check the answers in this order. (1) An answer to `"question": "problem"` (see the failure paragraph below): act on it and continue from where the work stopped. (2) An answer to the question whose id is `check.id`: append `Decision: remove` (for `check.remove`) or `Decision: <check.keep_decision>` (for `check.keep`; `check.keep_decision` is the style's word for it) as the last line of `WORK/<check.file>`; if the decision is `remove`, leave the flagged slides out everywhere (otherwise keep them); if `brief.md` doesn't exist yet, write it now (steps 2–3). (3) The interview: if `interview.md` doesn't exist yet and the answers include the interview, write `interview.md` (the style's questions, chapters, length, voice, and the decision for each possible issue) before planning. If `interview.md` doesn't exist and there are no interview answers, send the interview card and stop: no planning in this turn. Otherwise (`interview.md` exists or was just written in this turn), step 4: read `WORK/<check.file>` if it exists, write `plan.md`, run `estimate`. | If the interview was asked: the interview `questions` card. Otherwise `"plan"`: `markdown` = the outline in brief (with music and clips and their costs, if any); `estimate` = the JSON that `LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music] --json` prints (`"usd"` and `"items"`), plus `"minutes": <per video>` and `"chapters": <N>`. |
 | `change` | Revise `plan.md` from `feedback`, re-run `estimate` (with `--json`, as in the `answer` row). | `"plan"` again, its `estimate` built as in the `answer` row. |
 | `approve` | Note the approval and date at the top of `plan.md`. Steps 5–6 (music and clips only as the approval rule above allows), then chapter 1 (6.1–6.7). | `"review"` for chapter 1. |
 | `feedback` | Read `review.md` for the chapter under review. Apply `feedback` to that chapter (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
@@ -157,8 +165,8 @@ Card formats (all start with `"contract": 1`, `"kind"` and a one-line `"message"
 
 ```json
 {"contract": 1, "kind": "questions", "message": "A few questions before I plan the videos.",
- "questions": [{"id": "grade", "text": "What grade are the students?",
-                "options": [{"label": "Grades 6–8", "detail": "Middle school", "recommended": true}], "other": true}]}
+ "questions": [{"id": "length", "text": "About how long should each video be?",
+                "options": [{"label": "2–3 minutes", "detail": "Short and focused", "recommended": true}], "other": true}]}
 ```
 
 - `"questions"`: up to 8 questions; ids are short lowercase words; each has 1–6 options (`label`, optional
