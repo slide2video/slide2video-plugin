@@ -1,4 +1,5 @@
 import datetime as dt
+import shutil
 import hashlib
 import json
 import os
@@ -26,6 +27,9 @@ def _turn(kind="start", tid="trn_0123456789abcdefghijkl", path="in/water-cycle.p
 def lessons(tmp_path, monkeypatch):
     root = tmp_path / "Lesson Videos"
     monkeypatch.setenv("LV_LESSONS_DIR", str(root))
+    real_which = shutil.which  # CI runners have no `claude`: fake only that lookup
+    monkeypatch.setattr(worker.shutil, "which",
+                        lambda n, *a, **k: f"/usr/local/bin/{n}" if n == "claude" else real_which(n, *a, **k))
     return root
 
 
@@ -295,7 +299,7 @@ def test_claude_command_limits_tools(monkeypatch):
     cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
     assert cmd[1:3] == ["-p", worker.PROMPT]
     allowed = _flag(cmd, "--allowedTools")
-    plugin = str(worker.config.PLUGIN_ROOT).lstrip("/")
+    plugin = str(worker.config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
     assert allowed == ['Bash("/usr/bin/uv" run "/p/slide2video.py":*)', "Read(./**)", f"Read(//{plugin}/**)",
                        "Edit(./**)", "Write(./**)"]
     assert not any(t.startswith("Bash") and t != 'Bash("/usr/bin/uv" run "/p/slide2video.py":*)' for t in cmd)

@@ -25,7 +25,12 @@ class Awake:
 
 def _watch(claude, **kw):
     a, lines, sleeps = Awake(), [], []
-    code = worker.watch(claude=claude, out=lines.append, sleep=sleeps.append, awake_on=a.keep, awake_off=a.release, **kw)
+
+    def sleep(seconds):  # a worker that never stops must fail in seconds, not hang
+        sleeps.append(seconds)
+        if len(sleeps) > 50:
+            pytest.fail("worker.watch never stopped")
+    code = worker.watch(claude=claude, out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release, **kw)
     return code, lines, sleeps, a
 
 
