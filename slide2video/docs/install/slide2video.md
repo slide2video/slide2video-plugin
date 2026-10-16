@@ -24,6 +24,8 @@ Claude Code, sign in, then type:
 /plugin install slide2video@slide2video
 ```
 
+Used lesson-videos before? Also type `/plugin uninstall lesson-videos`, then close and reopen Claude Code. Your keys, settings and connection to slide2video.com come along.
+
 ## 2. Set up and connect this computer (once)
 
 Type `/slide2video:setup`. Claude installs the free tools it needs (about 10 minutes) and asks which voice you
