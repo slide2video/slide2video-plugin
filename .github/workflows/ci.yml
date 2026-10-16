@@ -2,7 +2,15 @@ name: ci
 on:
   push:
     branches: [main, "feat/**"]
+    paths-ignore: ["docs/**"]
   pull_request:
+    paths-ignore: ["docs/**"]
+  workflow_dispatch:
+
+# A newer push to the same branch cancels the run still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -11,16 +19,15 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # A green run takes about 10 minutes. Without a limit, a hung test held both machines for GitHub's 6-hour maximum
+    # (October 2026, lesson-videos 0.7.0 to 1.0.1, in DanielLandi/plugins).
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - name: ffmpeg on PATH (the media tests skip without it)
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then brew install ffmpeg; else choco install ffmpeg -y --no-progress; fi
       - name: doctor (installs Chromium + ffmpeg, renders a test video)
         run: uv run slide2video/scripts/slide2video.py doctor --no-keys
       - name: browser for the test environment
         run: uv run python -m playwright install chromium
       - name: tests
-        run: uv run pytest -q
+        run: uv run pytest -q -p no:cacheprovider --timeout 300 --timeout-method thread
