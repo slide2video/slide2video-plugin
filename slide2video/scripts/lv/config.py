@@ -21,11 +21,16 @@ def _copy_once(old: Path, new: Path) -> None:
     concurrent copy never leaves a half-filled `new`. Symlinks stay symlinks; file modes are kept."""
     import shutil
     import tempfile
+    import time
     if new.exists() or not old.exists():
         return
     new.parent.mkdir(parents=True, exist_ok=True)
-    for stale in new.parent.glob(new.name + ".partial-*"):
-        shutil.rmtree(stale, ignore_errors=True) if stale.is_dir() else stale.unlink(missing_ok=True)
+    for stale in new.parent.glob(new.name + ".partial-*"):     # only old ones: a fresh one may be another run's live copy
+        try:
+            if time.time() - stale.stat().st_mtime > 3600:
+                shutil.rmtree(stale, ignore_errors=True) if stale.is_dir() else stale.unlink(missing_ok=True)
+        except OSError:
+            pass
     tmp = Path(tempfile.mkdtemp(prefix=new.name + ".partial-", dir=new.parent))
     try:
         if old.is_dir():

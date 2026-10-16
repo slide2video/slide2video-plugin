@@ -28,7 +28,8 @@ def test_api_error_is_printed_plainly(monkeypatch, capsys):
 
 
 def test_cli_prints_unicode_on_cp1252(tmp_path):
-    env = {"PYTHONIOENCODING": "cp1252", "LESSON_VIDEOS_HOME": str(tmp_path), "PATH": __import__("os").environ["PATH"],
+    env = {"PYTHONIOENCODING": "cp1252", "LESSON_VIDEOS_HOME": str(tmp_path),
+           "LESSON_VIDEOS_SETTINGS": str(tmp_path / "settings.json"), "PATH": __import__("os").environ["PATH"],
            "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}
     r = subprocess.run([sys.executable, str(PLUGIN / "scripts/slide2video.py"), "keys", "check"], capture_output=True, env=env)
     assert r.returncode == 0 and "✓".encode("utf-8") in r.stdout
@@ -104,7 +105,7 @@ def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(lesson)
     monkeypatch.setenv("LV_SITE_MODE", "1")
     for argv in (["asset", "/etc/hosts", "x.jpg"],
-                 ["render", "slide2video/_work/ch1", "--out", str(tmp_path / "elsewhere")],
+                 ["render", "lesson-videos/_work/ch1", "--out", str(tmp_path / "elsewhere")],
                  ["asset", "link.jpg", "x.jpg"],
                  ["asset", "site/card.json", str(config.PLUGIN_ROOT / "x.jpg")]):
         assert cli.main(argv) == 1
@@ -152,3 +153,12 @@ def test_clip_name_cannot_leave_the_clips_folder(monkeypatch, tmp_path, capsys):
             assert cli.main(["clip", str(tmp_path / "photo.jpg"), "--work", str(tmp_path / "w"), "--name", name,
                              "--prompt", "p"]) == 1
             assert "clip name" in capsys.readouterr().err
+
+
+def test_a_failed_migration_never_blocks_a_command(monkeypatch, capsys, tmp_path):
+    from lv import config
+    def boom():
+        raise OSError("disk full")
+    monkeypatch.setattr(config, "migrate_home", boom)
+    assert cli.main(["where", str(tmp_path)]) == 0
+    assert "couldn't copy the old lesson-videos settings" in capsys.readouterr().err

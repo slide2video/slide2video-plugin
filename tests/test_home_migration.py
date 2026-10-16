@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -74,9 +75,20 @@ def test_an_explicit_home_is_never_migrated(fake_home, tmp_path, monkeypatch):
 def test_a_leftover_partial_copy_is_replaced(fake_home):
     write_text(fake_home / ".lesson-videos" / "keys.env", "OLD\n")
     write_text(fake_home / ".slide2video.partial-123" / "half", "x")      # an earlier run was interrupted
+    two_hours_ago = time.time() - 7200
+    os.utime(fake_home / ".slide2video.partial-123", (two_hours_ago, two_hours_ago))
     config.migrate_home()
     assert read_text(fake_home / ".slide2video" / "keys.env") == "OLD\n"
     assert not (fake_home / ".slide2video" / "half").exists()
+    assert not (fake_home / ".slide2video.partial-123").exists()
+
+
+def test_a_fresh_partial_of_another_run_is_left_alone(fake_home):
+    write_text(fake_home / ".lesson-videos" / "keys.env", "OLD\n")
+    write_text(fake_home / ".slide2video.partial-live" / "x" / "half", "x")   # another process is copying right now
+    config.migrate_home()
+    assert (fake_home / ".slide2video.partial-live" / "x" / "half").exists()
+    assert read_text(fake_home / ".slide2video" / "keys.env") == "OLD\n"
 
 
 def test_the_settings_file_is_copied(fake_home):

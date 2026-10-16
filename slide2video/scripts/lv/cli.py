@@ -99,7 +99,7 @@ def main(argv=None) -> int:
     try:
         from . import config
         config.migrate_home()
-    except OSError as e:                     # never block a command over the one-time copy
+    except (OSError, RuntimeError) as e:      # never block a command over the one-time copy
         print(f"note: couldn't copy the old lesson-videos settings ({e}); they are still in place.", file=sys.stderr)
     try:
         return dispatch(args)
