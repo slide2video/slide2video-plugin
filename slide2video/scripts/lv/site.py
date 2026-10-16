@@ -1,4 +1,4 @@
-"""slide2video.com: this computer's connection (pairing, its token in the Keychain, device API calls). The token is
+"""slide2video.com and pro.slide2video.com: this computer's connection (pairing, its token in the Keychain, device API calls). The token is
 never printed."""
 from __future__ import annotations
 
@@ -15,8 +15,6 @@ import lv
 from . import config, contract, net, version
 from .util import UserError, read_json, write_json
 
-NOT_PAIRED = ("This computer isn't connected to slide2video.com (or it was removed there). Run /slide2video:setup "
-              "and choose to connect this computer.")
 UPDATE = f"Update the slide2video plugin on this computer: {version.STEPS}."
 LATEST: str | None = None  # the plugin version the website said it is built for (X-LV-Latest), last seen
 BAD_CODE = "The website sent a connection code this plugin can't use. Run the pairing again."
@@ -31,8 +29,39 @@ def _check_token(token) -> str:
     return token
 
 
+SITES = {"slide2video.com": "https://slide2video.com", "pro": "https://pro.slide2video.com"}
+_chosen: str | None = None  # set by `--site`; None is slide2video.com
+
+
+def use(name: str | None) -> None:
+    """Which of our sites this run works for: None (slide2video.com) or "pro". Nothing else: a site this computer is
+    paired with can send it jobs that run Claude Code, so an arbitrary address would let a fake site do that."""
+    global _chosen
+    if name is not None and name != "pro":
+        raise UserError(f"Unknown site {name!r}. Use pro, or leave it out for slide2video.com.")
+    _chosen = SITES["pro"] if name else None
+
+
 def site_url() -> str:
-    return (os.environ.get("LV_SITE_URL") or config.SITE_URL).rstrip("/")
+    return (os.environ.get("LV_SITE_URL") or _chosen or config.SITE_URL).rstrip("/")
+
+
+def is_pro() -> bool:
+    return site_url() == SITES["pro"]
+
+
+def host() -> str:
+    return site_url().split("://", 1)[-1]
+
+
+def cmd(skill: str) -> str:
+    """The slash command to suggest, for the site this run works for."""
+    return f"/slide2video:{skill}" + (" pro" if is_pro() else "")
+
+
+def not_paired() -> str:
+    return (f"This computer isn't connected to {host()} (or it was removed there). Run {cmd('setup')} "
+            "and choose to connect this computer.")
 
 
 class KeychainStore:
@@ -108,7 +137,7 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
     if auth:
         token = store.get(site_url())
         if not token:
-            raise UserError(NOT_PAIRED)
+            raise UserError(not_paired())
         h["Authorization"] = f"Bearer {token}"
     try:
         return net.request(site_url() + path, data=data, headers=h, method=method, raw=raw, timeout=timeout,
@@ -117,7 +146,7 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
         if e.status == 426:
             raise UserError(_error_message(e.detail) or UPDATE) from None
         if e.status == 401 and auth:
-            raise UserError(NOT_PAIRED) from None
+            raise UserError(not_paired()) from None
         raise
 
 

@@ -22,6 +22,15 @@ def lv_home(tmp_path, monkeypatch):
     return home
 
 
+@pytest.fixture(autouse=True)
+def _default_site():
+    """`site.use()` is process-wide: every test starts and ends on slide2video.com."""
+    from lv import site
+    site.use(None)
+    yield
+    site.use(None)
+
+
 @pytest.fixture
 def lv_project(tmp_path, monkeypatch):
     """A registered project folder; results and work live outside it, all in paths with spaces."""

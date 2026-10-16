@@ -50,19 +50,25 @@ IDLE, RAN, STOP, BUSY = "idle", "ran", "stop", "busy"
 STOP_FINISH_TIMEOUT = 10       # seconds: a stopped step is handed back once, quickly, or left to its lease
 STOPPED = ("Stopped on this computer before this step finished. It starts again when the computer is making videos "
            "again.")
-DISCONNECTED_LINE = "Disconnected from the website. To start again, run /slide2video:serve."
 STILL_ACTIVE = 259             # GetExitCodeProcess: the process hasn't exited
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 ERROR_ACCESS_DENIED = 5
 
 
+def disconnected_line() -> str:
+    return f"Disconnected from the website. To start again, run {site.cmd('serve')}."
+
+
 def lessons_root() -> Path:
     """Where website lessons are worked on. A ~/Lesson Videos left by lesson-videos keeps being used, so a lesson in
-    progress continues after the update."""
+    progress continues after the update. pro.slide2video.com works in a subfolder, so each site has its own lessons and
+    locks and one computer can serve both at once."""
     if value := os.environ.get("LV_LESSONS_DIR"):
-        return Path(value)
-    old = Path.home() / "Lesson Videos"
-    return old if old.is_dir() else Path.home() / "slide2video"
+        base = Path(value)
+    else:
+        old = Path.home() / "Lesson Videos"
+        base = old if old.is_dir() else Path.home() / "slide2video"
+    return base / site.host() if site.is_pro() else base
 
 
 def lesson_dir(lesson: dict) -> Path:
@@ -451,7 +457,7 @@ def _once(claude, out, start: bool = False) -> tuple[str, int]:
 def run_once(claude=None, out=print) -> int:
     state, code = _once(claude, out)
     if state == STOP:
-        out(DISCONNECTED_LINE)
+        out(disconnected_line())
     return code
 
 
@@ -480,7 +486,7 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
     root = lessons_root()
     guard = _lock(root, ".worker-watch.lock")
     if guard is None:
-        out("This computer is already making videos for slide2video.com (another window is running it).")
+        out(f"This computer is already making videos for {site.host()} (another window is running it).")
         return 0
     handle = previous = None
     awake = False
@@ -532,7 +538,7 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
                 continue
             start, said_busy = False, False
             if state == STOP:
-                out(DISCONNECTED_LINE)
+                out(disconnected_line())
                 return 0
             if state == IDLE:
                 sleep(POLL)

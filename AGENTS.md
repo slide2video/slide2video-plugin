@@ -27,6 +27,10 @@ what the website shows about computers), set `plugin` to the new version, copy `
 is fine. Publish the plugin release first (merge and push this repo), then deploy the website; never the reverse: a
 website deployed first with a new major refuses every computer until the plugin ships.
 
+The plugin serves pro.slide2video.com too (`--site pro`, before launch): the same contract applies to both sites.
+While two sites run, a contract change must stay within the major that the website's `live` branch accepts. A change
+slide2video.com must understand ships website `live` first, then `main` (pro), and only then is the plugin published.
+
 ## Rules
 
 - **Public repo.** Never commit class material (slides, worksheets, student
