@@ -11,7 +11,7 @@ Students get to rewatch the lesson in your words: every definition, example and 
 | ![Title card: The Water Cycle](docs/images/sample-1-hook.webp) | ![Condensation scene with a "trap" warning](docs/images/sample-2-diagram.webp) |
 | ![Quiz question with a countdown](docs/images/sample-3-quiz.webp) | ![Recap checklist](docs/images/sample-4-recap.webp) |
 
-**[▶ Watch the full sample video](https://github.com/DanielLandi/plugins/releases/download/lesson-videos-sample-v2/water-cycle-sample.mp4)** (2 minutes 18 seconds). Made from the six-slide [examples/water-cycle.pptx](../examples/water-cycle.pptx) with an ElevenLabs voice, no edits ([the same chapter with the free voice](https://github.com/DanielLandi/plugins/releases/download/lesson-videos-sample-v1/water-cycle-sample.mp4)).
+**[▶ Watch the full sample video](https://github.com/slide2video/slide2video-plugin/releases/download/slide2video-sample-v2/water-cycle-sample.mp4)** (2 minutes 18 seconds). Made from the six-slide [examples/water-cycle.pptx](../examples/water-cycle.pptx) with an ElevenLabs voice, no edits ([the same chapter with the free voice](https://github.com/DanielLandi/plugins/releases/download/lesson-videos-sample-v1/water-cycle-sample.mp4)).
 
 ## What each video has
 
