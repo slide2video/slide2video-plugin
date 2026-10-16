@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.11,<3.15"
 # dependencies = [
 #   "edge-tts>=7.3.1",
 #   "jsonschema>=4.23",

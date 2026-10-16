@@ -21,7 +21,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import lv
 from . import awake, config, contract, keys, narrate, net, paths, site, version
@@ -37,9 +37,9 @@ LIMIT_SUFFIX = {".mp4": "video", ".vtt": "captions", ".jpg": "stills", ".jpeg": 
 RESET = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", re.I)
 # Claude Code reads these from the folder it runs in; a turn could plant them for the next turn. Never part of a lesson.
 CLAUDE_CONFIG = (".claude", ".mcp.json", "CLAUDE.md", "CLAUDE.local.md")
-DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Write(./.claude/**)", "Edit(./.mcp.json)",
-          "Write(./.mcp.json)", "Edit(./CLAUDE.md)", "Write(./CLAUDE.md)", "Edit(./CLAUDE.local.md)",
-          "Write(./CLAUDE.local.md)"]
+# Edit(...) rules cover every file-editing tool (Write too); Claude Code ignores Write(...) rules.
+DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "Edit(./CLAUDE.md)",
+          "Edit(./CLAUDE.local.md)"]
 # Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
 DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "ANTHROPIC_API_KEY",
                "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
@@ -85,6 +85,15 @@ def lv_command() -> str:
     return f'"{shutil.which("uv") or "uv"}" run "{config.ENTRY}"'
 
 
+def read_rule(folder: PurePath) -> str:
+    """A Read rule for an absolute folder. Claude Code matches Windows paths in POSIX form: C:\\Plugins\\lv is
+    /c/Plugins/lv, so the rule is Read(//c/Plugins/lv/**); //C:/Plugins/lv never matches."""
+    path = folder.as_posix()
+    if re.match(r"[A-Za-z]:/", path):
+        path = "/" + path[0].lower() + path[2:]
+    return f"Read(/{path}/**)"
+
+
 def claude_command(lv: str) -> list[str]:
     """Claude Code pinned to this job: one model (config.CLAUDE_MODEL), no user, project or local settings (so no
     hooks, extra allow rules or permission mode of the teacher's own), no MCP servers, this plugin loaded explicitly,
@@ -93,12 +102,11 @@ def claude_command(lv: str) -> list[str]:
     if not claude:
         raise UserError("Claude Code isn't installed on this computer (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
-    plugin = str(config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
     model = os.environ.get("LV_CLAUDE_MODEL") or config.CLAUDE_MODEL
     return [claude, "-p", PROMPT, "--model", model,
             "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
             "--plugin-dir", str(config.PLUGIN_ROOT),
-            "--allowedTools", f"Bash({lv}:*)", "Read(./**)", f"Read(//{plugin}/**)", "Edit(./**)", "Write(./**)",
+            "--allowedTools", f"Bash({lv}:*)", "Read(./**)", read_rule(config.PLUGIN_ROOT), "Edit(./**)",
             "--disallowedTools", *DENIED]
 
 

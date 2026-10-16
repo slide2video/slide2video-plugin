@@ -10,7 +10,7 @@ slide2video.com is invite-only. If you haven't been invited, use [Claude Code](c
 ## What you need
 
 - An invitation to slide2video.com (you sign in there with an emailed code).
-- A computer that stays at home and makes the videos. Today that's a **Mac**; Windows support is on the way.
+- A computer that stays at home and makes the videos: a **Mac** or a **Windows PC**.
 - **Claude Code** on that computer, signed in to your own Claude account (any paid plan).
 - About 1 GB of free disk space, and about 15 minutes the first time.
 

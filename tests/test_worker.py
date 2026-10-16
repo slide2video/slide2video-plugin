@@ -299,12 +299,19 @@ def test_claude_command_limits_tools(monkeypatch):
     cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
     assert cmd[1:3] == ["-p", worker.PROMPT]
     allowed = _flag(cmd, "--allowedTools")
-    plugin = str(worker.config.PLUGIN_ROOT).replace("\\", "/").lstrip("/")
-    assert allowed == ['Bash("/usr/bin/uv" run "/p/slide2video.py":*)', "Read(./**)", f"Read(//{plugin}/**)",
-                       "Edit(./**)", "Write(./**)"]
+    assert allowed == ['Bash("/usr/bin/uv" run "/p/slide2video.py":*)', "Read(./**)",
+                       worker.read_rule(worker.config.PLUGIN_ROOT), "Edit(./**)"]
+    assert not any(t.startswith("Write(") for t in cmd)  # Claude Code ignores Write rules; Edit rules cover writing
     assert not any(t.startswith("Bash") and t != 'Bash("/usr/bin/uv" run "/p/slide2video.py":*)' for t in cmd)
     for bare in ("Read", "Write", "Edit", "Glob", "Grep", "Bash"):
         assert bare not in cmd  # a bare tool name would allow it anywhere on the Mac
+
+
+def test_read_rule_uses_claude_codes_posix_form():
+    from pathlib import PurePosixPath, PureWindowsPath
+    assert worker.read_rule(PurePosixPath("/Users/t/.claude/plugins/lv")) == "Read(//Users/t/.claude/plugins/lv/**)"
+    assert (worker.read_rule(PureWindowsPath(r"C:\Users\Daniel Landi\.claude\plugins\lv"))
+            == "Read(//c/Users/Daniel Landi/.claude/plugins/lv/**)")
 
 
 def test_claude_command_model_can_be_overridden_for_comparisons(monkeypatch):
@@ -323,8 +330,7 @@ def test_claude_command_pins_claude_codes_configuration(monkeypatch):
     assert _flag(cmd, "--plugin-dir") == [str(worker.config.PLUGIN_ROOT)]
     assert "--strict-mcp-config" in cmd and "--mcp-config" not in cmd
     denied = set(_flag(cmd, "--disallowedTools"))
-    assert {"WebFetch", "WebSearch", "Edit(./.claude/**)", "Write(./.claude/**)", "Write(./.mcp.json)",
-            "Edit(./.mcp.json)", "Write(./CLAUDE.md)", "Edit(./CLAUDE.md)", "Write(./CLAUDE.local.md)",
+    assert {"WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "Edit(./CLAUDE.md)",
             "Edit(./CLAUDE.local.md)"} <= denied
     assert "--bare" not in cmd  # --bare never reads the subscription login
 
