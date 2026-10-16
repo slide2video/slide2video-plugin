@@ -99,7 +99,7 @@ Only if the teacher asks to keep lessons in one project folder (for example a fo
 ## 8. Connect this computer to slide2video.com (optional)
 
 slide2video.com is a website where invited teachers upload a lesson and this computer makes the videos for it.
-Today this works on a Mac (Windows support is on the way).
+It works on a Mac or a Windows PC.
 
 First run `LV worker --status`. If it says "Connected to …", this computer is already connected: tell the teacher
 which account it's connected to and skip to the `/slide2video:serve` paragraph below. If it says this computer isn't connected,

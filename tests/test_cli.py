@@ -2,6 +2,8 @@ import io
 import subprocess
 import sys
 
+import pytest
+
 from conftest import PLUGIN
 from lv import cli, config, net
 
@@ -98,7 +100,10 @@ def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     lesson = tmp_path / "lesson"
     (lesson / "site").mkdir(parents=True)
     (tmp_path / "outside.jpg").write_bytes(b"x")
-    (lesson / "link.jpg").symlink_to(tmp_path / "outside.jpg")
+    try:
+        (lesson / "link.jpg").symlink_to(tmp_path / "outside.jpg")
+    except OSError:
+        pytest.skip("symlinks need Developer Mode on Windows")
     (lesson / "site" / "card.json").write_text(json.dumps(
         {"contract": 1, "kind": "questions", "message": "Q",
          "questions": [{"id": "g", "text": "Grade?", "options": [{"label": "6"}]}]}), encoding="utf-8")
