@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - name: ffmpeg on PATH (the music-video media tests skip without it)
+      - name: ffmpeg on PATH (the media tests skip without it)
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then brew install ffmpeg; else choco install ffmpeg -y --no-progress; fi

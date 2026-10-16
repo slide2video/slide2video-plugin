@@ -1,10 +1,8 @@
-# plugins
+# slide2video-plugin
 
-Public Claude Code marketplace `daniellandi`. It holds `lesson-videos` (narrated study videos), `music-video`
-(theme → Suno song → code-rendered music video) and `batatais` (a Blender reconstruction workflow, also usable in
-Codex). Users install with
-`/plugin marketplace add DanielLandi/plugins` then
-`/plugin install lesson-videos@daniellandi`.
+Public Claude Code marketplace `slide2video`. It holds `lesson-videos` (narrated study videos). Users install with
+`/plugin marketplace add slide2video/slide2video-plugin` then
+`/plugin install lesson-videos@slide2video`.
 
 ## Contribution flow
 
@@ -42,7 +40,7 @@ website deployed first with a new major refuses every computer until the plugin 
 
 GitHub Issues is the single source of truth for pending work. Capture
 follow-ups with the `inbox` skill. For sandboxed sessions pass
-`-R DanielLandi/plugins` to `gh`.
+`-R slide2video/slide2video-plugin` to `gh`.
 
 ## Build & test
 
@@ -65,28 +63,3 @@ service dependency is added, removed, or re-keyed.
 
 Anything under `docs/archive/` or any file with an `⚠️ ARCHIVED` banner is
 historical reference only — never a source of truth for current behavior.
-
-## Batatais ownership
-
-`batatais/` is the canonical public package. Keep its skill and compatibility
-installer here; do not maintain recipe copies in Blender or HAIK. Bump both
-Batatais manifests and its marketplace version together when the package changes.
-
-## music-video
-
-- **macOS-first.** The published commands avoid bash-only syntax so Windows can follow, but only macOS is tested.
-  Skills call only `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/music-video.py" <command>`.
-- **Version bump:** `music-video/.claude-plugin/plugin.json`, its `.claude-plugin/marketplace.json` entry and
-  `music-video/scripts/musicvideo/__init__.py` agree; `tests/test_mv_packaging.py` checks them.
-- **Privacy:** the plugin and its tests (`tests/test_mv_*.py`, `tests/mv_fixtures.py`) contain nothing personal and
-  no seasonal-holiday references. `tests/test_mv_privacy.py` scans them with the local, gitignored
-  `.private-terms.txt` (kept by the maintainer, never committed) plus generic checks for home paths,
-  emails and tokens. A publish runs `MV_PUBLISH=1 uv run pytest -q`, which fails without the denylist.
-- **Vendored code:** `music-video/studio/transitions/` is MIT code from remotion-transitions. Never edit it;
-  re-vendor with `music-video/studio/tools/vendor-transitions.sh`.
-- **Folders:** project (specs, albums, video code), install (`~/Library/Application Support/music-video/`: the
-  engine and models), work (`~/Library/Caches/music-video/work/`), results (`results_dir`). Nothing is written into
-  the plugin folder.
-- **The engine's own gate** (needs the engine installed once):
-  `uv run music-video/scripts/music-video.py doctor`, then `npm test` in the engine folder it prints, and
-  `uv run pytest -m studio -q` (a fresh workspace renders a still). The plain `uv run pytest -q` skips it.

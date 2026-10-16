@@ -1,11 +1,7 @@
 {
-  "name": "daniellandi",
-  "owner": {
-    "name": "Daniel Landi"
-  },
-  "metadata": {
-    "description": "Claude Code plugins by Daniel Landi."
-  },
+  "name": "slide2video",
+  "owner": {"name": "Daniel Landi"},
+  "metadata": {"description": "slide2video: turn slide decks into narrated videos."},
   "plugins": [
     {
       "name": "lesson-videos",
@@ -13,20 +9,6 @@
       "description": "Turn a slide deck into narrated, animated study videos, one per chapter. Guides setup of the tools and the ElevenLabs/Gemini keys.",
       "version": "1.0.1",
       "category": "education"
-    },
-    {
-      "name": "batatais",
-      "source": "./batatais",
-      "description": "Reconstruct Batatais in Blender from maps and photographic evidence using reproducible Python scripts.",
-      "version": "1.0.1",
-      "category": "productivity"
-    },
-    {
-      "name": "music-video",
-      "source": "./music-video",
-      "description": "Turn a theme into a music video: lyrics, a song from your own Suno account, word timings, and a code-rendered 2D/3D video.",
-      "version": "0.4.0",
-      "category": "productivity"
     }
   ]
 }

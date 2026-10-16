@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-pytest_plugins = ["mv_fixtures", "site_fake"]
+pytest_plugins = ["site_fake"]
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "lesson-videos"

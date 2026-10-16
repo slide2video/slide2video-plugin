@@ -13,7 +13,7 @@ def test_versions_agree():
     entry = next(p for p in market["plugins"] if p["name"] == "lesson-videos")
     assert plugin["version"] == entry["version"] == lv.__version__
     assert entry["source"] == "./lesson-videos"
-    assert market["name"] == "daniellandi"
+    assert market["name"] == "slide2video"
 
 
 def test_site_contract_matches_the_plugin_major_and_is_not_newer():
