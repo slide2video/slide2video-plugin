@@ -163,9 +163,9 @@ def test_call_remembers_the_websites_version(paired, monkeypatch):
     monkeypatch.setattr(site, "LATEST", None)
     site.call("/api/device/status")
     assert site.LATEST is None  # an older website sends none
-    paired.latest = "1.3.0"
+    paired.latest = "1.8.0"
     site.call("/api/device/next")  # 204 answers carry it too
-    assert site.LATEST == "1.3.0"
+    assert site.LATEST == "1.8.0"
 
 
 def test_a_refusal_prints_the_websites_own_words(paired):
@@ -185,10 +185,10 @@ def test_status_names_the_version_and_an_available_update(paired, capsys, monkey
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out
     assert f"(this device: Test Mac, slide2video {lv.__version__})." in out and "newer" not in out
-    paired.latest = "1.3.0"
+    paired.latest = "1.8.0"
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[1] == ("A newer slide2video (1.3.0) is available. To update: run /plugin update slide2video, "
+    assert out[1] == ("A newer slide2video (1.8.0) is available. To update: run /plugin update slide2video, "
                       "then close and reopen Claude Code, then run /slide2video:serve.")
     paired.latest = "1.0.0"
     assert cli.main(["worker", "--status"]) == 0

@@ -239,13 +239,13 @@ def test_cli_worker_watch_is_wired(monkeypatch):
     assert cli.main(["worker", "--watch"]) == 0 and "called" in seen
 
 
-UPDATE_11 = ("A newer slide2video (1.3.0) is available. To update: run /plugin update slide2video, then close "
+UPDATE_11 = ("A newer slide2video (1.8.0) is available. To update: run /plugin update slide2video, then close "
              "and reopen Claude Code, then run /slide2video:serve.")
 
 
 def test_watch_says_once_that_an_update_is_available_and_keeps_working(paired, lessons, monkeypatch):
     monkeypatch.setattr(site, "LATEST", None)
-    paired.latest = "1.3.0"
+    paired.latest = "1.8.0"
     polls = []
 
     def sleep(s):  # three idle polls, then Disconnect
@@ -266,15 +266,15 @@ def test_watch_says_it_again_when_the_website_moves_on_while_it_runs(paired, les
     def sleep(s):
         polls.append(s)
         if len(polls) == 1:
-            paired.latest = "1.3.0"
+            paired.latest = "1.8.0"
         if len(polls) == 3:
-            paired.latest = "1.4.0"
+            paired.latest = "1.9.0"
         if len(polls) == 5:
             paired.stop_next = True
     a, lines = Awake(), []
     worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
     updates = [l for l in lines if l.startswith("A newer slide2video")]
-    assert [u.split(")")[0] for u in updates] == ["A newer slide2video (1.3.0", "A newer slide2video (1.4.0"]
+    assert [u.split(")")[0] for u in updates] == ["A newer slide2video (1.8.0", "A newer slide2video (1.9.0"]
 
 
 def test_watch_says_nothing_when_the_plugin_is_as_new_or_newer(paired, lessons, monkeypatch):

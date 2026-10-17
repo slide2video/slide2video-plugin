@@ -60,7 +60,13 @@ ELEVEN_ROOT = "https://api.elevenlabs.io/v1"
 ELEVEN_MODEL = "eleven_multilingual_v2"
 ELEVEN_FORMAT = "mp3_44100_128"            # 192 kbps needs a paid plan
 VOICE_SETTINGS = {"stability": 0.45, "similarity_boost": 0.8, "style": 0.3, "use_speaker_boost": True}
-DEFAULT_VOICE = "cgSgspJ2msm6clMCkdW9"     # Jessica: playful, bright, warm (premade voice)
+# The ElevenLabs voices offered by name (premade voices, usable on every plan); script.json "voice" takes a name
+# or any voice ID.
+ELEVEN_VOICES = {
+    "jessica": "cgSgspJ2msm6clMCkdW9",     # young American woman: playful, bright, warm
+    "daniel": "onwK4e9ZLuTAKqWW03F9",      # British man: steady, news-presenter tone
+}
+DEFAULT_VOICE = ELEVEN_VOICES["jessica"]
 NARRATION_WORKERS = 2                      # the ElevenLabs free plan allows 2 concurrent requests
 EDGE_VOICE = "en-US-AvaMultilingualNeural"  # free Microsoft voice used when there is no ElevenLabs key
 EDGE_HOST = "speech.platform.bing.com"     # the free Microsoft voice's server

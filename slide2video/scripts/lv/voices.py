@@ -43,7 +43,8 @@ def chain(spec: dict) -> list[str]:
 
 
 def voice_for(provider: str, spec: dict) -> str:
-    return {"elevenlabs": spec.get("voice", config.DEFAULT_VOICE), "edge": spec.get("edge_voice", config.EDGE_VOICE),
+    eleven = spec.get("voice", config.DEFAULT_VOICE)
+    return {"elevenlabs": config.ELEVEN_VOICES.get(eleven.lower(), eleven), "edge": spec.get("edge_voice", config.EDGE_VOICE),
             "system": spec.get("system_voice", "")}.get(provider, "")
 
 
