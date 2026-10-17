@@ -4,7 +4,7 @@ import sys
 import pytest
 
 from conftest import HELLO_JS
-from lv import narrate, net, render, sfx, tools, voices
+from lv import config, narrate, net, render, sfx, tools, voices
 from lv.util import UserError, read_json
 
 
@@ -146,3 +146,9 @@ def test_edge_voice_trusts_the_proxy_ca(monkeypatch, tmp_path):
     with pytest.raises(voices.VoiceUnavailable):
         voices.speak_edge("Hello there.", "en-US-AvaNeural", tmp_path / "x.mp3")
     assert seen and _trusts_test_ca(seen[0])
+
+
+def test_elevenlabs_voice_by_name_or_id():
+    assert voices.voice_for("elevenlabs", {}) == config.ELEVEN_VOICES["jessica"]
+    assert voices.voice_for("elevenlabs", {"voice": "Daniel"}) == "onwK4e9ZLuTAKqWW03F9"
+    assert voices.voice_for("elevenlabs", {"voice": "someOtherVoiceId"}) == "someOtherVoiceId"
