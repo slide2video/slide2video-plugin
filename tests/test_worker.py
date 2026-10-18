@@ -613,6 +613,48 @@ def test_heartbeat_sends_the_fraction(paired, lessons, monkeypatch):
     assert {"progress": "Narrating scenes", "fraction": 0.25} in paired.heartbeat_bodies
 
 
+def test_notes_are_the_last_few_lines(tmp_path):
+    f = tmp_path / "notes.txt"
+    assert worker._notes(f) == []                                  # no file yet
+    lines = [f"Note {i}" for i in range(1, 8)] + ["", "   ", "x" * 300]
+    write_text(f, "\n".join(lines) + "\n")
+    assert worker._notes(f) == ["Note 4", "Note 5", "Note 6", "Note 7", "x" * 200]
+
+
+def test_notes_never_carry_a_key(tmp_path):
+    f = tmp_path / "notes.txt"
+    write_text(f, "Checked the voice with sk_" + "a" * 48 + "\n")
+    assert "a" * 48 not in worker._notes(f)[0]
+
+
+def test_heartbeat_sends_the_notes(paired, lessons, monkeypatch):
+    monkeypatch.setattr(worker, "HEARTBEAT", 0.05)
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+
+    def slow(cwd):
+        import time
+        write_text(cwd / "site" / "progress.txt", "Reading the deck\n")
+        write_text(cwd / "site" / "notes.txt", "51 slides, in 3 journal entries\n")
+        time.sleep(0.3)
+    assert worker.run_once(claude=_claude_writing(QUESTIONS, also=slow)) == 0
+    assert {"progress": "Reading the deck", "notes": ["51 slides, in 3 journal entries"]} in paired.heartbeat_bodies
+
+
+def test_a_turn_starts_with_no_notes_from_the_last_one(paired, lessons, monkeypatch):
+    monkeypatch.setattr(worker, "HEARTBEAT", 0.05)
+    turn = _turn()
+    paired.turns.append(turn)
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    write_text(worker.project_dir(turn["project"]) / "site" / "notes.txt", "From the last step\n")
+
+    def slow(cwd):
+        import time
+        time.sleep(0.3)
+    assert worker.run_once(claude=_claude_writing(QUESTIONS, also=slow)) == 0
+    assert paired.heartbeat_bodies and all("notes" not in b for b in paired.heartbeat_bodies)
+
+
 def test_lessons_root_has_no_pro_part(lessons, monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
     assert worker.lessons_root() == lessons

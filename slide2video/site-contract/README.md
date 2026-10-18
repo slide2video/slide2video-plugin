@@ -1,12 +1,16 @@
 # Job contract notes
 
-The JSON schemas in `schemas/` describe the files that travel between slide2video.com and the worker. Two device
+The JSON schemas in `schemas/` describe the files that travel between slide2video.com and the worker. Three device
 API behaviours are not files and live here:
 
 - `GET /api/device/next` answers a turn (`turn.json`), nothing (204), or `{"stop": true}` once after the person
   pressed **Disconnect** for this computer: the worker (`worker --watch`) then exits.
 - `GET /api/device/next?start=1` is a watcher's first call: it clears a Disconnect left from while the computer was
   offline, then answers as usual.
+- `POST /api/device/turns/:id/heartbeat` renews a running turn's lease with `{"progress": "<last line>"}`, plus
+  `"fraction"` (0–1) when that line counts through items and, since 2.1.0, `"notes"`: up to 5 short plain sentences
+  (at most 200 characters each) that Claude wrote about this turn, oldest first. A website that doesn't know a field
+  ignores it.
 
 ## Versions
 
