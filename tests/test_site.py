@@ -14,7 +14,7 @@ def test_site_url_defaults_to_slide2video(monkeypatch):
 def test_pair_waits_for_the_code_then_stores_the_token(fake_site):
     lines = []
     email = site.pair(name="Test Mac", sleep=lambda s: None, out=lines.append)
-    assert email == "teacher@example.org"
+    assert email == "user@example.org"
     assert site.store.get(fake_site.url) == fake_site.token
     assert any("ABC-123" in l for l in lines) and any("/devices" in l for l in lines)
     assert not any(fake_site.token in l for l in lines)
@@ -41,7 +41,7 @@ def test_revoked_token_says_connect(paired):
 
 
 def test_contract_mismatch_says_update(paired):
-    paired.contract = 2
+    paired.contract = 3
     with pytest.raises(UserError) as e:
         site.call("/api/device/status")
     assert "/plugin update slide2video" in str(e.value)
@@ -57,7 +57,7 @@ def test_cli_pair_and_status(fake_site, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "connected" in out and fake_site.token not in out
     assert cli.main(["worker", "--status"]) == 0
-    assert "teacher@example.org" in capsys.readouterr().out
+    assert "user@example.org" in capsys.readouterr().out
 
 
 class _Done:
@@ -156,16 +156,16 @@ def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_pa
 def test_call_sends_its_version_and_the_old_contract_header(paired):
     site.call("/api/device/status")
     assert paired.plugin_headers[-1] == lv.__version__
-    assert paired.contract == 1  # the fake still checks X-LV-Contract: 1, as today's website does
+    assert paired.contract == 2  # the fake checks X-LV-Contract against the plugin major
 
 
 def test_call_remembers_the_websites_version(paired, monkeypatch):
     monkeypatch.setattr(site, "LATEST", None)
     site.call("/api/device/status")
     assert site.LATEST is None  # an older website sends none
-    paired.latest = "1.8.0"
+    paired.latest = "2.8.0"
     site.call("/api/device/next")  # 204 answers carry it too
-    assert site.LATEST == "1.8.0"
+    assert site.LATEST == "2.8.0"
 
 
 def test_a_refusal_prints_the_websites_own_words(paired):
@@ -185,51 +185,36 @@ def test_status_names_the_version_and_an_available_update(paired, capsys, monkey
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out
     assert f"(this device: Test Mac, slide2video {lv.__version__})." in out and "newer" not in out
-    paired.latest = "1.8.0"
+    paired.latest = "2.8.0"
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[1] == ("A newer slide2video (1.8.0) is available. To update: run /plugin update slide2video, "
+    assert out[1] == ("A newer slide2video (2.8.0) is available. To update: run /plugin update slide2video, "
                       "then close and reopen Claude Code, then run /slide2video:serve.")
     paired.latest = "1.0.0"
     assert cli.main(["worker", "--status"]) == 0
     assert "newer" not in capsys.readouterr().out
 
 
-def test_pro_is_the_only_other_site(monkeypatch):
+def test_only_slide2video_com(monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
-    site.use("pro")
-    assert site.site_url() == "https://pro.slide2video.com"
-    assert site.is_pro() and site.host() == "pro.slide2video.com"
-    assert site.cmd("serve") == "/slide2video:serve pro"
-    site.use(None)
-    assert site.site_url() == "https://slide2video.com" and not site.is_pro()
-    assert site.cmd("setup") == "/slide2video:setup"
-    with pytest.raises(UserError):
-        site.use("https://evil.example")
+    assert site.site_url() == "https://slide2video.com"
+    assert site.host() == "slide2video.com"
+    assert site.cmd("serve") == "/slide2video:serve"
+    assert not hasattr(site, "use") and not hasattr(site, "is_pro")
 
 
 def test_the_test_override_still_wins(monkeypatch):
     monkeypatch.setenv("LV_SITE_URL", "http://127.0.0.1:9")
-    site.use("pro")
-    assert site.site_url() == "http://127.0.0.1:9" and not site.is_pro()
+    assert site.site_url() == "http://127.0.0.1:9"
 
 
 def test_not_paired_names_the_site_and_command(monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
     assert "slide2video.com" in site.not_paired() and "/slide2video:setup " in site.not_paired()
-    site.use("pro")
-    assert "pro.slide2video.com" in site.not_paired() and "/slide2video:setup pro" in site.not_paired()
 
 
-def test_pairing_pro_keeps_the_other_connection(fake_site):
-    site.store.set("https://slide2video.com", "s2v_" + "a" * 30)
-    site.pair(name="Test Mac", sleep=lambda s: None, out=lambda s: None)
-    assert site.store.get("https://slide2video.com") == "s2v_" + "a" * 30
-    assert site.store.get(fake_site.url) == fake_site.token
-
-
-def test_cli_site_option_only_takes_pro():
-    with pytest.raises(SystemExit):
-        cli.build_parser().parse_args(["worker", "--status", "--site", "https://evil.example"])
-    assert cli.build_parser().parse_args(["pair", "--site", "pro"]).site == "pro"
-    assert cli.build_parser().parse_args(["worker", "--watch"]).site is None
+def test_cli_has_no_site_option():
+    for site_arg in ("pro", "https://evil.example"):
+        for cmd in (["pair"], ["worker", "--status"]):
+            with pytest.raises(SystemExit):
+                cli.build_parser().parse_args([*cmd, "--site", site_arg])

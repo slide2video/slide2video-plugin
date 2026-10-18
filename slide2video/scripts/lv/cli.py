@@ -83,8 +83,6 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--watch", action="store_true",
                       help="keep running jobs as they come, keeping the computer awake, until stopped or disconnected")
     mode.add_argument("--status", action="store_true", help="show which account this computer is connected to")
-    for sp in (pr, wk):
-        sp.add_argument("--site", choices=["pro"], help=argparse.SUPPRESS)
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -192,18 +190,16 @@ def dispatch(args) -> int:
         return 0 if not bad else 1
     if args.cmd == "pair":
         from . import site
-        site.use(args.site)
         email = site.pair(name=args.name)
         print(f"This computer is connected to {site.site_url()} for {email}.")
         return 0
     if args.cmd == "worker":
         from . import site
-        site.use(args.site)
         if args.status:
             import lv
             from . import version
             s = site.status()
-            print(f"Connected to {site.site_url()} as {s['teacher_email']} "
+            print(f"Connected to {site.site_url()} as {s['user_email']} "
                   f"(this device: {s['device_name']}, slide2video {lv.__version__}).")
             line = version.update_line(site.LATEST)
             if line:

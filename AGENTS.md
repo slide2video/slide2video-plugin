@@ -27,9 +27,8 @@ what the website shows about computers), set `plugin` to the new version, copy `
 is fine. Publish the plugin release first (merge and push this repo), then deploy the website; never the reverse: a
 website deployed first with a new major refuses every computer until the plugin ships.
 
-The plugin serves pro.slide2video.com too (`--site pro`, before launch): the same contract applies to both sites.
-While two sites run, a contract change must stay within the major that the website's `live` branch accepts. A change
-slide2video.com must understand ships website `live` first, then `main` (pro), and only then is the plugin published.
+The plugin talks to slide2video.com only (contract 2; there is no `--site` option). A change slide2video.com must understand
+ships in a plugin release, published before the website deploy.
 
 ## Rules
 
@@ -54,11 +53,11 @@ validates every style.
 ## Kept names
 
 The rename to slide2video left these unchanged on purpose, because the website,
-the worker, saved projects and existing lessons depend on them: the Python
+the worker, saved projects and existing video projects depend on them: the Python
 package `lv`; env vars `LV_*` and `LESSON_VIDEOS_*`; headers `X-LV-Plugin` and
 `X-LV-Contract`; the contents and schemas of `slide2video/site-contract/`
-(`{"plugin": "1.0.0"}` stays until a contract change); the Keychain entry; and
-the `lesson-videos/` folder inside a website lesson folder (worker `_inside`,
+(`{"plugin": "2.0.0"}`, the version the website is built for); the Keychain entry; and
+the `lesson-videos/` folder inside a website video project folder (worker `_inside`,
 `_publish`, `timing_for`, `deck.json` paths). Do not rename them.
 
 ## Work tracking

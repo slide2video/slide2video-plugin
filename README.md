@@ -11,7 +11,7 @@ Install in Claude Code:
 /plugin install slide2video@slide2video
 ```
 
-Used lesson-videos before? Also type `/plugin uninstall lesson-videos`, then close and reopen Claude Code. Your keys, settings and connection to slide2video.com come along.
+Used lesson-videos before? The `lesson-videos` plugin no longer connects to slide2video.com, so switch: type the two lines above, then `/plugin uninstall lesson-videos`, and close and reopen Claude Code. Your keys and settings come along; connect this computer again from **Devices** on slide2video.com.
 
-School is the public style: the one this repo ships, for teachers turning lesson slides into study videos. See the
+This is plugin version 2 (contract 2). It works with slide2video.com only, where your work is organised as video projects. School is the public style: the one this repo ships, for teachers turning lesson slides into study videos. See the
 [plugin README](./slide2video/README.md) for how it works.

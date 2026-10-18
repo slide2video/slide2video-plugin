@@ -105,7 +105,7 @@ def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     except OSError:
         pytest.skip("symlinks need Developer Mode on Windows")
     (lesson / "site" / "card.json").write_text(json.dumps(
-        {"contract": 1, "kind": "questions", "message": "Q",
+        {"contract": 2, "kind": "questions", "message": "Q",
          "questions": [{"id": "g", "text": "Grade?", "options": [{"label": "6"}]}]}), encoding="utf-8")
     monkeypatch.chdir(lesson)
     monkeypatch.setenv("LV_SITE_MODE", "1")

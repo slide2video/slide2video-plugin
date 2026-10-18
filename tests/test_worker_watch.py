@@ -124,7 +124,7 @@ def test_watch_start_line_names_the_site_teacher_and_computer(paired, lessons):
     a, lines = Awake(), []
     code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
     assert code == 0
-    assert lines[0] == (f"Making videos for {paired.url} as teacher@example.org on Test Mac with slide2video {lv.__version__}. "
+    assert lines[0] == (f"Making videos for {paired.url} as user@example.org on Test Mac with slide2video {lv.__version__}. "
                         "Waiting for lessons… (stop with Ctrl-C, or Disconnect on the website)")
     assert paired.next_queries[0] == "start=1"  # status is not /next: the first /next still says start=1
 
@@ -146,7 +146,7 @@ def test_watch_stops_with_the_websites_refusal(paired, lessons):
 
 
 def test_watch_stops_on_contract_mismatch_from_an_older_website(paired, lessons):
-    paired.contract = 2
+    paired.contract = 3
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
     assert code == 1 and "Update the slide2video plugin" in lines[-1] and a.on == 0
 
@@ -239,13 +239,13 @@ def test_cli_worker_watch_is_wired(monkeypatch):
     assert cli.main(["worker", "--watch"]) == 0 and "called" in seen
 
 
-UPDATE_11 = ("A newer slide2video (1.8.0) is available. To update: run /plugin update slide2video, then close "
+UPDATE_11 = ("A newer slide2video (2.8.0) is available. To update: run /plugin update slide2video, then close "
              "and reopen Claude Code, then run /slide2video:serve.")
 
 
 def test_watch_says_once_that_an_update_is_available_and_keeps_working(paired, lessons, monkeypatch):
     monkeypatch.setattr(site, "LATEST", None)
-    paired.latest = "1.8.0"
+    paired.latest = "2.8.0"
     polls = []
 
     def sleep(s):  # three idle polls, then Disconnect
@@ -266,15 +266,15 @@ def test_watch_says_it_again_when_the_website_moves_on_while_it_runs(paired, les
     def sleep(s):
         polls.append(s)
         if len(polls) == 1:
-            paired.latest = "1.8.0"
+            paired.latest = "2.8.0"
         if len(polls) == 3:
-            paired.latest = "1.9.0"
+            paired.latest = "2.9.0"
         if len(polls) == 5:
             paired.stop_next = True
     a, lines = Awake(), []
     worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=sleep, awake_on=a.keep, awake_off=a.release)
     updates = [l for l in lines if l.startswith("A newer slide2video")]
-    assert [u.split(")")[0] for u in updates] == ["A newer slide2video (1.8.0", "A newer slide2video (1.9.0"]
+    assert [u.split(")")[0] for u in updates] == ["A newer slide2video (2.8.0", "A newer slide2video (2.9.0"]
 
 
 def test_watch_says_nothing_when_the_plugin_is_as_new_or_newer(paired, lessons, monkeypatch):

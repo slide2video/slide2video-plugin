@@ -50,7 +50,7 @@ def test_breakdown_lists_what_report_says():
 
 
 def test_breakdown_fits_the_plan_card():
-    card = {"contract": 1, "kind": "plan", "message": "m", "markdown": "x",
+    card = {"contract": 2, "kind": "plan", "message": "m", "markdown": "x",
             "estimate": {**estimate.breakdown(9000, 3, True), "minutes": 3, "chapters": 2}}
     assert contract.problems("card", card) == []
 

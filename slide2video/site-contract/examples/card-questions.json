@@ -1,4 +1,4 @@
-{"contract": 1, "kind": "questions", "message": "A few questions before I plan the videos.", "slides": 12,
+{"contract": 2, "kind": "questions", "message": "A few questions before I plan the videos.", "slides": 12,
  "questions": [
    {"id": "grade", "text": "What grade are the students?",
     "options": [{"label": "Grades 3–5"}, {"label": "Grades 6–8", "recommended": true}, {"label": "Grades 9–10"}], "other": true},

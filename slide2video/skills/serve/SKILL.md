@@ -17,10 +17,6 @@ uv run "${CLAUDE_SKILL_DIR}/../../scripts/slide2video.py"
 If that path doesn't exist (in some claude.ai sessions `${CLAUDE_SKILL_DIR}` comes through empty), the plugin is
 under `/root/.claude/plugins/synced/`: use the `slide2video/scripts/slide2video.py` you find there.
 
-**pro.slide2video.com (Daniel only, before launch):** if the person typed `pro` after the command
-(`/slide2video:serve pro`), add `--site pro` to every `LV pair` and `LV worker` command below, and say
-pro.slide2video.com wherever this skill says slide2video.com. Slash commands this skill tells the person to run (`/slide2video:serve`, `/slide2video:setup`) get ` pro` appended. Never suggest it otherwise.
-
 ## 1. Check the connection
 
 Run `LV worker --status`. If it says "Connected to …", go on. If this computer isn't connected, offer to connect it

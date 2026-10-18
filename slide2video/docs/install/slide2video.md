@@ -1,8 +1,8 @@
 # Connect a computer to slide2video.com
 
-slide2video.com lets you upload a slide deck from any computer, for example a school laptop, answer Claude's
-questions there, and watch the finished videos there. The videos themselves are made on **your own computer at
-home**, by Claude Code signed in to **your own** Claude account. The website never runs Claude.
+slide2video.com lets you upload a slide deck from any browser, answer Claude's questions there, and watch the
+finished videos there. The videos themselves are made on **your own computer**, by Claude Code signed in to **your
+own** Claude account. The website never runs Claude.
 
 slide2video.com is invite-only. If you haven't been invited, use [Claude Code](claude-code.md) or
 [Cowork](cowork.md) instead.
@@ -10,7 +10,7 @@ slide2video.com is invite-only. If you haven't been invited, use [Claude Code](c
 ## What you need
 
 - An invitation to slide2video.com (you sign in there with an emailed code).
-- A computer that stays at home and makes the videos: a **Mac** or a **Windows PC**.
+- A computer that makes your videos and stays on while it works: a **Mac** or a **Windows PC**.
 - **Claude Code** on that computer, signed in to your own Claude account (any paid plan).
 - About 1 GB of free disk space, and about 15 minutes the first time.
 
@@ -24,14 +24,14 @@ Claude Code, sign in, then type:
 /plugin install slide2video@slide2video
 ```
 
-Used lesson-videos before? Also type `/plugin uninstall lesson-videos`, then close and reopen Claude Code. Your keys, settings and connection to slide2video.com come along.
+Used lesson-videos before? The `lesson-videos` plugin no longer connects to slide2video.com, so switch: type the two lines above, then `/plugin uninstall lesson-videos`, and close and reopen Claude Code. Your keys and settings come along; connect this computer again from **Devices** on slide2video.com.
 
 ## 2. Set up and connect this computer (once)
 
 Type `/slide2video:setup`. Claude installs the free tools it needs (about 10 minutes) and asks which voice you
 want. At the end it asks whether to **connect this computer to slide2video.com**: say yes.
 
-It shows a short code, like `ABC-123`, valid for 10 minutes. On any computer:
+It shows a short code, like `ABC-123`, valid for 10 minutes. In any browser:
 
 1. Sign in at https://slide2video.com.
 2. Open **Devices**.
@@ -42,30 +42,30 @@ appears under **Devices** with the time it was last seen.
 
 ## 3. Start making videos
 
-In Claude Code on your home computer, type `/slide2video:serve` and leave that window open. The computer then
-works on every lesson step by itself, and stays awake while it does (keep a laptop's lid open). To stop, say "stop"
+In Claude Code on the computer that makes your videos, type `/slide2video:serve` and leave that window open. The computer then
+works on every video project step by itself, and stays awake while it does (keep a laptop's lid open). To stop, say "stop"
 in Claude Code, or press **Disconnect** on the website's Devices page; to start again, run `/slide2video:serve`
 again.
 
 ## 4. Make videos
 
-1. On slide2video.com, click **New lesson**, give it a title, add your deck (`.pptx` or `.pdf`) and any extra
-   files, tick the box confirming there's no student information, and click **Upload and start**.
-2. The lesson says **Waiting for your computer**; with `/slide2video:serve` running (step 3), your home computer
-   picks it up by itself.
-3. Back on the website, the lesson shows Claude's questions, then the plan with its cost, then each chapter to
+1. On slide2video.com, open **Video projects**, click **New video project**, give it a title, add your deck (`.pptx` or `.pdf`) and any extra
+   files, and click **Upload and start**. (School projects also have a box to tick confirming there's no student information.)
+2. The video project says **Waiting for your computer**; with `/slide2video:serve` running (step 3), the computer that makes your
+   videos picks it up by itself.
+3. Back on the website, the video project shows Claude's questions, then the plan with its cost, then each chapter to
    watch. Answer, approve or give feedback there; the computer carries on by itself.
-4. Download each chapter's video and captions from the lesson page.
+4. Download each chapter's video and captions from the video project page.
 
 ## Good to know
 
 - **Your Claude account only.** Connect only computers signed in to your own Claude account, and don't connect
   your computer to someone else's slide2video account. Claude subscriptions are personal under
   [Anthropic's Consumer Terms](https://www.anthropic.com/legal/consumer-terms).
-- **Never student information** in what you upload: no student names, photos of students, student work or grades.
-- **Your lessons go only to your computers.** A lesson stays on the computer that started it; your other computers
-  and other teachers' computers never see it.
-- **Deleting** a lesson on the website removes it there at once, and from your computer the next time it is working.
+- **School projects: never student information** in what you upload: no student names, photos of students, student work or grades.
+- **Your video projects go only to your computers.** A video project stays on the computer that started it; your other computers
+  and other people's computers never see it.
+- **Deleting** a video project on the website removes it there at once, and from your computer the next time it is working.
 
 ## Troubleshooting
 
@@ -75,7 +75,7 @@ again.
 | "This computer isn't connected to slide2video.com" | It was removed under **Devices**, or never connected. Connect it again (step 2). |
 | "Update the slide2video plugin on this computer" or "slide2video.com needs …" | In Claude Code, type `/plugin update slide2video`, then close and reopen Claude Code, then run `/slide2video:serve`. |
 | "slide2video.com hasn't caught up with slide2video …" | Nothing to do on this computer: the website gets updated soon. Try again later. |
-| "Your Claude plan's usage limit was reached" | Nothing to do: the lesson continues by itself after the limit resets. |
-| The lesson keeps saying **Waiting for your computer** | Run `/slide2video:serve` on your home computer and leave it open. If it was asleep or offline mid-step, the step starts over. |
-| "The device this lesson was on was removed" | That computer was removed under **Devices**, so the lesson can't continue. Delete it and upload the deck again. |
+| "Your Claude plan's usage limit was reached" | Nothing to do: the video project continues by itself after the limit resets. |
+| The video project keeps saying **Waiting for your computer** | Run `/slide2video:serve` on the computer that makes your videos and leave it open. If it was asleep or offline mid-step, the step starts over. |
+| "The device this video project was on was removed" | That computer was removed under **Devices**, so the video project can't continue. Delete it and upload the deck again. |
 | Claude Code isn't installed on this computer | Install it (step 1) and sign in, then run `/slide2video:serve`. |

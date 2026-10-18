@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://slide2video.com/contract/1/turn.schema.json",
-  "title": "A turn: what the teacher sent, for the Mac",
+  "$id": "https://slide2video.com/contract/2/turn.schema.json",
+  "title": "A turn: what the person sent, for the Mac",
   "type": "object",
-  "required": ["contract", "lesson", "turn", "files"],
+  "required": ["contract", "project", "turn", "files"],
   "properties": {
-    "contract": {"const": 1},
-    "lesson": {
+    "contract": {"const": 2},
+    "project": {
       "type": "object",
-      "required": ["id", "title"],
+      "required": ["id", "title", "style"],
       "properties": {
-        "id": {"type": "string", "pattern": "^les_[0-9A-Za-z]{22}$"},
-        "title": {"type": "string", "minLength": 1, "maxLength": 200}
+        "id": {"type": "string", "pattern": "^prj_[0-9A-Za-z]{22}$"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 200},
+        "style": {"type": "string", "pattern": "^[a-z]{1,20}$"}
       }
     },
     "turn": {

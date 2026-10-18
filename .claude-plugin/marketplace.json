@@ -11,7 +11,7 @@
       "name": "slide2video",
       "source": "./slide2video",
       "description": "Turn a slide deck into narrated, animated videos, one per chapter, with captions. The School style makes study videos with test tips and an end-of-video quiz.",
-      "version": "1.3.0",
+      "version": "2.0.0",
       "category": "education"
     }
   ]

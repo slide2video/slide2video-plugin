@@ -53,3 +53,9 @@ def test_cowork_troubleshooting_quotes_the_real_blocked_message(monkeypatch):
     guide = (PLUGIN / "docs" / "install" / "cowork.md").read_text(encoding="utf-8")
     quoted = guide.split("## Troubleshooting", 1)[1].split('"')[1].split("…")[0].strip()
     assert quoted and said.startswith(quoted)
+
+
+def test_readme_says_lesson_videos_is_retired_for_the_website():
+    text = (PLUGIN.parent / "README.md").read_text(encoding="utf-8")
+    assert "lesson-videos" in text and "no longer connects to slide2video.com" in text
+    assert "/plugin install slide2video@slide2video" in text

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://slide2video.com/contract/1/timing.schema.json",
+  "$id": "https://slide2video.com/contract/2/timing.schema.json",
   "title": "Scene timing of one video version, for the player's scene marks",
   "type": "object",
   "required": ["duration", "scenes"],
