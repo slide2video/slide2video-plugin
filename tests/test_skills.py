@@ -227,3 +227,15 @@ def test_setup_and_serve_know_only_slide2video_com():
     for name in ("setup", "serve"):
         _, text = frontmatter(name)
         assert "pro.slide2video.com" not in text and "--site" not in text
+
+
+def test_make_skill_card_examples_match_the_schema():
+    import json
+    from lv import contract
+    _, text = frontmatter("make")
+    cards = [json.loads(b) for b in re.findall(r"```json\n(.*?)\n```", text, re.S)]
+    cards = [c for c in cards if isinstance(c, dict) and "kind" in c]
+    assert cards
+    for card in cards:
+        assert contract.problems("card", card) == [], card
+    assert '"contract": 1' not in text

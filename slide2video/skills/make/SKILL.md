@@ -161,10 +161,10 @@ What to do for each `turn.kind`, and which card ends it:
 | `feedback` | Read `review.md` for the chapter under review. Apply `feedback` to that chapter (re-narrate only changed scenes), re-render it. | `"review"` for the same chapter. |
 | `continue` | Read `review.md` for the last chapter shown. Write the agreed style notes at the top of `plan.md` if not there yet. Make the next unfinished chapter after it (`LV status`). If none is left, step 8. | `"review"` for that chapter, or `"done"`. |
 
-Card formats (all start with `"contract": 1`, `"kind"` and a one-line `"message"` for the teacher):
+Card formats (all start with `"contract": 2`, `"kind"` and a one-line `"message"` for the teacher):
 
 ```json
-{"contract": 1, "kind": "questions", "message": "A few questions before I plan the videos.",
+{"contract": 2, "kind": "questions", "message": "A few questions before I plan the videos.",
  "questions": [{"id": "length", "text": "About how long should each video be?",
                 "options": [{"label": "2–3 minutes", "detail": "Short and focused", "recommended": true}], "other": true}]}
 ```
