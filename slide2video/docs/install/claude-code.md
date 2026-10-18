@@ -20,7 +20,7 @@ Pick either way; both end in the same place.
 /plugin install slide2video@slide2video
 ```
 
-Used lesson-videos before? Also type `/plugin uninstall lesson-videos`, then close and reopen Claude Code. Your keys, settings and connection to slide2video.com come along.
+Used lesson-videos before? The `lesson-videos` plugin no longer connects to slide2video.com, so switch: type the two lines above, then `/plugin uninstall lesson-videos`, and close and reopen Claude Code. Your keys and settings come along; connect this computer again from **Devices** on slide2video.com.
 
 **B. On claude.ai.** Open **Customize** → **Plugins** → **Add** → **Add marketplace** → **Add from a repository**, type `slide2video/slide2video-plugin` and click **Sync**. Then find **slide2video** under **Discover** and click **Add**. It appears in Claude Code the next time you open it.
 
