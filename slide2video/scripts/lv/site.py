@@ -1,4 +1,4 @@
-"""slide2video.com and pro.slide2video.com: this computer's connection (pairing, its token in the Keychain, device API calls). The token is
+"""slide2video.com: this computer's connection (pairing, its token in the Keychain, device API calls). The token is
 never printed."""
 from __future__ import annotations
 
@@ -29,25 +29,8 @@ def _check_token(token) -> str:
     return token
 
 
-SITES = {"slide2video.com": "https://slide2video.com", "pro": "https://pro.slide2video.com"}
-_chosen: str | None = None  # set by `--site`; None is slide2video.com
-
-
-def use(name: str | None) -> None:
-    """Which of our sites this run works for: None (slide2video.com) or "pro". Nothing else: a site this computer is
-    paired with can send it jobs that run Claude Code, so an arbitrary address would let a fake site do that."""
-    global _chosen
-    if name is not None and name != "pro":
-        raise UserError(f"Unknown site {name!r}. Use pro, or leave it out for slide2video.com.")
-    _chosen = SITES["pro"] if name else None
-
-
 def site_url() -> str:
-    return (os.environ.get("LV_SITE_URL") or _chosen or config.SITE_URL).rstrip("/")
-
-
-def is_pro() -> bool:
-    return site_url() == SITES["pro"]
+    return (os.environ.get("LV_SITE_URL") or config.SITE_URL).rstrip("/")
 
 
 def host() -> str:
@@ -55,8 +38,8 @@ def host() -> str:
 
 
 def cmd(skill: str) -> str:
-    """The slash command to suggest, for the site this run works for."""
-    return f"/slide2video:{skill}" + (" pro" if is_pro() else "")
+    """The slash command to suggest."""
+    return f"/slide2video:{skill}"
 
 
 def not_paired() -> str:

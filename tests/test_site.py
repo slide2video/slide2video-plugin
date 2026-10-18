@@ -195,41 +195,26 @@ def test_status_names_the_version_and_an_available_update(paired, capsys, monkey
     assert "newer" not in capsys.readouterr().out
 
 
-def test_pro_is_the_only_other_site(monkeypatch):
+def test_only_slide2video_com(monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
-    site.use("pro")
-    assert site.site_url() == "https://pro.slide2video.com"
-    assert site.is_pro() and site.host() == "pro.slide2video.com"
-    assert site.cmd("serve") == "/slide2video:serve pro"
-    site.use(None)
-    assert site.site_url() == "https://slide2video.com" and not site.is_pro()
-    assert site.cmd("setup") == "/slide2video:setup"
-    with pytest.raises(UserError):
-        site.use("https://evil.example")
+    assert site.site_url() == "https://slide2video.com"
+    assert site.host() == "slide2video.com"
+    assert site.cmd("serve") == "/slide2video:serve"
+    assert not hasattr(site, "use") and not hasattr(site, "is_pro")
 
 
 def test_the_test_override_still_wins(monkeypatch):
     monkeypatch.setenv("LV_SITE_URL", "http://127.0.0.1:9")
-    site.use("pro")
-    assert site.site_url() == "http://127.0.0.1:9" and not site.is_pro()
+    assert site.site_url() == "http://127.0.0.1:9"
 
 
 def test_not_paired_names_the_site_and_command(monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
     assert "slide2video.com" in site.not_paired() and "/slide2video:setup " in site.not_paired()
-    site.use("pro")
-    assert "pro.slide2video.com" in site.not_paired() and "/slide2video:setup pro" in site.not_paired()
 
 
-def test_pairing_pro_keeps_the_other_connection(fake_site):
-    site.store.set("https://slide2video.com", "s2v_" + "a" * 30)
-    site.pair(name="Test Mac", sleep=lambda s: None, out=lambda s: None)
-    assert site.store.get("https://slide2video.com") == "s2v_" + "a" * 30
-    assert site.store.get(fake_site.url) == fake_site.token
-
-
-def test_cli_site_option_only_takes_pro():
-    with pytest.raises(SystemExit):
-        cli.build_parser().parse_args(["worker", "--status", "--site", "https://evil.example"])
-    assert cli.build_parser().parse_args(["pair", "--site", "pro"]).site == "pro"
-    assert cli.build_parser().parse_args(["worker", "--watch"]).site is None
+def test_cli_has_no_site_option():
+    for site_arg in ("pro", "https://evil.example"):
+        for cmd in (["pair"], ["worker", "--status"]):
+            with pytest.raises(SystemExit):
+                cli.build_parser().parse_args([*cmd, "--site", site_arg])

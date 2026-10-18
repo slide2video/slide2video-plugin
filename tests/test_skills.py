@@ -223,7 +223,7 @@ def test_install_guide_update_row_says_to_reopen_claude_code():
     assert STEPS in guide and "hasn't caught up" in guide
 
 
-def test_setup_and_serve_pass_pro_through():
+def test_setup_and_serve_know_only_slide2video_com():
     for name in ("setup", "serve"):
         _, text = frontmatter(name)
-        assert "--site pro" in text and f"/slide2video:{name} pro" in text
+        assert "pro.slide2video.com" not in text and "--site" not in text

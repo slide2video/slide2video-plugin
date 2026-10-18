@@ -613,43 +613,20 @@ def test_heartbeat_sends_the_fraction(paired, lessons, monkeypatch):
     assert {"progress": "Narrating scenes", "fraction": 0.25} in paired.heartbeat_bodies
 
 
-def test_pro_works_in_its_own_subfolder(lessons, monkeypatch):
+def test_lessons_root_has_no_pro_part(lessons, monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
     assert worker.lessons_root() == lessons
-    site.use("pro")
-    assert worker.lessons_root() == lessons / "pro.slide2video.com"
+    assert "pro.slide2video.com" not in worker.lessons_root().parts
 
 
-def test_pro_subfolder_is_never_a_lesson_and_live_lessons_are_still_found(lessons, monkeypatch):
+def test_a_second_watch_says_which_site(lessons, monkeypatch, lv_pid):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
-    live = lessons / f"Unit 3 ({PRJ})"
-    live.mkdir(parents=True)
-    (lessons / "pro.slide2video.com").mkdir()
-    assert worker.project_dir({"id": PRJ, "title": "Unit 3"}) == live
-    site.use("pro")
-    assert worker.project_dir({"id": PRJ, "title": "Unit 3"}).parent == lessons / "pro.slide2video.com"
-
-
-def test_both_sites_hold_their_own_locks(lessons, monkeypatch):
-    monkeypatch.delenv("LV_SITE_URL", raising=False)
-    live = worker._lock(worker.lessons_root(), ".worker-watch.lock")
-    site.use("pro")
-    pro = worker._lock(worker.lessons_root(), ".worker-watch.lock")
-    assert live is not None and pro is not None and live != pro
-
-
-def test_a_second_watch_for_the_same_site_says_which_site(lessons, monkeypatch, lv_pid):
-    monkeypatch.delenv("LV_SITE_URL", raising=False)
-    site.use("pro")
-    root = lessons / "pro.slide2video.com"
-    root.mkdir(parents=True)
-    (root / ".worker-watch.lock").write_text(str(lv_pid), encoding="utf-8")
+    lessons.mkdir(parents=True, exist_ok=True)
+    (lessons / ".worker-watch.lock").write_text(str(lv_pid), encoding="utf-8")
     lines = []
     assert worker.watch(out=lines.append) == 0
-    assert lines == ["This computer is already making videos for pro.slide2video.com (another window is running it)."]
+    assert lines == ["This computer is already making videos for slide2video.com (another window is running it)."]
 
 
-def test_disconnected_line_names_the_pro_command(monkeypatch):
-    monkeypatch.delenv("LV_SITE_URL", raising=False)
-    site.use("pro")
-    assert worker.disconnected_line().endswith("run /slide2video:serve pro.")
+def test_disconnected_line_names_the_serve_command():
+    assert worker.disconnected_line().endswith("run /slide2video:serve.")

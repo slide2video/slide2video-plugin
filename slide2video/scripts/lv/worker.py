@@ -62,14 +62,13 @@ def disconnected_line() -> str:
 
 def lessons_root() -> Path:
     """Where website lessons are worked on. A ~/Lesson Videos left by lesson-videos keeps being used, so a lesson in
-    progress continues after the update. pro.slide2video.com works in a subfolder, so each site has its own lessons and
-    locks and one computer can serve both at once."""
+    progress continues after the update."""
     if value := os.environ.get("LV_LESSONS_DIR"):
         base = Path(value)
     else:
         old = Path.home() / "Lesson Videos"
         base = old if old.is_dir() else Path.home() / "slide2video"
-    return base / site.host() if site.is_pro() else base
+    return base
 
 
 def project_dir(project: dict) -> Path:
