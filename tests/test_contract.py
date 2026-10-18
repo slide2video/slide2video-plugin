@@ -13,8 +13,8 @@ def _ex(name):
 
 
 def test_contract_version_is_the_plugin_major():
-    assert contract.PLUGIN == "1.0.0"
-    assert contract.VERSION == 1
+    assert contract.PLUGIN == "2.0.0"
+    assert contract.VERSION == 2
 
 
 @pytest.mark.parametrize("name", sorted(p.name for p in EXAMPLES.glob("*.json")))
@@ -30,12 +30,24 @@ def test_question_without_options_is_rejected():
 
 
 def test_unknown_card_kind_is_rejected():
-    assert contract.problems("card", {"contract": 1, "kind": "chat", "message": "hi"})
+    assert contract.problems("card", {"contract": 2, "kind": "chat", "message": "hi"})
+
+
+def test_turn_needs_a_project_with_a_style():
+    no_style = _ex("turn-start.json")
+    del no_style["project"]["style"]
+    assert any("style" in p for p in contract.problems("turn", no_style))
+    old = _ex("turn-start.json")
+    old["lesson"] = old.pop("project")
+    assert contract.problems("turn", old)
+    bad_id = _ex("turn-start.json")
+    bad_id["project"]["id"] = "les_0123456789abcdefghijkl"
+    assert contract.problems("turn", bad_id)
 
 
 def test_wrong_contract_version_is_rejected():
     card = _ex("card-done.json")
-    card["contract"] = 2
+    card["contract"] = 1
     assert contract.problems("card", card)
 
 
@@ -52,7 +64,7 @@ def test_card_command(tmp_path, capsys):
     assert cli.main(["card", str(good)]) == 0
     assert "card ok" in capsys.readouterr().out
     bad = tmp_path / "bad.json"
-    bad.write_text(json.dumps({"contract": 1, "kind": "plan", "message": "x"}), encoding="utf-8")
+    bad.write_text(json.dumps({"contract": 2, "kind": "plan", "message": "x"}), encoding="utf-8")
     assert cli.main(["card", str(bad)]) == 1
     assert "markdown" in capsys.readouterr().out
 

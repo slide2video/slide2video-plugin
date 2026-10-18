@@ -146,7 +146,7 @@ def test_watch_stops_with_the_websites_refusal(paired, lessons):
 
 
 def test_watch_stops_on_contract_mismatch_from_an_older_website(paired, lessons):
-    paired.contract = 2
+    paired.contract = 3
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
     assert code == 1 and "Update the slide2video plugin" in lines[-1] and a.on == 0
 

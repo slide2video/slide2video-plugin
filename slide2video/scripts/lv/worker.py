@@ -44,6 +44,7 @@ DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "E
 DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "ANTHROPIC_API_KEY",
                "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
+SCHOOL_ONLY = "This computer makes School videos only."
 POLL = 30                      # seconds between checks while no lesson is waiting
 BACKOFF = (30, 60, 120, 300)   # seconds after network or server errors, capped at the last
 IDLE, RAN, STOP, BUSY = "idle", "ran", "stop", "busy"
@@ -71,14 +72,14 @@ def lessons_root() -> Path:
     return base / site.host() if site.is_pro() else base
 
 
-def lesson_dir(lesson: dict) -> Path:
-    """The lesson's folder, found by its id (the title on the site may have changed since)."""
-    root, tag = lessons_root(), f"({lesson['id']})"
+def project_dir(project: dict) -> Path:
+    """The video project's folder, found by its id (the title on the site may have changed since)."""
+    root, tag = lessons_root(), f"({project['id']})"
     if root.exists():
         for d in root.iterdir():
             if d.is_dir() and d.name.endswith(tag):
                 return d
-    return root / f"{safe_name(lesson['title'])[:80]} {tag}"
+    return root / f"{safe_name(project['title'])[:80]} {tag}"
 
 
 def lv_command() -> str:
@@ -393,11 +394,13 @@ def _claude_turn(turn: dict, folder: Path, sitedir: Path, log: Path, claude) -> 
 
 def _run_turn(turn: dict, claude, out) -> int:
     tid, kind = turn["turn"]["id"], turn["turn"]["kind"]
-    out(f"Working on “{turn['lesson']['title']}” ({kind}).")
+    out(f"Working on “{turn['project']['title']}” ({kind}).")
     log: Path | None = None
     beat: _Heartbeat | None = None
     try:
-        folder = lesson_dir(turn["lesson"])
+        if kind != "delete" and turn["project"]["style"] != "school":
+            raise UserError(SCHOOL_ONLY)
+        folder = project_dir(turn["project"])
         if kind == "delete":
             shutil.rmtree(folder, ignore_errors=True)
             card = {"contract": contract.VERSION, "kind": "done", "message": "Removed from this computer."}

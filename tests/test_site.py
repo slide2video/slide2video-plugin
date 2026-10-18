@@ -41,7 +41,7 @@ def test_revoked_token_says_connect(paired):
 
 
 def test_contract_mismatch_says_update(paired):
-    paired.contract = 2
+    paired.contract = 3
     with pytest.raises(UserError) as e:
         site.call("/api/device/status")
     assert "/plugin update slide2video" in str(e.value)
@@ -156,7 +156,7 @@ def test_pair_code_shows_at_once_when_output_is_not_a_terminal(fake_site, tmp_pa
 def test_call_sends_its_version_and_the_old_contract_header(paired):
     site.call("/api/device/status")
     assert paired.plugin_headers[-1] == lv.__version__
-    assert paired.contract == 1  # the fake still checks X-LV-Contract: 1, as today's website does
+    assert paired.contract == 2  # the fake checks X-LV-Contract against the plugin major
 
 
 def test_call_remembers_the_websites_version(paired, monkeypatch):

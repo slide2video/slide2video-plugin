@@ -13,11 +13,11 @@ from lv import site, worker
 from lv.util import read_json, write_json, write_text
 
 DECK = b"pretend pptx bytes"
-LES = "les_0123456789abcdefghijkl"
+PRJ = "prj_0123456789abcdefghijkl"
 
 
-def _turn(kind="start", tid="trn_0123456789abcdefghijkl", path="in/water-cycle.pptx", **extra):
-    return {"contract": 1, "lesson": {"id": LES, "title": "Unit 3: Water/Cycle"},
+def _turn(kind="start", tid="trn_0123456789abcdefghijkl", path="in/water-cycle.pptx", style="school", **extra):
+    return {"contract": 2, "project": {"id": PRJ, "title": "Unit 3: Water/Cycle", "style": style},
             "turn": {"id": tid, "seq": 1, "kind": kind, "lease_seconds": 1800},
             "files": [{"id": "fil_0123456789abcdefghijkl", "name": "water-cycle.pptx", "kind": "deck",
                        "sha256": hashlib.sha256(DECK).hexdigest(), "size": len(DECK), "path": path}], **extra}
@@ -57,7 +57,7 @@ def lv_pid():
     p.wait()
 
 
-QUESTIONS = {"contract": 1, "kind": "questions", "message": "Questions",
+QUESTIONS = {"contract": 2, "kind": "questions", "message": "Questions",
              "questions": [{"id": "grade", "text": "Grade?", "options": [{"label": "6–8"}]}]}
 
 
@@ -71,8 +71,8 @@ def test_start_turn_downloads_runs_claude_and_sends_card(paired, lessons):
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     fake = _claude_writing(QUESTIONS)
     assert worker.run_once(claude=fake) == 0
-    folder = worker.lesson_dir({"id": LES, "title": "x"})
-    assert folder.name == f"Unit 3- Water-Cycle ({LES})"
+    folder = worker.project_dir({"id": PRJ, "title": "x"})
+    assert folder.name == f"Unit 3- Water-Cycle ({PRJ})"
     assert (folder / "in" / "water-cycle.pptx").read_bytes() == DECK
     assert read_json(folder / "site" / "turn.json")["turn"]["kind"] == "start"
     assert (folder / "site" / "lv.txt").read_text(encoding="utf-8").strip() == worker.lv_command()
@@ -81,7 +81,7 @@ def test_start_turn_downloads_runs_claude_and_sends_card(paired, lessons):
 
 
 def test_existing_deck_with_same_hash_is_not_downloaded_again(paired, lessons):
-    folder = worker.lesson_dir({"id": LES, "title": "Unit 3: Water/Cycle"})
+    folder = worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"})
     write_text(folder / "in" / "keep.txt", "")
     (folder / "in" / "water-cycle.pptx").write_bytes(DECK)
     paired.turns.append(_turn())  # paired.files is empty: a download would 404
@@ -119,7 +119,7 @@ def _chapter(folder):
     (ch / "build" / "final.jpg").write_bytes(b"jpg")
 
 
-REVIEW = {"contract": 1, "kind": "review", "message": "Chapter 1 is ready.", "chapter": 1,
+REVIEW = {"contract": 2, "kind": "review", "message": "Chapter 1 is ready.", "chapter": 1,
           "video": "lesson-videos/Chapter 1 - Water.mp4", "captions": "lesson-videos/Chapter 1 - Water.vtt",
           "stills": "lesson-videos/_work/ch1/build/final.jpg"}
 
@@ -162,7 +162,7 @@ def test_claude_failure_sends_redacted_log(paired, lessons):
 def test_invalid_card_is_an_error(paired, lessons):
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
-    assert worker.run_once(claude=_claude_writing({"contract": 1, "kind": "plan", "message": "x"})) == 1
+    assert worker.run_once(claude=_claude_writing({"contract": 2, "kind": "plan", "message": "x"})) == 1
     assert "couldn't be read" in paired.finished[0][1]["message"]
 
 
@@ -176,13 +176,34 @@ def test_usage_limit_sets_retry_after():
 
 
 def test_delete_turn_removes_the_folder_without_claude(paired, lessons):
-    folder = worker.lesson_dir({"id": LES, "title": "Unit 3: Water/Cycle"})
+    folder = worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"})
     write_text(folder / "in" / "x.txt", "x")
     paired.turns.append(_turn("delete", delete=True))
     fake = _claude_writing(QUESTIONS)
     assert worker.run_once(claude=fake) == 0
     assert not folder.exists() and fake.calls == []
     assert paired.finished[0][1]["kind"] == "done"
+
+
+def test_delete_turn_of_any_style_removes_the_folder(paired, lessons):
+    folder = worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"})
+    write_text(folder / "in" / "x.txt", "x")
+    paired.turns.append(_turn("delete", style="general", delete=True))
+    fake = _claude_writing(QUESTIONS)
+    assert worker.run_once(claude=fake) == 0
+    assert not folder.exists() and fake.calls == []
+    assert paired.finished[0][1]["kind"] == "done"
+
+
+def test_non_school_style_is_an_error_without_claude(paired, lessons):
+    paired.turns.append(_turn(style="business"))
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    fake = _claude_writing(QUESTIONS)
+    assert worker.run_once(claude=fake) == 1
+    assert fake.calls == []
+    card = paired.finished[0][1]
+    assert card["kind"] == "error" and card["message"] == worker.SCHOOL_ONLY
+    assert not worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"}).exists()
 
 
 def test_live_lock_makes_a_second_run_exit(paired, lessons, lv_pid):
@@ -390,7 +411,7 @@ def test_invalid_card_error_is_valid_and_short(paired, lessons):
     from lv import contract
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
-    card = {"contract": 1, "kind": "plan", "message": "x", "markdown": "m" * 20001}
+    card = {"contract": 2, "kind": "plan", "message": "x", "markdown": "m" * 20001}
     assert worker.run_once(claude=_claude_writing(card)) == 1
     sent = paired.finished[0][1]
     assert contract.problems("card", sent) == [] and "problems at" in sent["message"]
@@ -399,7 +420,7 @@ def test_invalid_card_error_is_valid_and_short(paired, lessons):
 def test_other_service_limit_is_not_a_claude_usage_limit(paired, lessons):
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
-    bad = {"contract": 1, "kind": "plan", "message": "x"}
+    bad = {"contract": 2, "kind": "plan", "message": "x"}
     assert worker.run_once(claude=_claude_writing(bad, log="ElevenLabs character limit reached\n")) == 1
     sent = paired.finished[0][1]
     assert sent["retry_after"] is None and "usage limit" not in sent["message"]
@@ -470,7 +491,7 @@ def test_claude_cannot_name_its_own_timing_or_version(paired, lessons):
 def test_claude_written_error_card_is_rebuilt(paired, lessons):
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
-    card = {"contract": 1, "kind": "error", "message": "The deck has no slides.",
+    card = {"contract": 2, "kind": "error", "message": "The deck has no slides.",
             "retry_after": "2030-01-01T00:00:00+00:00", "log_tail": "made up"}
     assert worker.run_once(claude=_claude_writing(card, log="5-hour limit reached ∙ resets 3pm\nreal log\n")) == 1
     sent = paired.finished[0][1]
@@ -481,13 +502,13 @@ def test_claude_written_error_card_is_rebuilt(paired, lessons):
 def test_claude_error_card_without_message_gets_one(paired, lessons):
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
-    assert worker.run_once(claude=_claude_writing({"contract": 1, "kind": "error", "message": ""})) == 1
+    assert worker.run_once(claude=_claude_writing({"contract": 2, "kind": "error", "message": ""})) == 1
     assert paired.finished[0][1]["message"] == "Claude reported a problem."
 
 
 def test_lesson_folder_that_cannot_be_made_still_finishes_with_error(paired, lessons):
     lessons.mkdir(parents=True)
-    (lessons / f"Unit 3- Water-Cycle ({LES})").write_text("a file where the folder should be", encoding="utf-8")
+    (lessons / f"Unit 3- Water-Cycle ({PRJ})").write_text("a file where the folder should be", encoding="utf-8")
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     fake = _claude_writing(QUESTIONS)
@@ -601,12 +622,12 @@ def test_pro_works_in_its_own_subfolder(lessons, monkeypatch):
 
 def test_pro_subfolder_is_never_a_lesson_and_live_lessons_are_still_found(lessons, monkeypatch):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
-    live = lessons / f"Unit 3 ({LES})"
+    live = lessons / f"Unit 3 ({PRJ})"
     live.mkdir(parents=True)
     (lessons / "pro.slide2video.com").mkdir()
-    assert worker.lesson_dir({"id": LES, "title": "Unit 3"}) == live
+    assert worker.project_dir({"id": PRJ, "title": "Unit 3"}) == live
     site.use("pro")
-    assert worker.lesson_dir({"id": LES, "title": "Unit 3"}).parent == lessons / "pro.slide2video.com"
+    assert worker.project_dir({"id": PRJ, "title": "Unit 3"}).parent == lessons / "pro.slide2video.com"
 
 
 def test_both_sites_hold_their_own_locks(lessons, monkeypatch):

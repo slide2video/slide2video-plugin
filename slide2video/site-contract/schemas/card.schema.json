@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://slide2video.com/contract/1/card.schema.json",
-  "title": "A card: what the Mac sends back for the teacher",
+  "$id": "https://slide2video.com/contract/2/card.schema.json",
+  "title": "A card: what the Mac sends back for the person",
   "type": "object",
   "required": ["contract", "kind", "message"],
   "properties": {
-    "contract": {"const": 1},
+    "contract": {"const": 2},
     "kind": {"enum": ["questions", "plan", "review", "done", "error"]},
     "message": {"type": "string", "maxLength": 2000},
     "slides": {"type": "integer", "minimum": 1, "maximum": 500}

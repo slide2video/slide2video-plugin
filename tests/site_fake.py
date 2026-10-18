@@ -13,7 +13,7 @@ class FakeSite:
     def __init__(self):
         self.turns, self.files, self.uploads, self.finished, self.heartbeats = [], {}, {}, [], []
         self.heartbeat_bodies = []
-        self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 1
+        self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 2
         self.fail_uploads = False
         self.latest, self.plugin_headers, self.refuse = None, [], None
         self.stop_next, self.next_queries, self.fail_next = False, [], 0
@@ -62,7 +62,7 @@ class FakeSite:
                 if self.headers.get("Authorization") != f"Bearer {site.token}":
                     return self._send(401, {"error": "unauthorized"})
                 if u.path == "/api/device/status":
-                    return self._send(200, {"teacher_email": "teacher@example.org", "device_name": "Test Mac", "contract": 1})
+                    return self._send(200, {"teacher_email": "teacher@example.org", "device_name": "Test Mac", "contract": 2})
                 if u.path == "/api/device/next":
                     site.next_queries.append(u.query)
                     if u.query == "start=1":       # like the real site: a fresh watcher clears a stale stop
