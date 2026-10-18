@@ -208,6 +208,27 @@ def test_site_mode_sends_the_new_card_details():
     assert "[3/12]" in site                                # counted progress lines
 
 
+def test_impossible_instructions_are_asked_about_first():
+    _, text = frontmatter("make")
+    read = text.split("## 1. Read the deck", 1)[1].split("## 2.", 1)[0]
+    assert "before anything else" in read and "recommend none" in read
+    site = text.split("## Site mode", 1)[1]
+    start = next(l for l in site.splitlines() if l.startswith("| `start`"))
+    assert start.index("instructions.md") < start.index("the style's check")   # notes first, students second
+    assert "instructions-1" in start and "no option is `recommended`" in start
+    answer = next(l for l in site.splitlines() if l.startswith("| `answer`"))
+    assert answer.index("instructions-") < answer.index("check.id")
+    assert "the rest of the `start` row" in answer
+    assert "`instructions.md`" in site.split("**Files between turns**", 1)[1]
+
+
+def test_site_mode_writes_plain_notes_for_the_website():
+    _, text = frontmatter("make")
+    site = text.split("## Site mode", 1)[1]
+    notes = next(l for l in site.splitlines() if l.startswith("- **Notes:**"))
+    assert "site/notes.txt" in notes and "never a name of a person" in notes.lower()
+
+
 STEPS = "/plugin update slide2video`, then close and reopen Claude Code"
 
 

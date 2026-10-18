@@ -245,6 +245,18 @@ def _progress(f: Path) -> tuple[str, float | None]:
     return line, None
 
 
+NOTES = 5                       # notes the website shows while a step runs
+
+
+def _notes(f: Path) -> list[str]:
+    """The last few lines of site/notes.txt: what Claude noticed, in plain words, for the website to show."""
+    try:
+        lines = [l.strip() for l in read_text(f).splitlines() if l.strip()]
+    except OSError:
+        return []
+    return [keys.redact(l)[:200] for l in lines[-NOTES:]]
+
+
 class _Heartbeat(threading.Thread):
     def __init__(self, turn_id: str, progress: Path):
         super().__init__(daemon=True)
@@ -255,6 +267,8 @@ class _Heartbeat(threading.Thread):
             try:
                 text, fraction = _progress(self.progress)
                 body = {"progress": text} if fraction is None else {"progress": text, "fraction": fraction}
+                if notes := _notes(self.progress.with_name("notes.txt")):
+                    body["notes"] = notes
                 site.call(f"/api/device/turns/{self.turn_id}/heartbeat", body)
             except Exception:  # noqa: BLE001  a missed heartbeat only shortens the lease
                 pass
@@ -407,6 +421,7 @@ def _run_turn(turn: dict, claude, out) -> int:
             sitedir = folder / "site"
             sitedir.mkdir(parents=True, exist_ok=True)
             (sitedir / "card.json").unlink(missing_ok=True)
+            (sitedir / "notes.txt").unlink(missing_ok=True)
             write_text(sitedir / "progress.txt", "Starting\n")
             log = sitedir / "claude.log"
             beat = _Heartbeat(tid, sitedir / "progress.txt")
