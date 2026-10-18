@@ -199,7 +199,7 @@ def dispatch(args) -> int:
             import lv
             from . import version
             s = site.status()
-            print(f"Connected to {site.site_url()} as {s['teacher_email']} "
+            print(f"Connected to {site.site_url()} as {s['user_email']} "
                   f"(this device: {s['device_name']}, slide2video {lv.__version__}).")
             line = version.update_line(site.LATEST)
             if line:

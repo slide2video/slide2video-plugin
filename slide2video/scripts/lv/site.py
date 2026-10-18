@@ -134,7 +134,7 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
 
 
 def pair(name=None, sleep=None, out=print, clock=time.monotonic) -> str:
-    """Show a code to type on the website, wait for it, keep the token. Returns the teacher's email."""
+    """Show a code to type on the website, wait for it, keep the token. Returns the user's email."""
     sleep = sleep or time.sleep
     name = (name or platform.node().removesuffix(".local") or "Computer")[:60]
     start = call("/api/device/pair/start", {"name": name}, auth=False)
@@ -154,7 +154,7 @@ def pair(name=None, sleep=None, out=print, clock=time.monotonic) -> str:
             raise
         token = _check_token(got.get("token"))
         store.set(site_url(), token)
-        return got["teacher_email"]
+        return got["user_email"]
     raise UserError("The code expired before it was entered. Run the pairing again for a new code.")
 
 

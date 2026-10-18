@@ -504,7 +504,7 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
         previous = _sigterm_as_interrupt()
         try:
             who = site.status()
-            as_who = f" as {who['teacher_email']} on {who['device_name']}"
+            as_who = f" as {who['user_email']} on {who['device_name']}"
         except UserError as e:              # not connected, or the plugin needs an update: nothing to start
             out(str(e))
             return 1

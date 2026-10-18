@@ -58,11 +58,11 @@ class FakeSite:
                     if site.pair_polls_pending > 0:
                         site.pair_polls_pending -= 1
                         return self._send(428, {"error": "pending"})
-                    return self._send(200, {"token": site.token, "teacher_email": "teacher@example.org"})
+                    return self._send(200, {"token": site.token, "user_email": "user@example.org"})
                 if self.headers.get("Authorization") != f"Bearer {site.token}":
                     return self._send(401, {"error": "unauthorized"})
                 if u.path == "/api/device/status":
-                    return self._send(200, {"teacher_email": "teacher@example.org", "device_name": "Test Mac", "contract": 2})
+                    return self._send(200, {"user_email": "user@example.org", "device_name": "Test Mac", "contract": 2})
                 if u.path == "/api/device/next":
                     site.next_queries.append(u.query)
                     if u.query == "start=1":       # like the real site: a fresh watcher clears a stale stop

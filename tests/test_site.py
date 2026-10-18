@@ -14,7 +14,7 @@ def test_site_url_defaults_to_slide2video(monkeypatch):
 def test_pair_waits_for_the_code_then_stores_the_token(fake_site):
     lines = []
     email = site.pair(name="Test Mac", sleep=lambda s: None, out=lines.append)
-    assert email == "teacher@example.org"
+    assert email == "user@example.org"
     assert site.store.get(fake_site.url) == fake_site.token
     assert any("ABC-123" in l for l in lines) and any("/devices" in l for l in lines)
     assert not any(fake_site.token in l for l in lines)
@@ -57,7 +57,7 @@ def test_cli_pair_and_status(fake_site, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "connected" in out and fake_site.token not in out
     assert cli.main(["worker", "--status"]) == 0
-    assert "teacher@example.org" in capsys.readouterr().out
+    assert "user@example.org" in capsys.readouterr().out
 
 
 class _Done:
