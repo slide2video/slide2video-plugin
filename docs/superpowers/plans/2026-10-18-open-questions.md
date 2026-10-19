@@ -90,7 +90,7 @@ Ground rules, new bullet right after "The teacher's slides are the only source o
 
 > - The teacher's questions stay the teacher's. A question the deck (or a file the teacher added) asks the audience and leaves open (review, recap, exit ticket, homework, discussion, practice problems) is a **deck question**: shown as written and handed back with a pause, never answered, hinted at, pointed to ("it's on slide 7") or reworded into a quiz question. Speaker notes don't count as the deck answering: the audience never sees them, so a question answered only in the notes stays open (the notes remain a source of facts for the content scenes). If the slides themselves answer a question, that's content: explain it as usual. Deck questions on slides get their own scene (a slide with several questions is one scene); deck questions in added files are listed in `brief.md` and `plan.md` as left open and are not put in the video unless the teacher asks.
 
-Step 3, before the "Possible issues in the slides" sentence: `Then a section **"The teacher's questions (left open)"**: every deck question with its slide number or file name, or \`None found.\`` (keep "Possible issues" as the last section: change "Finish with" to "Then").
+Step 3, before the "Possible issues in the slides" sentence: `Then a section **"The teacher's questions (left open)"**: every deck question with its slide number or file name, or \`None found.\`` ("Possible issues in the slides" stays the last section).
 
 Step 4, in the `plan.md` sentence after "a scene outline (the style's `outline`)": `, which deck questions it shows open (from the brief's "left open" section)`.
 
