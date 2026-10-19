@@ -18,10 +18,12 @@ Students get to rewatch the lesson in your words: every definition, example and 
 - A friendly narrator who explains each idea in your wording (a free voice, or ElevenLabs if you have an account).
 - Animated diagrams and your own slide images, revealed in sync with the narration.
 - Captions, "test tip" and "trap" callouts.
-- A short pause-and-answer quiz and a recap.
+- A short pause-and-answer quiz and a recap. Questions already in your deck are shown but never answered: they stay yours.
 - Optional background music and a few AI-animated clips made from your photos.
 
 Videos are 4–6 minutes by default; you choose the length.
+
+**Where we stand on AI in education:** https://slide2video.com/ai
 
 ## Get started
 

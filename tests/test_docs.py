@@ -1,6 +1,6 @@
 import re
 
-from conftest import PLUGIN
+from conftest import PLUGIN, REPO
 from lv import keys
 
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)\)")
@@ -59,3 +59,11 @@ def test_readme_says_lesson_videos_is_retired_for_the_website():
     text = (PLUGIN.parent / "README.md").read_text(encoding="utf-8")
     assert "lesson-videos" in text and "no longer connects to slide2video.com" in text
     assert "/plugin install slide2video@slide2video" in text
+
+
+def test_readme_says_deck_questions_stay_open_and_links_the_ai_page():
+    text = (PLUGIN / "README.md").read_text(encoding="utf-8")
+    assert "Questions already in your deck are shown but never answered" in text
+    assert "https://slide2video.com/ai" in text
+    for f in (PLUGIN / ".claude-plugin/plugin.json", REPO / ".claude-plugin/marketplace.json"):
+        assert "shown but never answered" in f.read_text(encoding="utf-8"), f
