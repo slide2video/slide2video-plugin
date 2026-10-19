@@ -281,11 +281,17 @@
   function measureBadge(ctx, label, size) { ctx.save(); ctx.font = `800 ${size}px ${FONT}`; const w = ctx.measureText(label).width + size * 1.3; ctx.restore(); return w; }
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
-    o = { n: 1, q: '', choices: null, emoji: '🤔', ...o };
+    o = { n: 1, q: '', choices: null, emoji: '🤔', badge: '', numbered: false, ...o };
     bg(ctx, 'deep', t + 100);
-    badge(ctx, `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
+    badge(ctx, o.badge || `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
     text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.aqua });
-    if (o.choices) o.choices.forEach((c, i) => { const k = P(t, 0.8 + i * 0.25, 0.5); card(ctx, 120, 560 + i * 120, 1000, 96, { fill: 'rgba(255,255,255,0.1)', shadow: false, alpha: k, r: 20 }); text(ctx, `${String.fromCharCode(65 + i)}.  ${c}`, 160, 580 + i * 120, { size: 44, weight: 600, color: '#fff', alpha: k }); });
+    if (o.choices) o.choices.forEach((c, i) => {
+      const k = P(t, 0.8 + i * 0.25, 0.5); card(ctx, 120, 560 + i * 120, 1000, 96, { fill: 'rgba(255,255,255,0.1)', shadow: false, alpha: k, r: 20 });
+      // a teacher's questions are numbered (they are not options to pick); a long line shrinks to fit its card
+      const label = `${o.numbered ? i + 1 : String.fromCharCode(65 + i)}.  ${c}`;
+      let size = 44; while (size > 30 && measure(ctx, label, { size, weight: 600 }).w > 920) size -= 2;
+      text(ctx, label, 160, 580 + i * 120 + (44 - size) / 2, { size, weight: 600, color: '#fff', alpha: k });
+    });
     emoji(ctx, o.emoji, 1560, 420, 220, { scale: pop(t, 0.5), rot: Math.sin(t * 2) * 0.06 });
     const holdStart = s.end, k = clamp((t - holdStart) / Math.max(0.1, s.dur - holdStart - 0.3));
     if (t > holdStart - 0.2) { const a = P(t, holdStart - 0.2, 0.4); ctx.save(); ctx.globalAlpha *= a; ring(ctx, 1560, 780, 90, 1 - k, { color: C.sun }); text(ctx, String(Math.max(1, Math.ceil((1 - k) * (s.dur - holdStart - 0.3)))), 1560, 735, { size: 80, weight: 800, color: '#fff', align: 'center' }); ctx.restore(); }

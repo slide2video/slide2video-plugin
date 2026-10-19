@@ -10,8 +10,8 @@
   "check": {"id": "students", "file": "student-info.md",
             "looks_for": "names of students, class photos, graded student work",
             "remove": "Remove these slides", "keep": "They're not students", "keep_decision": "not students"},
-  "brief": "the essential question if the deck has one; key terms with definitions in the teacher's own wording; examples and lab data from the slides; likely test questions; common mistakes worth a \"trap\" warning",
-  "outline": "hook, 6–12 content scenes, a 3-question quiz, recap for 4–6 minutes; for shorter videos scale down, e.g. one scene per key idea and a 1-question quiz",
+  "brief": "the essential question if the deck has one; key terms with definitions in the teacher's own wording; examples and lab data from the slides; likely test questions; common mistakes worth a \"trap\" warning; the deck's own questions (review, recap, homework), each with its slide number, to leave open",
+  "outline": "hook, 6–12 content scenes, the deck's own questions shown open where the deck has them, a 3-question quiz, recap for 4–6 minutes; for shorter videos scale down, e.g. one scene per key idea and a 1-question quiz",
   "clips": "real photos of living things or landscapes that benefit from motion; not drawings or clip-art, which Veo turns into realistic footage partway through; never diagrams with text, never photos of students",
   "music": "calm, light instrumental study music, no vocals, steady gentle beat"
 }

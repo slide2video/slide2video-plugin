@@ -26,7 +26,7 @@ How to build one chapter video with the slide2video engine. **LV** = the full `u
 - `clip(g, 'assets/clip_name', frameCount, t, x, y, w, h, {fps: 24, loop: false, fit: 'cover', r})`: plays a JPEG frame sequence made by `LV frames` (an 8 s clip = 192 frames).
 - `emoji(g, '🐟', x, y, size, {scale, rot, alpha})`: great for icons. Emoji look slightly different on Windows and Mac.
 - Science helpers: `molecule(g, x, y, 'water'|'salt'|'sugar'|'o2'|'co2'|color, scale, alpha)`, `wander(i, t, {x, y, w, h}, seed)` → `[x, y]` for particle fields, `membrane(g, x, y1, y2, t)`.
-- Standard scenes: `titleCard(g, t, s, {kicker, title, sub, emojis, bg})`, `quizQ(g, t, s, {n, q, choices, emoji})` (countdown ring during `hold`), `quizA(g, t, s, {answer, why})`, `recap(g, t, s, items, times, {title, kicker, gap, next, nextAt})`.
+- Standard scenes: `titleCard(g, t, s, {kicker, title, sub, emojis, bg})`, `quizQ(g, t, s, {n, q, choices, emoji, badge})` (countdown ring during `hold`; `badge` replaces the `QUIZ · QUESTION n` label; `numbered: true` numbers the lines 1., 2., 3. instead of A., B., C.; a long line shrinks to fit its card), `quizA(g, t, s, {answer, why})`, `recap(g, t, s, items, times, {title, kicker, gap, next, nextAt})`.
 - Layout: margins x 120..1800; headings y 40..170; content y 210..900; **captions are drawn automatically below y ≈ 930**, so keep content above 900. Minimum text size 30 px (prefer 36 or more). One idea per scene; big, bold, colorful; animate things in as they are spoken.
 - Palette: `C.navy, C.sea, C.teal, C.aqua, C.foam, C.coral, C.sun, C.leaf, C.purple, C.pink, C.ink, C.grey, C.water`.
 

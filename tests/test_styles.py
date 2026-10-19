@@ -95,3 +95,14 @@ def test_missing_styles_dir_is_a_clear_error(monkeypatch, tmp_path):
     monkeypatch.setenv("LV_STYLES_DIR", str(tmp_path / "nope"))
     with pytest.raises(UserError, match="isn't a folder"):
         styles.installed()
+
+
+def test_school_leaves_the_teachers_questions_open(capsys):
+    code, out = run(capsys, "style", "school")
+    assert code == 0
+    s = json.loads(out.out)
+    assert "to leave open" in s["brief"] and "shown open" in s["outline"]
+    guide = (PLUGIN / "styles/school/guide.md").read_text(encoding="utf-8")
+    for needed in ("YOUR TEACHER'S QUESTION", "EXTRA QUESTION", "no `quizA` after it", "never rewords",
+                   "## Wrap-up", "https://slide2video.com/ai", "district's policy"):
+        assert needed in guide, needed
