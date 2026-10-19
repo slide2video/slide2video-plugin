@@ -1,3 +1,4 @@
+import json
 import re
 
 from conftest import PLUGIN, REPO
@@ -279,3 +280,11 @@ def test_deck_questions_stay_open():
         assert needed in text, needed
     site = text.split("## Site mode", 1)[1]
     assert "deck questions left open" in site
+
+
+def test_reference_chapter_shows_a_deck_question_open():
+    sample = PLUGIN / "skills/make/references/sample"
+    ids = [s["id"] for s in json.loads((sample / "script.json").read_text(encoding="utf-8"))["scenes"]]
+    assert ids.index("tq") < ids.index("q1") and "ta" not in ids
+    scenes = (sample / "scenes.js").read_text(encoding="utf-8")
+    assert "badge: \"YOUR TEACHER'S QUESTION\"" in scenes and 'badge: "EXTRA QUESTION"' in scenes
