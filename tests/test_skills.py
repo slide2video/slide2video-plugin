@@ -260,3 +260,10 @@ def test_make_skill_card_examples_match_the_schema():
     for card in cards:
         assert contract.problems("card", card) == [], card
     assert '"contract": 1' not in text
+
+
+def test_quiz_question_badge_is_configurable():
+    engine = (PLUGIN / "engine/engine.js").read_text(encoding="utf-8")
+    assert "o.badge || `QUIZ · QUESTION ${o.n}`" in engine
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    assert "quizQ(g, t, s, {n, q, choices, emoji, badge})" in guide

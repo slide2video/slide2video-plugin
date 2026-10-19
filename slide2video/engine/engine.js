@@ -281,9 +281,9 @@
   function measureBadge(ctx, label, size) { ctx.save(); ctx.font = `800 ${size}px ${FONT}`; const w = ctx.measureText(label).width + size * 1.3; ctx.restore(); return w; }
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
-    o = { n: 1, q: '', choices: null, emoji: '🤔', ...o };
+    o = { n: 1, q: '', choices: null, emoji: '🤔', badge: '', ...o };
     bg(ctx, 'deep', t + 100);
-    badge(ctx, `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
+    badge(ctx, o.badge || `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
     text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.aqua });
     if (o.choices) o.choices.forEach((c, i) => { const k = P(t, 0.8 + i * 0.25, 0.5); card(ctx, 120, 560 + i * 120, 1000, 96, { fill: 'rgba(255,255,255,0.1)', shadow: false, alpha: k, r: 20 }); text(ctx, `${String.fromCharCode(65 + i)}.  ${c}`, 160, 580 + i * 120, { size: 44, weight: 600, color: '#fff', alpha: k }); });
     emoji(ctx, o.emoji, 1560, 420, 220, { scale: pop(t, 0.5), rot: Math.sin(t * 2) * 0.06 });
