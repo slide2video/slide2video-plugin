@@ -267,3 +267,15 @@ def test_quiz_question_badge_is_configurable():
     assert "o.badge || `QUIZ · QUESTION ${o.n}`" in engine
     guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
     assert "quizQ(g, t, s, {n, q, choices, emoji, badge})" in guide
+
+
+def test_deck_questions_stay_open():
+    _, text = frontmatter("make")
+    for needed in ("The teacher's questions stay the teacher's.", "never answered, hinted at, pointed to",
+                   "Speaker notes don't count", "If the slides themselves answer a question, that's content",
+                   "are not put in the video unless the teacher asks",
+                   '**"The teacher\'s questions (left open)"**', "None found.",
+                   "which deck questions it shows open", "notes the style's guide lists for the wrap-up"):
+        assert needed in text, needed
+    site = text.split("## Site mode", 1)[1]
+    assert "deck questions left open" in site
