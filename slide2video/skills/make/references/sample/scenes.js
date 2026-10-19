@@ -48,7 +48,7 @@ scene('precipitation', (g, t, s) => {
   text(g, 'and the cycle starts again', 960, 650, { size: 44, weight: 700, color: C.teal, align: 'center', alpha: P(t, again) });
 }, { sfx: [['rain', 'pop0', -14], ['snow', 'pop1', -14], ['sleet', 'pop2', -14], ['hail', 'pop3', -14], ['again', 'zip1', -14]] });
 
-scene('tq', (g, t, s) => quizQ(g, t, s, { badge: "YOUR TEACHER'S QUESTION", q: 'Review', choices: ['Name the three main steps of the water cycle.', 'Which step turns liquid into gas?', 'Are clouds made of gas or liquid?'], emoji: '📝' }), { dark: true, sfx: [[0.1, 'pluck1', -10]] });
+scene('tq', (g, t, s) => quizQ(g, t, s, { badge: "YOUR TEACHER'S QUESTION", numbered: true, q: 'Review', choices: ['Name the three main steps of the water cycle.', 'Which step turns liquid into gas?', 'Are clouds made of gas or liquid?'], emoji: '📝' }), { dark: true, sfx: [[0.1, 'pluck1', -10]] });
 scene('q1', (g, t, s) => quizQ(g, t, s, { n: 1, badge: "EXTRA QUESTION", q: 'A puddle *disappears* on a sunny afternoon. Which step?', choices: ['Evaporation', 'Condensation', 'Precipitation'], emoji: '☀️' }), { dark: true, sfx: [[0.1, 'pluck2', -10]] });
 scene('a1', (g, t, s) => quizA(g, t, s, { answer: 'Evaporation', why: 'The sun turned the *liquid* into *water vapor*.' }), { dark: true, sfx: [[0.1, 'sparkle1', -12]] });
 

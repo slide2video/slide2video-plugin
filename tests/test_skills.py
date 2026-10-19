@@ -288,3 +288,60 @@ def test_reference_chapter_shows_a_deck_question_open():
     assert ids.index("tq") < ids.index("q1") and "ta" not in ids
     scenes = (sample / "scenes.js").read_text(encoding="utf-8")
     assert "badge: \"YOUR TEACHER'S QUESTION\"" in scenes and 'badge: "EXTRA QUESTION"' in scenes
+
+
+def _quiz_choice_draws(choices, **opts):
+    """Draw one quizQ frame in Chromium and return each choice's (label, font, right edge) as fillText drew it."""
+    from playwright.sync_api import sync_playwright
+    engine = (PLUGIN / "engine/engine.js").read_text(encoding="utf-8")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page()
+        pg.set_content('<canvas id="c" width="1920" height="1080"></canvas>')
+        pg.add_script_tag(content=engine)
+        draws = pg.evaluate("""([choices, opts]) => {
+            const cv = document.createElement('canvas'); cv.width = 1920; cv.height = 1080;
+            const g = cv.getContext('2d'), out = [], fill = g.fillText.bind(g);
+            g.fillText = (s, x, y) => { out.push({ s, font: g.font, y, right: x + g.measureText(s).width }); fill(s, x, y); };
+            Engine.quizQ(g, 5, { end: 1, dur: 6 }, { q: 'Review', choices, ...opts });
+            // the engine draws word by word: one row per baseline, labelled by its first word ("A." or "1.")
+            const rows = new Map();
+            for (const d of out) { const r = rows.get(d.y) || { words: [], font: d.font, right: 0 }; r.words.push(d.s); r.right = Math.max(r.right, d.right); rows.set(d.y, r); }
+            return [...rows.values()].filter(r => /^([A-Z]|\\d+)\\.$/.test(r.words[0]))
+                .map(r => ({ s: r.words.join(' '), font: r.font, right: r.right }));
+        }""", [choices, opts])
+        b.close()
+    return draws
+
+
+CARD_RIGHT = 120 + 1000   # quizQ's choice cards span x 120..1120
+
+
+def test_quiz_choices_fit_their_cards(browser_ok):
+    long = ["Name the three main steps of the water cycle.", "Which step turns liquid into gas?",
+            "Are clouds made of gas or liquid?"]
+    draws = _quiz_choice_draws(long)
+    assert len(draws) == 3
+    assert all(d["right"] <= CARD_RIGHT - 20 for d in draws), draws
+
+
+def test_short_quiz_choices_keep_their_size(browser_ok):
+    draws = _quiz_choice_draws(["Evaporation", "Condensation", "Precipitation"])
+    assert len(draws) == 3
+    assert all("44px" in d["font"] for d in draws), draws
+
+
+def test_teacher_questions_are_numbered_not_lettered(browser_ok):
+    qs = ["Name the three main steps.", "Which step turns liquid into gas?", "Are clouds gas or liquid?"]
+    assert [d["s"][:3] for d in _quiz_choice_draws(qs, numbered=True)] == ["1. ", "2. ", "3. "]
+    assert [d["s"][:3] for d in _quiz_choice_draws(qs)] == ["A. ", "B. ", "C. "]
+
+
+def test_reference_and_guide_number_the_teachers_questions():
+    scenes = (PLUGIN / "skills/make/references/sample/scenes.js").read_text(encoding="utf-8")
+    tq = next(line for line in scenes.splitlines() if line.startswith("scene('tq'"))
+    assert "numbered: true" in tq
+    school = (PLUGIN / "styles/school/guide.md").read_text(encoding="utf-8")
+    assert "`numbered: true`" in school
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    assert "`numbered: true` numbers the lines 1., 2., 3." in guide
