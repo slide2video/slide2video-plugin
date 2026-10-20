@@ -34,7 +34,7 @@ This is the first of four sub-projects, each with its own spec and plan:
 | Version | slide2video continues the line at **1.1.0**, so the website (built for 1.0.x, refusing only another major) accepts old and new computers during the switch. |
 | Old plugin | A final **lesson-videos 1.0.2** keeps working exactly like 1.0.1 and says everywhere that it has moved. |
 | School | Today's plugin, **kept as it is**: "What grade are the students?", the student-information check, quiz and recap, the teacher wording, and today's voices (ElevenLabs, the free Microsoft voice, the computer's own voice, captions only). This replaces the earlier idea of rewording the plugin for everyone and of dropping the Microsoft voice. |
-| Other styles | Business meeting, Tech company, Travel agency, …: each its own questions and check. **Closed and proprietary, hosted only**: they live in a private repo installed only on Daniel's machines. A person's own computer only ever has School. |
+| Other styles | Business meeting, Tech company, Travel agency, …: each its own questions and check. Other styles can be added from a separate folder via `LV_STYLES_DIR`. Without it, only School is available. |
 | Picking a style | The person picks a style per project; that is the only extra step. With only School installed, nothing is asked. |
 | Website repo | `DanielLandi/slide2video` moves to `slide2video/slide2video-site`, still private. GitHub redirects the old address. |
 
@@ -172,7 +172,7 @@ text-to-speech rules, which apply to every style.
 ### 4.3 Where styles come from
 
 - The plugin's own `styles/` (School).
-- `LV_STYLES_DIR`, if set: a folder of more style folders in the same format. Only Daniel's hosted machines set it
+- `LV_STYLES_DIR`, if set: a folder of more style folders in the same format. Set by setups that add their own styles.
   (sub-project 2), pointing at a clone of the private `slide2video/slide2video-styles`.
 
 An id found in both places, a folder whose `style.json` doesn't match the schema, or an `id` that differs from its

@@ -1,6 +1,7 @@
 """The repo is public: no tracked text file may contain a term from the maintainer's local, git-ignored
 `.private-terms.txt` (one term per line, `#` comments, matched case-insensitively as substrings)."""
 import os
+import re
 import subprocess
 import warnings
 
@@ -39,6 +40,11 @@ def _text(path):
         return None
 
 
+def _found(term, low):
+    """The term as a whole word: not preceded or followed by a letter or digit."""
+    return re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", low) is not None
+
+
 def _hits(files, terms):
     hits = []
     for f in files:
@@ -46,7 +52,8 @@ def _hits(files, terms):
         if text is None:
             continue
         low = text.lower()
-        hits += [f"{f.relative_to(REPO) if f.is_relative_to(REPO) else f.name}: {t}" for t in terms if t in low]
+        name = f.relative_to(REPO) if f.is_relative_to(REPO) else f.name
+        hits += [f"{name}: {t}" for t in terms if _found(t, low)]
     return hits
 
 
@@ -66,3 +73,13 @@ def test_scan_catches_a_planted_term(tmp_path):
     planted = tmp_path / "planted.md"
     planted.write_text(f"a line with {terms[0].upper()} in it\n", encoding="utf-8")
     assert _hits([planted], terms)
+
+
+def test_matching_is_on_whole_words(tmp_path):
+    term = " ".join(["tu" + "rn", "tok" + "en"])
+    near = tmp_path / "near.md"
+    near.write_text("re" + term + " here\n", encoding="utf-8")  # contains the term inside a longer word
+    real = tmp_path / "real.md"
+    real.write_text(f"a {term.upper()}, really\n", encoding="utf-8")
+    assert _hits([near], [term]) == []
+    assert _hits([real], [term])

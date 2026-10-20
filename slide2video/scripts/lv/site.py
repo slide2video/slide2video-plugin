@@ -26,7 +26,7 @@ def _check_token(token) -> str:
     """The website's token must look like one of ours before it reaches the Keychain or the file store."""
     if not isinstance(token, str) or not _TOKEN_RE.fullmatch(token):
         raise UserError(BAD_CODE) from None
-    return str(token)
+    return token
 
 
 def site_url() -> str:
