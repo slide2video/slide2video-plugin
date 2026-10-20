@@ -93,3 +93,18 @@ def test_cards_without_the_new_fields_stay_valid():
             o.pop("recommended", None)
     assert contract.problems("card", plan) == []
     assert contract.problems("card", q) == []
+
+
+def test_plan_card_quantities_validate():
+    card = {"contract": 2, "kind": "plan", "message": "m", "markdown": "x",
+            "estimate": {"usd": 0, "minutes": 2, "chapters": 3,
+                         "quantities": {"chapters": 3, "minutes": 2, "clips": 0, "music": False, "chars": 5400}}}
+    assert contract.problems("card", card) == []
+    card["estimate"]["quantities"]["chapters"] = 0
+    assert contract.problems("card", card)
+
+
+def test_error_card_reason_is_a_short_string():
+    base = {"contract": 2, "kind": "error", "message": "m"}
+    assert contract.problems("card", {**base, "reason": "busy"}) == []
+    assert contract.problems("card", {**base, "reason": "x" * 41})

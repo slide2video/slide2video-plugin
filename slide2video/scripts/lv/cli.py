@@ -265,7 +265,8 @@ def dispatch(args) -> int:
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
         paid = bool(keys.get("ELEVENLABS_API_KEY", required=False))
         if args.json:
-            print(json.dumps(estimate.breakdown(chars, args.clips, args.music, paid_voice=paid)))
+            print(json.dumps(estimate.breakdown(chars, args.clips, args.music, paid_voice=paid,
+                                              chapters=args.chapters or None, minutes=args.minutes if args.chapters else None)))
         else:
             print(estimate.report(chars, args.clips, args.music, paid_voice=paid))
         return 0
