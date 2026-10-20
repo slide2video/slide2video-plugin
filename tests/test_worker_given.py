@@ -1,6 +1,7 @@
 import json
 import os
 import signal
+import sys
 
 import pytest
 
@@ -8,8 +9,6 @@ from lv import worker
 from lv.util import read_json, write_json
 from test_worker import (DECK, PRJ, QUESTIONS, REVIEW, _chapter, _claude_writing, _turn,  # noqa: F401
                          lessons)
-
-pytestmark = pytest.mark.skipif(not hasattr(signal, "SIGTERM"), reason="no SIGTERM")
 
 
 def _turn_file(tmp_path, **kw):
@@ -46,6 +45,7 @@ def test_invalid_given_turn_writes_an_error_card(paired, lessons, tmp_path):
     assert paired.finished == [] and paired.next_queries == [] and paired.heartbeats == []
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="no SIGTERM to send to oneself on Windows")
 def test_sigterm_during_given_turn_writes_a_hand_back_card(paired, lessons, tmp_path):
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     out = tmp_path / "card.json"
@@ -60,6 +60,19 @@ def test_sigterm_during_given_turn_writes_a_hand_back_card(paired, lessons, tmp_
     assert card["kind"] == "error" and card["message"] == worker.STOPPED and card["retry_after"]
     assert paired.finished == []
     assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_interrupt_during_given_turn_writes_a_hand_back_card(paired, lessons, tmp_path):
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    out = tmp_path / "card.json"
+
+    def claude(cmd, cwd, log):
+        raise KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt):
+        worker.run_given(_turn_file(tmp_path), out, claude=claude, out=lambda *_: None)
+    card = read_json(out)
+    assert card["kind"] == "error" and card["message"] == worker.STOPPED and card["retry_after"]
+    assert paired.finished == []
 
 
 def test_given_turn_with_api_key_passes_the_key_to_claude(paired, lessons, tmp_path, monkeypatch):
