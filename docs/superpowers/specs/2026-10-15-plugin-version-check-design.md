@@ -91,7 +91,7 @@ The plugin's existing 426 handling (`site.call`: print the website's `error`, el
 - **Skills**:
   - `serve`: the "Update the lesson-videos plugin" case becomes "run `/plugin update lesson-videos`, then close and
     reopen Claude Code, then run this skill again"; a "hasn't caught up" message means nothing to do on this
-    computer; "Is it working?" may mention the version line; the "newer version is available" line is relayed in
+    computer; "Is it working?" may mention the version line; the "newer version is available" line is passed on in
     plain words without stopping anything.
   - `setup`: where it tells the teacher to update the plugin, the same three steps.
 - Version comparison lives in one small helper (`lv/version.py` or inside `site.py`): parse `MAJOR.MINOR.PATCH`,

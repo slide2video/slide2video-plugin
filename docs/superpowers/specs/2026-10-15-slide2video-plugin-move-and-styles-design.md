@@ -17,7 +17,7 @@ This is the first of four sub-projects, each with its own spec and plan:
    the plugin (install steps, update steps, footer).
 2. **pro.slide2video.com behind Cloudflare Access** (Daniel only): the same website code deployed as a second Worker
    with its own D1 database and R2 bucket; slide2video.com is deployed from a frozen `live` branch from then on.
-   Hosted processing on Daniel's machines, the private styles repo and the first private style, the website's style
+   The private styles repo and the first private style, the website's style
    picker, and a Keychain entry per website address so one computer can pair with both sites.
 3. **On pro:** prepaid credits with Stripe, the public "Where your data goes" page, and new Terms and Privacy
    (Daniel approves the legal text).
@@ -33,7 +33,7 @@ This is the first of four sub-projects, each with its own spec and plan:
 | What moves | lesson-videos only, with its git history. **music-video and batatais stay in `DanielLandi/plugins`, untouched.** |
 | Version | slide2video continues the line at **1.1.0**, so the website (built for 1.0.x, refusing only another major) accepts old and new computers during the switch. |
 | Old plugin | A final **lesson-videos 1.0.2** keeps working exactly like 1.0.1 and says everywhere that it has moved. |
-| School | Today's plugin, **kept as it is**: "What grade are the students?", the student-information check, quiz and recap, the teacher wording, and today's voices (ElevenLabs, the free Microsoft voice, the computer's own voice, captions only). This replaces the earlier idea of rewording the plugin for everyone and of dropping the Microsoft voice; hosted processing (sub-project 2) never uses the Microsoft voice. |
+| School | Today's plugin, **kept as it is**: "What grade are the students?", the student-information check, quiz and recap, the teacher wording, and today's voices (ElevenLabs, the free Microsoft voice, the computer's own voice, captions only). This replaces the earlier idea of rewording the plugin for everyone and of dropping the Microsoft voice. |
 | Other styles | Business meeting, Tech company, Travel agency, …: each its own questions and check. **Closed and proprietary, hosted only**: they live in a private repo installed only on Daniel's machines. A person's own computer only ever has School. |
 | Picking a style | The person picks a style per project; that is the only extra step. With only School installed, nothing is asked. |
 | Website repo | `DanielLandi/slide2video` moves to `slide2video/slide2video-site`, still private. GitHub redirects the old address. |
@@ -304,7 +304,7 @@ doctor. Before lesson-videos leaves `main`, 1.0.2's notice is tested in `test_sk
 
 ## 9. Out of scope
 
-- pro.slide2video.com, the `live` branch, hosted processing, the private styles repo, the first private style, the
+- pro.slide2video.com, the `live` branch, the private styles repo, the first private style, the
   website's style picker, the `style` field in the job contract, and the per-site Keychain entry (sub-project 2).
 - Rewording the shared skill text for audiences other than teachers (sub-project 2).
 - Credits, Stripe, the data disclosure page, new Terms and Privacy (sub-project 3).
