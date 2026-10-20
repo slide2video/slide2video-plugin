@@ -185,6 +185,9 @@ def dispatch(args) -> int:
         rows = [r for r in keys.check() if r[0] in names]
         for name, good, msg in rows:
             print(f"{'✓' if good else '✗'} {name}: {msg}")
+        if args.action == "check" and os.environ.get("LV_NARRATORS", "").strip():
+            from . import voices
+            print("Allowed voices: " + ", ".join(voices.LABELS[n] for n in voices.allowed()) + ".")
         return 0 if all(good for _, good, _ in rows) else 1
     if args.cmd == "card":
         from . import contract

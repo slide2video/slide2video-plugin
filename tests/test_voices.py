@@ -152,3 +152,21 @@ def test_elevenlabs_voice_by_name_or_id():
     assert voices.voice_for("elevenlabs", {}) == config.ELEVEN_VOICES["jessica"]
     assert voices.voice_for("elevenlabs", {"voice": "Daniel"}) == "onwK4e9ZLuTAKqWW03F9"
     assert voices.voice_for("elevenlabs", {"voice": "someOtherVoiceId"}) == "someOtherVoiceId"
+
+
+def test_narrators_setting_limits_auto(monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk_0123456789abcdef0123")
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs,none")
+    assert voices.allowed() == ("elevenlabs", "none")
+    assert voices.chain({"narrator": "auto"}) == ["elevenlabs", "none"]
+    assert voices.chain({"narrator": "elevenlabs"}) == ["elevenlabs"]
+    monkeypatch.setenv("LV_NARRATORS", "robot")
+    with pytest.raises(UserError):
+        voices.allowed()
+
+
+def test_narrators_setting_never_falls_back_outside_the_list(monkeypatch):
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs,none")
+    with pytest.raises(UserError) as e:
+        voices.chain({"narrator": "edge"})
+    assert "This setup allows only these voices: ElevenLabs, captions only (no voice)." in str(e.value)

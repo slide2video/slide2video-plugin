@@ -31,15 +31,32 @@ class VoiceUnavailable(RuntimeError):
     """This voice can't be used right now; narrate() moves on to the next one."""
 
 
+def allowed() -> tuple[str, ...]:
+    """The voices this setup may use: the LV_NARRATORS list (comma-separated names from ORDER), or all of them."""
+    raw = os.environ.get("LV_NARRATORS", "").strip()
+    if not raw:
+        return ORDER
+    names = [n.strip().lower() for n in raw.split(",") if n.strip()]
+    bad = [n for n in names if n not in ORDER]
+    if bad or not names:
+        raise UserError(f'LV_NARRATORS must be a comma-separated list of: {", ".join(ORDER)}.')
+    return tuple(n for n in ORDER if n in names)
+
+
 def chain(spec: dict) -> list[str]:
     choice = spec.get("narrator", "auto")
+    ok = allowed()
     if choice == "auto":
-        return list(ORDER) if keys.get("ELEVENLABS_API_KEY", required=False) else list(ORDER[1:])
-    if choice == "elevenlabs":
-        return ["elevenlabs"]  # chosen on purpose: report its errors instead of swapping voices
-    if choice in ORDER:
-        return list(ORDER[ORDER.index(choice):])
-    raise UserError(f'script.json "narrator" must be one of: auto, {", ".join(ORDER)}.')
+        order = list(ORDER) if keys.get("ELEVENLABS_API_KEY", required=False) else list(ORDER[1:])
+    elif choice == "elevenlabs":
+        order = ["elevenlabs"]  # chosen on purpose: report its errors instead of swapping voices
+    elif choice in ORDER:
+        order = list(ORDER[ORDER.index(choice):])
+    else:
+        raise UserError(f'script.json "narrator" must be one of: auto, {", ".join(ORDER)}.')
+    if choice != "auto" and choice not in ok:
+        raise UserError(f"This setup allows only these voices: {', '.join(LABELS[n] for n in ok)}.")
+    return [n for n in order if n in ok]
 
 
 def voice_for(provider: str, spec: dict) -> str:

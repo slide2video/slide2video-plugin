@@ -262,3 +262,13 @@ def test_redact_hides_environment_key_and_site_token(monkeypatch):
     assert "odd key" not in out and "weird~value" not in out and out == "a [redacted] b [redacted] c"
     monkeypatch.setenv("LV_SITE_TOKEN", "short")
     assert keys.redact("x short y") == "x short y"
+
+
+def test_keys_check_lists_allowed_voices(monkeypatch, capsys):
+    from lv import cli
+    monkeypatch.setenv("LV_NARRATORS", "edge,none")
+    cli.main(["keys", "check"])
+    assert "Allowed voices: the free Microsoft voice, captions only (no voice)." in capsys.readouterr().out
+    monkeypatch.delenv("LV_NARRATORS")
+    cli.main(["keys", "check"])
+    assert "Allowed voices" not in capsys.readouterr().out

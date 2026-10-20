@@ -60,7 +60,7 @@ Then check the teacher's instructions (what they asked for when they started) ag
 - First the style's `questions`, in order. When a question's `options` is `"from-deck"`, write the options from the deck as its `hint` says and recommend one; otherwise offer its listed options.
 - Chapters: propose a split from the deck's sections or titles (for example one video per unit/entry/lesson) and ask them to confirm or adjust.
 - Length per video: default 4–6 minutes.
-- Voice: with an ElevenLabs key (`LV keys check`), Jessica (warm, upbeat young American woman; the default) or Daniel (steady British man, news-presenter tone), recorded as `"voice"` in each `script.json`; without one, the free Microsoft voice (Ava), which needs no account. They can also ask for the computer's own voice (offline, more robotic) or captions only; record the choice as `"narrator"` in each `script.json` (see `guide.md`).
+- Voice: with an ElevenLabs key (`LV keys check`), Jessica (warm, upbeat young American woman; the default) or Daniel (steady British man, news-presenter tone), recorded as `"voice"` in each `script.json`; without one, the free Microsoft voice (Ava), which needs no account. They can also ask for the computer's own voice (offline, more robotic) or captions only; record the choice as `"narrator"` in each `script.json` (see `guide.md`). If `LV keys check` prints **Allowed voices**, offer only those.
 - Music and AI clips: only if a Gemini key is set (`LV keys check`).
 
 ## 3. Content brief
