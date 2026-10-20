@@ -83,6 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--watch", action="store_true",
                       help="keep running jobs as they come, keeping the computer awake, until stopped or disconnected")
     mode.add_argument("--status", action="store_true", help="show which account this computer is connected to")
+    wk.add_argument("--api-key", action="store_true",
+                    help="run Claude Code with the API key in ANTHROPIC_API_KEY instead of this computer's Claude sign-in")
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -207,8 +209,8 @@ def dispatch(args) -> int:
             return 0
         from . import worker
         if args.watch:
-            return worker.watch()
-        return worker.run_once()
+            return worker.watch(api_key=args.api_key)
+        return worker.run_once(api_key=args.api_key)
     if args.cmd == "open":
         import webbrowser
         webbrowser.open(args.url)

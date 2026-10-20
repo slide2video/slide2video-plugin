@@ -43,6 +43,7 @@ DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "E
 # Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
 DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "ANTHROPIC_API_KEY",
                "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+NEEDS_API_KEY = "Set ANTHROPIC_API_KEY to use --api-key."
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
 SCHOOL_ONLY = "This computer makes School videos only."
 POLL = 30                      # seconds between checks while no lesson is waiting
@@ -110,14 +111,22 @@ def claude_command(lv: str) -> list[str]:
             "--disallowedTools", *DENIED]
 
 
-def _site_env(private: Path) -> dict:
+def _site_env(private: Path, api_key: bool = False) -> dict:
     """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
     file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one.
     Variables a parent Claude Code session set are dropped (the job is its own session), and so is every way to use an
     API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
-    token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept."""
+    token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept. With `api_key`, ANTHROPIC_API_KEY and
+    ANTHROPIC_BASE_URL from the environment are kept instead, and Claude Code's non-essential traffic is off."""
+    if api_key and not os.environ.get("ANTHROPIC_API_KEY"):
+        raise UserError(NEEDS_API_KEY)
     env = {k: v for k, v in os.environ.items() if k not in DROPPED_ENV
            and (not k.startswith("CLAUDE_CODE_") or k == "CLAUDE_CODE_OAUTH_TOKEN")}
+    if api_key:
+        for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"):
+            if os.environ.get(k):
+                env[k] = os.environ[k]
+        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     env["LV_SITE_MODE"] = "1"
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
     env["BASH_DEFAULT_TIMEOUT_MS"] = env["BASH_MAX_TIMEOUT_MS"] = BASH_TIMEOUT_MS
@@ -133,13 +142,13 @@ def _clear_claude_config(folder: Path) -> None:
             p.unlink()
 
 
-def run_claude(cmd: list[str], cwd: Path, log: Path) -> int:
+def run_claude(cmd: list[str], cwd: Path, log: Path, api_key: bool = False) -> int:
     _clear_claude_config(cwd)
     private = Path(tempfile.mkdtemp(prefix="lv-site-"))
     try:
         with open(log, "w", encoding="utf-8") as f:
             return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                  env=_site_env(private), timeout=CLAUDE_TIMEOUT).returncode
+                                  env=_site_env(private, api_key=api_key), timeout=CLAUDE_TIMEOUT).returncode
     finally:
         shutil.rmtree(private, ignore_errors=True)
 
@@ -479,8 +488,17 @@ def _once(claude, out, start: bool = False) -> tuple[str, int]:
         lock.unlink(missing_ok=True)
 
 
-def run_once(claude=None, out=print) -> int:
-    state, code = _once(claude, out)
+def _claude_runner(claude, api_key: bool):
+    """The function that runs Claude Code for a turn; with `api_key`, the key is checked before any turn is taken."""
+    if claude is not None or not api_key:
+        return claude
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise UserError(NEEDS_API_KEY)
+    return lambda cmd, cwd, log: run_claude(cmd, cwd, log, api_key=True)
+
+
+def run_once(claude=None, out=print, api_key: bool = False) -> int:
+    state, code = _once(_claude_runner(claude, api_key), out)
     if state == STOP:
         out(disconnected_line())
     return code
@@ -505,9 +523,11 @@ def _restore_sigterm(previous) -> None:
             pass
 
 
-def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release) -> int:
+def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release,
+          api_key: bool = False) -> int:
     """`worker --watch`: run every step this computer is given, one after another, until the website says stop
     (Disconnect), the pairing is gone, or the process is stopped. Keeps the computer awake meanwhile."""
+    claude = _claude_runner(claude, api_key)
     root = lessons_root()
     guard = _lock(root, ".worker-watch.lock")
     if guard is None:

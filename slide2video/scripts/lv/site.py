@@ -118,7 +118,8 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
     # X-LV-Contract only for websites deployed before 1.0.0; drop it in a later release
     h = {"X-LV-Plugin": lv.__version__, "X-LV-Contract": str(contract.VERSION), **(headers or {})}
     if auth:
-        token = store.get(site_url())
+        env_token = os.environ.get("LV_SITE_TOKEN")
+        token = _check_token(env_token) if env_token else store.get(site_url())
         if not token:
             raise UserError(not_paired())
         h["Authorization"] = f"Bearer {token}"
