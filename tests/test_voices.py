@@ -183,3 +183,13 @@ def test_narrators_setting_leaving_no_usable_voice_is_refused(monkeypatch):
     with pytest.raises(UserError) as e:
         voices.chain({"narrator": "system"})
     assert "allows only these voices: ElevenLabs, the free Microsoft voice." in str(e.value)
+
+
+def test_narrators_setting_without_captions_reports_the_last_voice_failing(make_chapter, monkeypatch):
+    monkeypatch.setenv("LV_NARRATORS", "edge")
+    monkeypatch.setitem(voices.SPEAKERS, "edge", _fail)
+    ch = make_chapter([{"id": "a", "say": "Water follows salt."}])
+    with pytest.raises(UserError) as e:
+        narrate.narrate(ch)
+    assert "offline in this test" in str(e.value)
+    assert "This setup allows only these voices: the free Microsoft voice." in str(e.value)

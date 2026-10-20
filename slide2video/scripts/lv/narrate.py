@@ -107,7 +107,13 @@ def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, ca
             raise
         except (voices.VoiceUnavailable, UserError) as e:
             if k == len(order) - 1:
-                raise
+                if isinstance(e, UserError):
+                    raise
+                msg = f"{voices.LABELS[provider]} didn't work for this chapter: {e}."
+                ok = voices.allowed()
+                if ok != voices.ORDER:
+                    msg += f" This setup allows only these voices: {', '.join(voices.LABELS[n] for n in ok)}."
+                raise UserError(msg) from None
             print(f"note: {voices.LABELS[provider]} didn't work for this chapter: {e}\n"
                   f"      Using {voices.LABELS[order[k + 1]]} instead.", flush=True)
     raise UserError("no narration voice worked")  # unreachable: chain() never returns an empty list
