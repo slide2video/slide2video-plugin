@@ -266,6 +266,8 @@ def test_redact_hides_environment_key_and_site_token(monkeypatch):
 
 def test_keys_check_lists_allowed_voices(monkeypatch, capsys):
     from lv import cli
+    for var in keys.VARS:
+        monkeypatch.setenv(var, "")
     monkeypatch.setenv("LV_NARRATORS", "edge,none")
     cli.main(["keys", "check"])
     assert "Allowed voices: the free Microsoft voice, captions only (no voice)." in capsys.readouterr().out

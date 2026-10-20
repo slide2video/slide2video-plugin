@@ -56,7 +56,13 @@ def chain(spec: dict) -> list[str]:
         raise UserError(f'script.json "narrator" must be one of: auto, {", ".join(ORDER)}.')
     if choice != "auto" and choice not in ok:
         raise UserError(f"This setup allows only these voices: {', '.join(LABELS[n] for n in ok)}.")
-    return [n for n in order if n in ok]
+    usable = [n for n in order if n in ok]
+    if not usable:
+        msg = f"This setup allows only these voices: {', '.join(LABELS[n] for n in ok)}."
+        if choice == "auto" and ok == ("elevenlabs",):
+            msg += " ElevenLabs needs a key: run `keys` to add one."
+        raise UserError(msg)
+    return usable
 
 
 def voice_for(provider: str, spec: dict) -> str:

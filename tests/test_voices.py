@@ -170,3 +170,16 @@ def test_narrators_setting_never_falls_back_outside_the_list(monkeypatch):
     with pytest.raises(UserError) as e:
         voices.chain({"narrator": "edge"})
     assert "This setup allows only these voices: ElevenLabs, captions only (no voice)." in str(e.value)
+
+
+def test_narrators_setting_leaving_no_usable_voice_is_refused(monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs")
+    with pytest.raises(UserError) as e:
+        voices.chain({"narrator": "auto"})
+    assert "This setup allows only these voices: ElevenLabs." in str(e.value)
+    assert "needs a key" in str(e.value)
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs,edge")
+    with pytest.raises(UserError) as e:
+        voices.chain({"narrator": "system"})
+    assert "allows only these voices: ElevenLabs, the free Microsoft voice." in str(e.value)

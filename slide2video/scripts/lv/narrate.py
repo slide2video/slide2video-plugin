@@ -110,7 +110,7 @@ def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, ca
                 raise
             print(f"note: {voices.LABELS[provider]} didn't work for this chapter: {e}\n"
                   f"      Using {voices.LABELS[order[k + 1]]} instead.", flush=True)
-    raise UserError("no narration voice worked")  # unreachable: the chain ends with captions only
+    raise UserError("no narration voice worked")  # unreachable: chain() never returns an empty list
 
 
 def _take(provider: str, say: str, voice: str, f: Path) -> None:
