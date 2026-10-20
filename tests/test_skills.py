@@ -345,3 +345,13 @@ def test_reference_and_guide_number_the_teachers_questions():
     assert "`numbered: true`" in school
     guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
     assert "`numbered: true` numbers the lines 1., 2., 3." in guide
+
+
+def test_make_skill_offers_only_allowed_voices():
+    _, text = frontmatter("make")
+    assert "Allowed voices" in text
+
+
+def test_site_mode_plan_card_copies_quantities():
+    _, text = frontmatter("make")
+    assert '"quantities"' in text.split("## Site mode", 1)[1]

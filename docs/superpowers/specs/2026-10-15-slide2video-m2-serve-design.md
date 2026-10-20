@@ -67,7 +67,7 @@ check or stop it.
 
 1. `LV worker --status`. Not paired → offer to pair (same steps as setup step 8), then continue.
 2. Start `LV worker --watch` with the Bash tool's `run_in_background` (no timeout). Read the first line of its
-   output to confirm it started (or relay the "already making videos" / error line).
+   output to confirm it started (or repeat the "already making videos" / error line).
 3. Tell the teacher in plain words: this computer now makes the videos for lessons on slide2video.com; keep this
    Claude Code window open; the screen may turn off but the computer won't sleep; on a laptop keep the lid open
    or plugged into a display; the website's Devices page shows it as Online; to stop, say "stop" here or press

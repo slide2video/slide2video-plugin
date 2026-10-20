@@ -5,7 +5,9 @@ folder, send back the card Claude wrote (or an error card), and exit.
 `worker --watch` (what /slide2video:serve runs in the background): do that for every turn, one after another,
 waiting between checks while there is none, keeping the computer awake, until Disconnect on the website, the
 pairing is gone, or the process is stopped (Ctrl-C or SIGTERM; a step it was working on is handed back to start
-again)."""
+again).
+`worker --turn TURN.json --card-out CARD.json`: run the turn in that file the same way and write the resulting card to
+the second file, without taking a turn from the website or finishing one."""
 from __future__ import annotations
 
 import datetime as dt
@@ -43,6 +45,7 @@ DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "E
 # Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
 DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "ANTHROPIC_API_KEY",
                "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+NEEDS_API_KEY = "Set ANTHROPIC_API_KEY to use --api-key."
 BASH_TIMEOUT_MS = "3600000"    # render and narrate can take far longer than Claude Code's 10-minute Bash limit
 SCHOOL_ONLY = "This computer makes School videos only."
 POLL = 30                      # seconds between checks while no lesson is waiting
@@ -110,14 +113,24 @@ def claude_command(lv: str) -> list[str]:
             "--disallowedTools", *DENIED]
 
 
-def _site_env(private: Path) -> dict:
+def _site_env(private: Path, api_key: bool = False) -> dict:
     """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
     file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one.
     Variables a parent Claude Code session set are dropped (the job is its own session), and so is every way to use an
     API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
-    token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept."""
+    token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept. With `api_key`, ANTHROPIC_API_KEY and
+    ANTHROPIC_BASE_URL from the environment are kept instead (and the sign-in token is dropped), and Claude Code's
+    non-essential traffic is off."""
+    if api_key and not os.environ.get("ANTHROPIC_API_KEY"):
+        raise UserError(NEEDS_API_KEY)
     env = {k: v for k, v in os.environ.items() if k not in DROPPED_ENV
            and (not k.startswith("CLAUDE_CODE_") or k == "CLAUDE_CODE_OAUTH_TOKEN")}
+    if api_key:
+        env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
+        for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"):
+            if os.environ.get(k):
+                env[k] = os.environ[k]
+        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     env["LV_SITE_MODE"] = "1"
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
     env["BASH_DEFAULT_TIMEOUT_MS"] = env["BASH_MAX_TIMEOUT_MS"] = BASH_TIMEOUT_MS
@@ -133,13 +146,13 @@ def _clear_claude_config(folder: Path) -> None:
             p.unlink()
 
 
-def run_claude(cmd: list[str], cwd: Path, log: Path) -> int:
+def run_claude(cmd: list[str], cwd: Path, log: Path, api_key: bool = False) -> int:
     _clear_claude_config(cwd)
     private = Path(tempfile.mkdtemp(prefix="lv-site-"))
     try:
         with open(log, "w", encoding="utf-8") as f:
             return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                  env=_site_env(private), timeout=CLAUDE_TIMEOUT).returncode
+                                  env=_site_env(private, api_key=api_key), timeout=CLAUDE_TIMEOUT).returncode
     finally:
         shutil.rmtree(private, ignore_errors=True)
 
@@ -370,11 +383,30 @@ def _finish(turn_id: str, card: dict, log: str = "") -> dict:
     return card
 
 
+def _hand_back_card(log: str) -> dict:
+    card = error_card(STOPPED, log)
+    card["retry_after"] = dt.datetime.now().astimezone().isoformat()
+    return card
+
+
+def _write_card(card_out: Path, card: dict) -> None:
+    """Write the card whole or not at all: into a temporary file next to it, then moved into place."""
+    card_out = Path(card_out)
+    card_out.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".card-", suffix=".tmp", dir=card_out.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(_redacted(card), indent=1, ensure_ascii=False) + "\n")
+        os.replace(tmp, card_out)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 def _hand_back(turn_id: str, log: str) -> None:
     """Stopped in the middle of a step: tell the website at once, so the step waits for this computer to start again
     instead of looking busy until its lease runs out. One quick try; a failure leaves it to the lease."""
-    card = error_card(STOPPED, log)
-    card["retry_after"] = dt.datetime.now().astimezone().isoformat()
+    card = _hand_back_card(log)
     try:
         site.call(f"/api/device/turns/{turn_id}/finish", _redacted(card), timeout=STOP_FINISH_TIMEOUT, retries=0)
     except Exception:  # noqa: BLE001  stopping must not wait on or fail because of the website
@@ -405,7 +437,9 @@ def _claude_turn(turn: dict, folder: Path, sitedir: Path, log: Path, claude) -> 
     return _publish(card, folder, tid)
 
 
-def _run_turn(turn: dict, claude, out) -> int:
+def _run_turn(turn: dict, claude, out, finish: bool = True, card_out: Path | None = None) -> int:
+    """Run one turn. With `finish=False` nothing is sent to /finish: the card (or, when stopped, the hand-back card)
+    is written to `card_out` instead."""
     tid, kind = turn["turn"]["id"], turn["turn"]["kind"]
     out(f"Working on “{turn['project']['title']}” ({kind}).")
     log: Path | None = None
@@ -431,7 +465,10 @@ def _run_turn(turn: dict, claude, out) -> int:
     except KeyboardInterrupt:  # Ctrl-C, or SIGTERM from "stop" in Claude Code: subprocess.run has killed Claude
         if beat is not None:
             beat.done.set()
-        _hand_back(tid, _log_text(log))
+        if finish:
+            _hand_back(tid, _log_text(log))
+        elif card_out is not None:
+            _card_if_missing(card_out, lambda: _hand_back_card(_log_text(log)))
         raise
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
@@ -444,6 +481,14 @@ def _run_turn(turn: dict, claude, out) -> int:
     finally:
         if beat is not None:
             beat.done.set()
+    if not finish:
+        try:
+            _write_card(card_out, card)
+        except OSError as e:
+            out(f"Couldn't write the result: {keys.redact(str(e))[:200]}")
+            return 1
+        out(f"Result: {card['kind']}. {card['message']}")
+        return 1 if card["kind"] == "error" else 0
     try:
         card = _finish(tid, card, _log_text(log))
     except Exception as e:  # noqa: BLE001
@@ -479,8 +524,17 @@ def _once(claude, out, start: bool = False) -> tuple[str, int]:
         lock.unlink(missing_ok=True)
 
 
-def run_once(claude=None, out=print) -> int:
-    state, code = _once(claude, out)
+def _claude_runner(claude, api_key: bool):
+    """The function that runs Claude Code for a turn; with `api_key`, the key is checked before any turn is taken."""
+    if claude is not None or not api_key:
+        return claude
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise UserError(NEEDS_API_KEY)
+    return lambda cmd, cwd, log: run_claude(cmd, cwd, log, api_key=True)
+
+
+def run_once(claude=None, out=print, api_key: bool = False) -> int:
+    state, code = _once(_claude_runner(claude, api_key), out)
     if state == STOP:
         out(disconnected_line())
     return code
@@ -505,9 +559,69 @@ def _restore_sigterm(previous) -> None:
             pass
 
 
-def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release) -> int:
+def run_given(turn_file: Path, card_out: Path, api_key: bool = False, claude=None, out=print) -> int:
+    """`worker --turn`: run the turn in `turn_file` the way a taken turn runs (inputs, Claude Code, review uploads,
+    heartbeats), without taking it from the website's queue or finishing it. The card goes to `card_out` on every way
+    out: the exit code is 0 for a card that isn't an error, 1 otherwise. When stopped, the hand-back card is written,
+    then the interruption continues. An old `card_out` is removed first, so a missing file means the process was
+    killed."""
+    card_out = Path(card_out)
+    previous = _sigterm_as_interrupt()
+    try:
+        card_out.unlink(missing_ok=True)
+        return _run_given(turn_file, card_out, api_key, claude, out)
+    except KeyboardInterrupt:
+        _card_if_missing(card_out, lambda: _hand_back_card(""))
+        raise
+    except Exception as e:  # noqa: BLE001  an unexpected failure still leaves a card
+        message = f"This step failed on this computer: {e}"
+        _card_if_missing(card_out, lambda: error_card(message, ""))
+        out(f"Result: error. {keys.redact(message)[:200]}")
+        return 1
+    except BaseException:
+        _card_if_missing(card_out, lambda: error_card("This step failed on this computer.", ""))
+        raise
+    finally:
+        _restore_sigterm(previous)
+
+
+def _card_if_missing(card_out: Path, make) -> None:
+    """Best effort: write a card only when none was written on the way here."""
+    try:
+        if not card_out.exists():
+            _write_card(card_out, make())
+    except Exception:  # noqa: BLE001  nothing more can be done; the missing file says what happened
+        pass
+
+
+def _run_given(turn_file: Path, card_out: Path, api_key: bool, claude, out) -> int:
+    try:
+        claude = _claude_runner(claude, api_key)
+        turn = read_json(turn_file)
+        bad = contract.problems("turn", turn)
+        if bad:
+            raise UserError("This job doesn't match what this plugin understands: " + "; ".join(bad[:3]))
+    except (OSError, ValueError, UserError) as e:
+        card = error_card(str(e) if isinstance(e, UserError) else f"The job file couldn't be read: {e}", "")
+        _write_card(card_out, card)
+        out(f"Result: error. {card['message']}")
+        return 1
+    lock = _lock(lessons_root())
+    if lock is None:
+        _write_card(card_out, error_card(BUSY_LINE, ""))
+        out(BUSY_LINE)
+        return 1
+    try:
+        return _run_turn(turn, claude or run_claude, out, finish=False, card_out=card_out)
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release,
+          api_key: bool = False) -> int:
     """`worker --watch`: run every step this computer is given, one after another, until the website says stop
     (Disconnect), the pairing is gone, or the process is stopped. Keeps the computer awake meanwhile."""
+    claude = _claude_runner(claude, api_key)
     root = lessons_root()
     guard = _lock(root, ".worker-watch.lock")
     if guard is None:

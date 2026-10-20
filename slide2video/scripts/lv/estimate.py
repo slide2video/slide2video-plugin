@@ -32,7 +32,8 @@ def report(chars: int, clips: int, music: bool, paid_voice: bool = True) -> str:
     return "\n".join(lines)
 
 
-def breakdown(chars: int, clips: int, music: bool, paid_voice: bool = True) -> dict:
+def breakdown(chars: int, clips: int, music: bool, paid_voice: bool = True,
+              chapters: int | None = None, minutes: float | None = None) -> dict:
     """The plan card's estimate as data: the dollar total and one line per part (the same numbers as `report`)."""
     clip_usd = config.VEO_SECONDS * config.VEO_PRICE_PER_SECOND
     items = [{"label": "Narration (ElevenLabs)", "usd": 0, "detail": f"about {chars:,} characters of your ElevenLabs plan"}
@@ -42,4 +43,7 @@ def breakdown(chars: int, clips: int, music: bool, paid_voice: bool = True) -> d
     if clips:
         items.append({"label": f"{clips} short animated clip{'' if clips == 1 else 's'}", "usd": round(clips * clip_usd, 2),
                       "detail": f"{config.VEO_SECONDS:g} seconds each"})
-    return {"usd": gemini_usd(clips, music), "items": items}
+    out = {"usd": gemini_usd(clips, music), "items": items}
+    if chapters is not None:
+        out["quantities"] = {"chapters": chapters, "minutes": minutes, "clips": clips, "music": bool(music), "chars": chars}
+    return out

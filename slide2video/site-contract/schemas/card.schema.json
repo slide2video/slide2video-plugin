@@ -56,6 +56,17 @@
               "usd": {"type": "number", "minimum": 0},
               "minutes": {"type": "number", "minimum": 0},
               "chapters": {"type": "integer", "minimum": 1},
+              "quantities": {
+                "type": "object",
+                "required": ["chapters", "minutes", "clips", "music", "chars"],
+                "properties": {
+                  "chapters": {"type": "integer", "minimum": 1},
+                  "minutes": {"type": "number", "minimum": 0},
+                  "clips": {"type": "integer", "minimum": 0},
+                  "music": {"type": "boolean"},
+                  "chars": {"type": "integer", "minimum": 0}
+                }
+              },
               "items": {
                 "type": "array", "maxItems": 8,
                 "items": {
@@ -110,6 +121,7 @@
       "if": {"properties": {"kind": {"const": "error"}}},
       "then": {
         "properties": {
+          "reason": {"type": "string", "minLength": 1, "maxLength": 40},
           "log_tail": {"type": "string", "maxLength": 20000},
           "retry_after": {"type": ["string", "null"], "format": "date-time"}
         }

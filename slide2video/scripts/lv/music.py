@@ -12,7 +12,7 @@ def make_bed(work: Path, prompt: str, request=None) -> Path:
     request = request or net.request
     key = keys.get("GEMINI_API_KEY")
     try:
-        d = request(f"{config.GEMINI_ROOT}/interactions",
+        d = request(f"{config.gemini_root()}/interactions",
                     data={"model": config.LYRIA_MODEL, "input": prompt, "response_format": {"type": "audio"}},
                     headers={"x-goog-api-key": key}, timeout=300)
     except net.ApiError as e:

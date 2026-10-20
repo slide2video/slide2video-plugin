@@ -40,7 +40,7 @@ def words_from(al: dict) -> list[dict]:
 
 def speak(text: str, voice: str, out: Path) -> None:
     body = {"text": text, "model_id": config.ELEVEN_MODEL, "voice_settings": config.VOICE_SETTINGS}
-    url = f"{config.ELEVEN_ROOT}/text-to-speech/{voice}/with-timestamps?output_format={config.ELEVEN_FORMAT}"
+    url = f"{config.eleven_root()}/text-to-speech/{voice}/with-timestamps?output_format={config.ELEVEN_FORMAT}"
     d = net.request(url, data=body, headers={"xi-api-key": keys.get("ELEVENLABS_API_KEY")}, timeout=180)
     a = d.get("alignment") or {}
     write_json(out.with_suffix(".json"), {"chars": a.get("characters", []), "starts": a.get("character_start_times_seconds", []),
@@ -107,10 +107,16 @@ def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, ca
             raise
         except (voices.VoiceUnavailable, UserError) as e:
             if k == len(order) - 1:
-                raise
+                if isinstance(e, UserError):
+                    raise
+                msg = f"{voices.LABELS[provider]} didn't work for this chapter: {e}."
+                ok = voices.allowed()
+                if ok != voices.ORDER:
+                    msg += f" This setup allows only these voices: {', '.join(voices.LABELS[n] for n in ok)}."
+                raise UserError(msg) from None
             print(f"note: {voices.LABELS[provider]} didn't work for this chapter: {e}\n"
                   f"      Using {voices.LABELS[order[k + 1]]} instead.", flush=True)
-    raise UserError("no narration voice worked")  # unreachable: the chain ends with captions only
+    raise UserError("no narration voice worked")  # unreachable: chain() never returns an empty list
 
 
 def _take(provider: str, say: str, voice: str, f: Path) -> None:

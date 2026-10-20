@@ -77,6 +77,21 @@ SITE_URL = "https://slide2video.com"      # the website; LV_SITE_URL overrides i
 CLAUDE_MODEL = "opus"
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
+
+
+def _root(env: str, default: str) -> str:
+    return (os.environ.get(env) or "").strip().rstrip("/") or default
+
+
+def eleven_root() -> str:
+    """The ElevenLabs address: LV_ELEVEN_ROOT if set and not blank, else the vendor's."""
+    return _root("LV_ELEVEN_ROOT", ELEVEN_ROOT)
+
+
+def gemini_root() -> str:
+    """The Gemini address: LV_GEMINI_ROOT if set and not blank, else the vendor's."""
+    return _root("LV_GEMINI_ROOT", GEMINI_ROOT)
+
 VEO_MODEL = "veo-3.1-lite-generate-preview"
 VEO_SECONDS = 8
 VEO_PRICE_PER_SECOND = 0.05                # USD at 720p

@@ -152,3 +152,44 @@ def test_elevenlabs_voice_by_name_or_id():
     assert voices.voice_for("elevenlabs", {}) == config.ELEVEN_VOICES["jessica"]
     assert voices.voice_for("elevenlabs", {"voice": "Daniel"}) == "onwK4e9ZLuTAKqWW03F9"
     assert voices.voice_for("elevenlabs", {"voice": "someOtherVoiceId"}) == "someOtherVoiceId"
+
+
+def test_narrators_setting_limits_auto(monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk_0123456789abcdef0123")
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs,none")
+    assert voices.allowed() == ("elevenlabs", "none")
+    assert voices.chain({"narrator": "auto"}) == ["elevenlabs", "none"]
+    assert voices.chain({"narrator": "elevenlabs"}) == ["elevenlabs"]
+    monkeypatch.setenv("LV_NARRATORS", "robot")
+    with pytest.raises(UserError):
+        voices.allowed()
+
+
+def test_narrators_setting_never_falls_back_outside_the_list(monkeypatch):
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs,none")
+    with pytest.raises(UserError) as e:
+        voices.chain({"narrator": "edge"})
+    assert "This setup allows only these voices: ElevenLabs, captions only (no voice)." in str(e.value)
+
+
+def test_narrators_setting_leaving_no_usable_voice_is_refused(monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs")
+    with pytest.raises(UserError) as e:
+        voices.chain({"narrator": "auto"})
+    assert "This setup allows only these voices: ElevenLabs." in str(e.value)
+    assert "needs a key" in str(e.value)
+    monkeypatch.setenv("LV_NARRATORS", "elevenlabs,edge")
+    with pytest.raises(UserError) as e:
+        voices.chain({"narrator": "system"})
+    assert "allows only these voices: ElevenLabs, the free Microsoft voice." in str(e.value)
+
+
+def test_narrators_setting_without_captions_reports_the_last_voice_failing(make_chapter, monkeypatch):
+    monkeypatch.setenv("LV_NARRATORS", "edge")
+    monkeypatch.setitem(voices.SPEAKERS, "edge", _fail)
+    ch = make_chapter([{"id": "a", "say": "Water follows salt."}])
+    with pytest.raises(UserError) as e:
+        narrate.narrate(ch)
+    assert "offline in this test" in str(e.value)
+    assert "This setup allows only these voices: the free Microsoft voice." in str(e.value)

@@ -18,6 +18,7 @@ VARS = {
     "ELEVENLABS_API_KEY": "ElevenLabs (most natural narration, optional)",
     "GEMINI_API_KEY": "Gemini (music and AI clips, optional)",
 }
+ENV_SECRETS = ("ANTHROPIC_API_KEY", "LV_SITE_TOKEN")
 TEMPLATE = """# slide2video API keys
 # Paste each key right after the = sign (no spaces, no quotes), then save and close.
 # Keep this file private. To replace a key, paste the new one over the old one.
@@ -79,6 +80,10 @@ def redact(text) -> str:
     text = str(text)
     for var in VARS:
         v = get(var, required=False)
+        if len(v) >= 8:
+            text = text.replace(v, "[redacted]")
+    for var in ENV_SECRETS:  # the API key and site token from the environment, whatever their shape
+        v = os.environ.get(var, "")
         if len(v) >= 8:
             text = text.replace(v, "[redacted]")
     return _SHAPES.sub("[redacted]", text)
@@ -209,12 +214,12 @@ def check(request=None) -> list[tuple[str, bool, str]]:
         rows.append(("ElevenLabs", True, "not set (optional): the free voice will be used"))
     else:
         try:
-            sub = request(f"{config.ELEVEN_ROOT}/user/subscription", headers={"xi-api-key": el}, timeout=30)
+            sub = request(f"{config.eleven_root()}/user/subscription", headers={"xi-api-key": el}, timeout=30)
             left = int(sub.get("character_limit", 0)) - int(sub.get("character_count", 0))
             rows.append(("ElevenLabs", True, f"{mask(el)}; {left:,} characters left this month ({sub.get('tier', '?')} plan)"))
         except net.ApiError as e:
             d = e.detail.lower()
-            blocked = net.blocked_hint(urllib.parse.urlparse(config.ELEVEN_ROOT).netloc) if e.status == 0 else ""
+            blocked = net.blocked_hint(urllib.parse.urlparse(config.eleven_root()).netloc) if e.status == 0 else ""
             if "permission" in d:  # the key authenticated; it just can't read the account
                 rows.append(("ElevenLabs", True, f"{mask(el)}; key works, but can't show your remaining credits "
                                                  "(to see them, edit the key at elevenlabs.io and set User to Access)"))
@@ -226,10 +231,10 @@ def check(request=None) -> list[tuple[str, bool, str]]:
         rows.append(("Gemini", True, "not set (optional): no music, no AI clips"))
     else:
         try:
-            request(f"{config.GEMINI_ROOT}/models?pageSize=1", headers={"x-goog-api-key": gm}, timeout=30)
+            request(f"{config.gemini_root()}/models?pageSize=1", headers={"x-goog-api-key": gm}, timeout=30)
             rows.append(("Gemini", True, f"{mask(gm)}; key works. Billing is checked the first time music or a clip is made."))
         except net.ApiError as e:
-            blocked = net.blocked_hint(urllib.parse.urlparse(config.GEMINI_ROOT).netloc) if e.status == 0 else ""
+            blocked = net.blocked_hint(urllib.parse.urlparse(config.gemini_root()).netloc) if e.status == 0 else ""
             hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status in (400, 401, 403) else str(e))
             rows.append(("Gemini", False, f"{mask(gm)}; {hint}"))
     return rows

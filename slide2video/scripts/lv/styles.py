@@ -1,6 +1,6 @@
 """Styles: what a project asks, checks and writes. Each style is a folder <id>/ with style.json (checked against
 styles/style.schema.json) and guide.md. The plugin's own styles/ holds the public ones; LV_STYLES_DIR adds more
-(only Daniel's hosted machines set it)."""
+(set by setups that add their own styles)."""
 from __future__ import annotations
 
 import os
