@@ -40,7 +40,7 @@ def words_from(al: dict) -> list[dict]:
 
 def speak(text: str, voice: str, out: Path) -> None:
     body = {"text": text, "model_id": config.ELEVEN_MODEL, "voice_settings": config.VOICE_SETTINGS}
-    url = f"{config.ELEVEN_ROOT}/text-to-speech/{voice}/with-timestamps?output_format={config.ELEVEN_FORMAT}"
+    url = f"{config.eleven_root()}/text-to-speech/{voice}/with-timestamps?output_format={config.ELEVEN_FORMAT}"
     d = net.request(url, data=body, headers={"xi-api-key": keys.get("ELEVENLABS_API_KEY")}, timeout=180)
     a = d.get("alignment") or {}
     write_json(out.with_suffix(".json"), {"chars": a.get("characters", []), "starts": a.get("character_start_times_seconds", []),

@@ -45,6 +45,13 @@ def result_uri(op: dict) -> str:
     return uri
 
 
+def retarget(uri: str) -> str:
+    """A link under the vendor's Gemini address is rewritten to the configured one; any other link is unchanged."""
+    if uri.startswith(config.GEMINI_ROOT):
+        return config.gemini_root() + uri[len(config.GEMINI_ROOT):]
+    return uri
+
+
 def veo(image_png: bytes, prompt: str, request=None, sleep=time.sleep, max_polls: int = 60) -> bytes:
     request = request or net.request
     h = {"x-goog-api-key": keys.get("GEMINI_API_KEY")}
@@ -53,15 +60,15 @@ def veo(image_png: bytes, prompt: str, request=None, sleep=time.sleep, max_polls
                "parameters": {"aspectRatio": "16:9", "durationSeconds": config.VEO_SECONDS, "resolution": "720p",
                               "personGeneration": "allow_adult"}}
     try:
-        op = request(f"{config.GEMINI_ROOT}/models/{config.VEO_MODEL}:predictLongRunning", data=payload, headers=h, timeout=60)
+        op = request(f"{config.gemini_root()}/models/{config.VEO_MODEL}:predictLongRunning", data=payload, headers=h, timeout=60)
         name = op.get("name") or ""
         if not name:
             raise UserError("Veo didn't start the job; try again.")
         for _ in range(max_polls):
             sleep(10)
-            op = request(f"{config.GEMINI_ROOT}/{name}", headers=h, timeout=60)
+            op = request(f"{config.gemini_root()}/{name}", headers=h, timeout=60)
             if op.get("done"):
-                return request(result_uri(op), headers=h, timeout=300, raw=True)
+                return request(retarget(result_uri(op)), headers=h, timeout=300, raw=True)
     except net.ApiError as e:
         raise net.gemini_error(e, "AI clip") from None
     raise UserError(f"Veo was still working after {max_polls * 10 // 60} minutes; try again later.")
