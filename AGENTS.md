@@ -52,7 +52,8 @@ Each is optional; with none set, behaviour is unchanged.
 - `worker --api-key`: run Claude Code with the key in `ANTHROPIC_API_KEY` instead of the computer's sign-in.
 - `worker --turn TURN.json --card-out CARD.json`: run the turn in that file and write the resulting card to the
   second file, without taking a job from the website or finishing one.
-- `LV_NARRATORS`: a comma-separated list of the narrator voices that may be used.
+- `LV_NARRATORS`: a comma-separated list of the narrator voices that may be used, from `elevenlabs`, `edge`,
+  `system` and `none`.
 - Plan cards may carry `estimate.quantities`; error cards may carry a short `reason`.
 
 A publish runs `S2V_PUBLISH=1 uv run pytest -q`, which needs the maintainer's local `.private-terms.txt`

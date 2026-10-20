@@ -18,14 +18,15 @@ from .util import UserError, read_json, write_json
 UPDATE = f"Update the slide2video plugin on this computer: {version.STEPS}."
 LATEST: str | None = None  # the plugin version the website said it is built for (X-LV-Latest), last seen
 BAD_CODE = "The website sent a connection code this plugin can't use. Run the pairing again."
+BAD_ENV_TOKEN = "LV_SITE_TOKEN isn't a valid site token."
 _TOKEN_RE = re.compile(r"s2v_[A-Za-z0-9_-]{20,200}")
 _SITE_RE = re.compile(r"[A-Za-z0-9:/._-]+")
 
 
-def _check_token(token) -> str:
+def _check_token(token, problem: str = BAD_CODE) -> str:
     """The website's token must look like one of ours before it reaches the Keychain or the file store."""
     if not isinstance(token, str) or not _TOKEN_RE.fullmatch(token):
-        raise UserError(BAD_CODE) from None
+        raise UserError(problem) from None
     return token
 
 
@@ -119,7 +120,7 @@ def call(path: str, data=None, method=None, raw=False, headers=None, auth=True, 
     h = {"X-LV-Plugin": lv.__version__, "X-LV-Contract": str(contract.VERSION), **(headers or {})}
     if auth:
         env_token = os.environ.get("LV_SITE_TOKEN")
-        token = _check_token(env_token) if env_token else store.get(site_url())
+        token = _check_token(env_token, BAD_ENV_TOKEN) if env_token else store.get(site_url())
         if not token:
             raise UserError(not_paired())
         h["Authorization"] = f"Bearer {token}"

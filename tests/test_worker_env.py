@@ -21,8 +21,9 @@ def test_site_token_from_environment_needs_no_pairing(fake_site, monkeypatch):
 
 def test_bad_site_token_in_environment_is_refused(paired, monkeypatch):
     monkeypatch.setenv("LV_SITE_TOKEN", "not a token")
-    with pytest.raises(UserError):
+    with pytest.raises(UserError) as e:
         site.call("/api/device/status")
+    assert str(e.value) == "LV_SITE_TOKEN isn't a valid site token."
 
 
 def test_api_key_mode_keeps_the_key_and_base_url(monkeypatch, tmp_path):
@@ -35,6 +36,13 @@ def test_api_key_mode_keeps_the_key_and_base_url(monkeypatch, tmp_path):
     assert env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] == "1"
     assert "ANTHROPIC_AUTH_TOKEN" not in env
     assert env["LV_SITE_MODE"] == "1"
+
+
+def test_api_key_mode_drops_the_sign_in_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sign-in")
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in worker._site_env(tmp_path, api_key=True)
+    assert worker._site_env(tmp_path)["CLAUDE_CODE_OAUTH_TOKEN"] == "sign-in"
 
 
 def test_default_mode_still_drops_api_keys(monkeypatch, tmp_path):

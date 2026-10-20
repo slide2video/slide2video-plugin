@@ -173,7 +173,6 @@ text-to-speech rules, which apply to every style.
 
 - The plugin's own `styles/` (School).
 - `LV_STYLES_DIR`, if set: a folder of more style folders in the same format. Set by setups that add their own styles.
-  (sub-project 2), pointing at a clone of the private `slide2video/slide2video-styles`.
 
 An id found in both places, a folder whose `style.json` doesn't match the schema, or an `id` that differs from its
 folder name is an error naming the folder; commands that don't need styles are not affected.

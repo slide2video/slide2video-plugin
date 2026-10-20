@@ -119,12 +119,14 @@ def _site_env(private: Path, api_key: bool = False) -> dict:
     Variables a parent Claude Code session set are dropped (the job is its own session), and so is every way to use an
     API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
     token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept. With `api_key`, ANTHROPIC_API_KEY and
-    ANTHROPIC_BASE_URL from the environment are kept instead, and Claude Code's non-essential traffic is off."""
+    ANTHROPIC_BASE_URL from the environment are kept instead (and the sign-in token is dropped), and Claude Code's
+    non-essential traffic is off."""
     if api_key and not os.environ.get("ANTHROPIC_API_KEY"):
         raise UserError(NEEDS_API_KEY)
     env = {k: v for k, v in os.environ.items() if k not in DROPPED_ENV
            and (not k.startswith("CLAUDE_CODE_") or k == "CLAUDE_CODE_OAUTH_TOKEN")}
     if api_key:
+        env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"):
             if os.environ.get(k):
                 env[k] = os.environ[k]

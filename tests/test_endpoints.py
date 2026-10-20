@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from lv import clips, config
+from lv import clips, config, narrate
 
 PLUGIN = Path(__file__).resolve().parent.parent / "slide2video"
 
@@ -26,3 +26,16 @@ def test_no_module_formats_a_vendor_constant_directly():
     for f in ("narrate.py", "keys.py", "music.py", "clips.py"):
         text = (PLUGIN / "scripts/lv" / f).read_text(encoding="utf-8")
         assert "config.ELEVEN_ROOT}" not in text and "config.GEMINI_ROOT}" not in text, f
+
+
+def test_eleven_root_reaches_the_narration_request(monkeypatch, tmp_path):
+    monkeypatch.setenv("LV_ELEVEN_ROOT", "https://proxy.test/el/")
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk_0123456789abcdef0123")
+    seen = []
+
+    def request(url, **kw):
+        seen.append(url)
+        return {"audio_base64": "", "alignment": {}}
+    monkeypatch.setattr(narrate.net, "request", request)
+    narrate.speak("Hello.", "voice1", tmp_path / "a.mp3")
+    assert seen and seen[0].startswith("https://proxy.test/el/text-to-speech/voice1/")

@@ -1,5 +1,5 @@
 """The repo is public: no tracked text file may contain a term from the maintainer's local, git-ignored
-`.private-terms.txt` (one term per line, `#` comments, matched case-insensitively as substrings)."""
+`.private-terms.txt` (one term per line, `#` comments, matched case-insensitively as whole words)."""
 import os
 import re
 import subprocess
@@ -76,10 +76,10 @@ def test_scan_catches_a_planted_term(tmp_path):
 
 
 def test_matching_is_on_whole_words(tmp_path):
-    term = " ".join(["tu" + "rn", "tok" + "en"])
+    term = "zq term"  # made up: no real term is spelled here
     near = tmp_path / "near.md"
-    near.write_text("re" + term + " here\n", encoding="utf-8")  # contains the term inside a longer word
+    near.write_text("azq term and zq termz here\n", encoding="utf-8")  # only inside longer words
     real = tmp_path / "real.md"
-    real.write_text(f"a {term.upper()}, really\n", encoding="utf-8")
+    real.write_text("a ZQ TERM, really\n", encoding="utf-8")
     assert _hits([near], [term]) == []
     assert _hits([real], [term])
