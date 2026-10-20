@@ -52,6 +52,7 @@ Each is optional; with none set, behaviour is unchanged.
 - `worker --api-key`: run Claude Code with the key in `ANTHROPIC_API_KEY` instead of the computer's sign-in.
 - `worker --turn TURN.json --card-out CARD.json`: run the turn in that file and write the resulting card to the
   second file, without taking a job from the website or finishing one.
+- `LV_PROJECT_DIR`: use this folder for the project instead of one found under the lessons folder.
 - `LV_NARRATORS`: a comma-separated list of the narrator voices that may be used, from `elevenlabs`, `edge`,
   `system` and `none`.
 - Plan cards may carry `estimate.quantities`; error cards may carry a short `reason`.
@@ -72,7 +73,7 @@ The rename to slide2video left these unchanged on purpose, because the website,
 the worker, saved projects and existing video projects depend on them: the Python
 package `lv`; env vars `LV_*` and `LESSON_VIDEOS_*`; headers `X-LV-Plugin` and
 `X-LV-Contract`; the contents and schemas of `slide2video/site-contract/`
-(`{"plugin": "2.3.0"}`, the version the website is built for); the Keychain entry; and
+(`{"plugin": "2.3.1"}`, the version the website is built for); the Keychain entry; and
 the `lesson-videos/` folder inside a website video project folder (worker `_inside`,
 `_publish`, `timing_for`, `deck.json` paths). Do not rename them.
 

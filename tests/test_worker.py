@@ -80,6 +80,24 @@ def test_start_turn_downloads_runs_claude_and_sends_card(paired, lessons):
     assert paired.finished == [("trn_0123456789abcdefghijkl", QUESTIONS)]
 
 
+def test_given_project_folder_is_used_as_is(paired, lessons, tmp_path, monkeypatch):
+    given = tmp_path / "given" / "prj_x"
+    monkeypatch.setenv("LV_PROJECT_DIR", str(given))
+    assert worker.project_dir({"id": PRJ, "title": "x"}) == given
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    fake = _claude_writing(QUESTIONS)
+    assert worker.run_once(claude=fake) == 0
+    assert fake.calls[0][1] == given
+    assert (given / "in" / "water-cycle.pptx").read_bytes() == DECK
+    assert not any(lessons.iterdir())
+
+
+def test_blank_project_folder_setting_changes_nothing(lessons, monkeypatch):
+    monkeypatch.setenv("LV_PROJECT_DIR", "  ")
+    assert worker.project_dir({"id": PRJ, "title": "x"}).name == f"x ({PRJ})"
+
+
 def test_existing_deck_with_same_hash_is_not_downloaded_again(paired, lessons):
     folder = worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"})
     write_text(folder / "in" / "keep.txt", "")

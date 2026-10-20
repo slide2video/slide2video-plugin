@@ -75,7 +75,10 @@ def lessons_root() -> Path:
 
 
 def project_dir(project: dict) -> Path:
-    """The video project's folder, found by its id (the title on the site may have changed since)."""
+    """The video project's folder: `LV_PROJECT_DIR` when set, else found by its id (the title on the site may have changed since)."""
+    given = os.environ.get("LV_PROJECT_DIR", "").strip()
+    if given:
+        return Path(given)
     root, tag = lessons_root(), f"({project['id']})"
     if root.exists():
         for d in root.iterdir():
