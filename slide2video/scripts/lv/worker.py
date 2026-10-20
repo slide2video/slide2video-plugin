@@ -379,11 +379,20 @@ def _finish(turn_id: str, card: dict, log: str = "") -> dict:
     return card
 
 
+def _hand_back_card(log: str) -> dict:
+    card = error_card(STOPPED, log)
+    card["retry_after"] = dt.datetime.now().astimezone().isoformat()
+    return card
+
+
+def _write_card(card_out: Path, card: dict) -> None:
+    write_json(card_out, _redacted(card))
+
+
 def _hand_back(turn_id: str, log: str) -> None:
     """Stopped in the middle of a step: tell the website at once, so the step waits for this computer to start again
     instead of looking busy until its lease runs out. One quick try; a failure leaves it to the lease."""
-    card = error_card(STOPPED, log)
-    card["retry_after"] = dt.datetime.now().astimezone().isoformat()
+    card = _hand_back_card(log)
     try:
         site.call(f"/api/device/turns/{turn_id}/finish", _redacted(card), timeout=STOP_FINISH_TIMEOUT, retries=0)
     except Exception:  # noqa: BLE001  stopping must not wait on or fail because of the website
@@ -414,7 +423,9 @@ def _claude_turn(turn: dict, folder: Path, sitedir: Path, log: Path, claude) -> 
     return _publish(card, folder, tid)
 
 
-def _run_turn(turn: dict, claude, out) -> int:
+def _run_turn(turn: dict, claude, out, finish: bool = True, card_out: Path | None = None) -> int:
+    """Run one turn. With `finish=False` nothing is sent to /finish: the card (or, when stopped, the hand-back card)
+    is written to `card_out` instead."""
     tid, kind = turn["turn"]["id"], turn["turn"]["kind"]
     out(f"Working on “{turn['project']['title']}” ({kind}).")
     log: Path | None = None
@@ -440,7 +451,10 @@ def _run_turn(turn: dict, claude, out) -> int:
     except KeyboardInterrupt:  # Ctrl-C, or SIGTERM from "stop" in Claude Code: subprocess.run has killed Claude
         if beat is not None:
             beat.done.set()
-        _hand_back(tid, _log_text(log))
+        if finish:
+            _hand_back(tid, _log_text(log))
+        elif card_out is not None:
+            _write_card(card_out, _hand_back_card(_log_text(log)))
         raise
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
@@ -453,6 +467,14 @@ def _run_turn(turn: dict, claude, out) -> int:
     finally:
         if beat is not None:
             beat.done.set()
+    if not finish:
+        try:
+            _write_card(card_out, card)
+        except OSError as e:
+            out(f"Couldn't write the result: {keys.redact(str(e))[:200]}")
+            return 1
+        out(f"Result: {card['kind']}. {card['message']}")
+        return 1 if card["kind"] == "error" else 0
     try:
         card = _finish(tid, card, _log_text(log))
     except Exception as e:  # noqa: BLE001
@@ -521,6 +543,35 @@ def _restore_sigterm(previous) -> None:
             signal.signal(signal.SIGTERM, previous)
         except (ValueError, AttributeError, OSError):
             pass
+
+
+def run_given(turn_file: Path, card_out: Path, api_key: bool = False, claude=None, out=print) -> int:
+    """`worker --turn`: run the turn in `turn_file` the way a taken turn runs (inputs, Claude Code, review uploads,
+    heartbeats), without taking it from the website's queue or finishing it. The card goes to `card_out`; the exit
+    code is 0 for a card that isn't an error, 1 otherwise. When stopped, the hand-back card is written, then the
+    interruption continues."""
+    claude = _claude_runner(claude, api_key)
+    try:
+        turn = read_json(turn_file)
+        bad = contract.problems("turn", turn)
+        if bad:
+            raise UserError("This job doesn't match what this plugin understands: " + "; ".join(bad[:3]))
+    except (OSError, ValueError, UserError) as e:
+        card = error_card(str(e) if isinstance(e, UserError) else f"The job file couldn't be read: {e}", "")
+        _write_card(card_out, card)
+        out(f"Result: error. {card['message']}")
+        return 1
+    lock = _lock(lessons_root())
+    if lock is None:
+        _write_card(card_out, error_card(BUSY_LINE, ""))
+        out(BUSY_LINE)
+        return 1
+    previous = _sigterm_as_interrupt()
+    try:
+        return _run_turn(turn, claude or run_claude, out, finish=False, card_out=card_out)
+    finally:
+        _restore_sigterm(previous)
+        lock.unlink(missing_ok=True)
 
 
 def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release,

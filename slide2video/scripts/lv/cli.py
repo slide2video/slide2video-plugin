@@ -85,6 +85,10 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--status", action="store_true", help="show which account this computer is connected to")
     wk.add_argument("--api-key", action="store_true",
                     help="run Claude Code with the API key in ANTHROPIC_API_KEY instead of this computer's Claude sign-in")
+    mode.add_argument("--turn", type=Path, metavar="TURN.json",
+                      help="run the job in this file without taking one from the website or finishing it; "
+                           "needs --card-out")
+    wk.add_argument("--card-out", type=Path, metavar="CARD.json", help="where --turn writes the resulting card")
     pt = sub.add_parser("_part")
     for a in ("chapter", "out"):
         pt.add_argument(a, type=Path)
@@ -101,7 +105,10 @@ def main(argv=None) -> int:
             stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except AttributeError:
             pass
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.cmd == "worker" and (args.turn is None) != (args.card_out is None):
+        parser.error("worker --turn and --card-out go together")
     try:
         from . import config
         config.migrate_home()
@@ -208,6 +215,8 @@ def dispatch(args) -> int:
                 print(line)
             return 0
         from . import worker
+        if args.turn:
+            return worker.run_given(args.turn, args.card_out, api_key=args.api_key)
         if args.watch:
             return worker.watch(api_key=args.api_key)
         return worker.run_once(api_key=args.api_key)

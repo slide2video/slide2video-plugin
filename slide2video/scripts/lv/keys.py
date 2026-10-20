@@ -18,6 +18,7 @@ VARS = {
     "ELEVENLABS_API_KEY": "ElevenLabs (most natural narration, optional)",
     "GEMINI_API_KEY": "Gemini (music and AI clips, optional)",
 }
+ENV_SECRETS = ("ANTHROPIC_API_KEY", "LV_SITE_TOKEN")
 TEMPLATE = """# slide2video API keys
 # Paste each key right after the = sign (no spaces, no quotes), then save and close.
 # Keep this file private. To replace a key, paste the new one over the old one.
@@ -79,6 +80,10 @@ def redact(text) -> str:
     text = str(text)
     for var in VARS:
         v = get(var, required=False)
+        if len(v) >= 8:
+            text = text.replace(v, "[redacted]")
+    for var in ENV_SECRETS:  # the API key and site token from the environment, whatever their shape
+        v = os.environ.get(var, "")
         if len(v) >= 8:
             text = text.replace(v, "[redacted]")
     return _SHAPES.sub("[redacted]", text)

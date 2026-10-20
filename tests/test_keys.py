@@ -252,3 +252,13 @@ def test_redact_hides_anthropic_tokens():
     out = k.redact(f"login failed with {tok} at 3pm")
     assert tok not in out and "sk-ant-" not in out and out.endswith("at 3pm")
     assert k.redact("sk-ant-short") == "sk-ant-short"  # too short to be a token
+
+
+def test_redact_hides_environment_key_and_site_token(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "odd key/with spaces 42")
+    monkeypatch.setenv("LV_SITE_TOKEN", "tok:weird~value")
+    monkeypatch.setenv("OTHER_VAR", "shortval")
+    out = keys.redact("a odd key/with spaces 42 b tok:weird~value c")
+    assert "odd key" not in out and "weird~value" not in out and out == "a [redacted] b [redacted] c"
+    monkeypatch.setenv("LV_SITE_TOKEN", "short")
+    assert keys.redact("x short y") == "x short y"
