@@ -5,7 +5,9 @@ folder, send back the card Claude wrote (or an error card), and exit.
 `worker --watch` (what /slide2video:serve runs in the background): do that for every turn, one after another,
 waiting between checks while there is none, keeping the computer awake, until Disconnect on the website, the
 pairing is gone, or the process is stopped (Ctrl-C or SIGTERM; a step it was working on is handed back to start
-again)."""
+again).
+`worker --turn TURN.json --card-out CARD.json`: run the turn in that file the same way and write the resulting card to
+the second file, without taking a turn from the website or finishing one."""
 from __future__ import annotations
 
 import datetime as dt
@@ -386,7 +388,17 @@ def _hand_back_card(log: str) -> dict:
 
 
 def _write_card(card_out: Path, card: dict) -> None:
-    write_json(card_out, _redacted(card))
+    """Write the card whole or not at all: into a temporary file next to it, then moved into place."""
+    card_out = Path(card_out)
+    card_out.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".card-", suffix=".tmp", dir=card_out.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(_redacted(card), indent=1, ensure_ascii=False) + "\n")
+        os.replace(tmp, card_out)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def _hand_back(turn_id: str, log: str) -> None:
@@ -454,7 +466,7 @@ def _run_turn(turn: dict, claude, out, finish: bool = True, card_out: Path | Non
         if finish:
             _hand_back(tid, _log_text(log))
         elif card_out is not None:
-            _write_card(card_out, _hand_back_card(_log_text(log)))
+            _card_if_missing(card_out, lambda: _hand_back_card(_log_text(log)))
         raise
     except subprocess.TimeoutExpired:
         card = error_card("Claude took more than 3 hours on this step and was stopped.", _log_text(log))
@@ -547,11 +559,42 @@ def _restore_sigterm(previous) -> None:
 
 def run_given(turn_file: Path, card_out: Path, api_key: bool = False, claude=None, out=print) -> int:
     """`worker --turn`: run the turn in `turn_file` the way a taken turn runs (inputs, Claude Code, review uploads,
-    heartbeats), without taking it from the website's queue or finishing it. The card goes to `card_out`; the exit
-    code is 0 for a card that isn't an error, 1 otherwise. When stopped, the hand-back card is written, then the
-    interruption continues."""
-    claude = _claude_runner(claude, api_key)
+    heartbeats), without taking it from the website's queue or finishing it. The card goes to `card_out` on every way
+    out: the exit code is 0 for a card that isn't an error, 1 otherwise. When stopped, the hand-back card is written,
+    then the interruption continues. An old `card_out` is removed first, so a missing file means the process was
+    killed."""
+    card_out = Path(card_out)
+    previous = _sigterm_as_interrupt()
     try:
+        card_out.unlink(missing_ok=True)
+        return _run_given(turn_file, card_out, api_key, claude, out)
+    except KeyboardInterrupt:
+        _card_if_missing(card_out, lambda: _hand_back_card(""))
+        raise
+    except Exception as e:  # noqa: BLE001  an unexpected failure still leaves a card
+        message = f"This step failed on this computer: {e}"
+        _card_if_missing(card_out, lambda: error_card(message, ""))
+        out(f"Result: error. {keys.redact(message)[:200]}")
+        return 1
+    except BaseException:
+        _card_if_missing(card_out, lambda: error_card("This step failed on this computer.", ""))
+        raise
+    finally:
+        _restore_sigterm(previous)
+
+
+def _card_if_missing(card_out: Path, make) -> None:
+    """Best effort: write a card only when none was written on the way here."""
+    try:
+        if not card_out.exists():
+            _write_card(card_out, make())
+    except Exception:  # noqa: BLE001  nothing more can be done; the missing file says what happened
+        pass
+
+
+def _run_given(turn_file: Path, card_out: Path, api_key: bool, claude, out) -> int:
+    try:
+        claude = _claude_runner(claude, api_key)
         turn = read_json(turn_file)
         bad = contract.problems("turn", turn)
         if bad:
@@ -566,11 +609,9 @@ def run_given(turn_file: Path, card_out: Path, api_key: bool = False, claude=Non
         _write_card(card_out, error_card(BUSY_LINE, ""))
         out(BUSY_LINE)
         return 1
-    previous = _sigterm_as_interrupt()
     try:
         return _run_turn(turn, claude or run_claude, out, finish=False, card_out=card_out)
     finally:
-        _restore_sigterm(previous)
         lock.unlink(missing_ok=True)
 
 
