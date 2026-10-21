@@ -8,7 +8,8 @@ Public Claude Code marketplace `slide2video`. It holds `slide2video` (narrated v
 
 This is a **Tier B repo** (solo dev tool): work on a short-lived branch off
 `main`, run `uv run pytest -q` (the gate), merge to `main` with `--no-ff`, and
-push. PRs are optional and only opened when asked.
+push. PRs are optional and only opened when asked. Each release merge gets a tag
+`v<version>`, pushed with it.
 
 **CI** (`.github/workflows/ci.yml`) runs on GitHub's macOS and Windows runners
 with a 25-minute job limit and a 5-minute per-test limit. The local gate is the
