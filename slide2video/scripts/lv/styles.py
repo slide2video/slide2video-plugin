@@ -1,9 +1,7 @@
 """Styles: what a project asks, checks and writes. Each style is a folder <id>/ with style.json (checked against
-styles/style.schema.json) and guide.md. The plugin's own styles/ holds the public ones; LV_STYLES_DIR adds more
-(set by setups that add their own styles)."""
+styles/style.schema.json) and guide.md. Styles come only from the plugin's own styles/ folder."""
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +17,7 @@ class Style:
     id: str
     data: dict
     folder: Path
-    origin: str          # "plugin", or the LV_STYLES_DIR path it came from
+    origin: str          # always "plugin"
 
     @property
     def guide(self) -> Path:
@@ -27,13 +25,7 @@ class Style:
 
 
 def _roots() -> list[tuple[Path, str]]:
-    roots = [(ROOT, "plugin")]
-    if extra := os.environ.get("LV_STYLES_DIR"):
-        p = Path(extra).expanduser()
-        if not p.is_dir():
-            raise UserError(f"LV_STYLES_DIR is {extra}, which isn't a folder.")
-        roots.append((p, str(p)))
-    return roots
+    return [(ROOT, "plugin")]
 
 
 def _load(folder: Path, validator) -> dict:

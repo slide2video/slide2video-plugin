@@ -214,7 +214,7 @@ def test_delete_turn_of_any_style_removes_the_folder(paired, lessons):
 
 
 def test_non_school_style_is_an_error_without_claude(paired, lessons):
-    paired.turns.append(_turn(style="business"))
+    paired.turns.append(_turn(style="other"))
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     fake = _claude_writing(QUESTIONS)
     assert worker.run_once(claude=fake) == 1

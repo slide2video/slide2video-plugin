@@ -56,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--json", action="store_true", help="print the plan card's estimate (total and parts) as JSON")
     st = sub.add_parser("status", help="which chapters are done and what each needs next")
     st.add_argument("work", type=Path)
-    sts = sub.add_parser("styles", help="the installed styles (School, plus any in LV_STYLES_DIR)")
+    sts = sub.add_parser("styles", help="the installed styles (School)")
     sts.add_argument("--json", action="store_true")
     sty = sub.add_parser("style", help="one style's questions, check, brief, outline, clips, music and guide path, as JSON")
     sty.add_argument("id")
