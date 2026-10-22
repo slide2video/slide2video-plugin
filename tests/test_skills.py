@@ -355,3 +355,16 @@ def test_make_skill_offers_only_allowed_voices():
 def test_site_mode_plan_card_copies_quantities():
     _, text = frontmatter("make")
     assert '"quantities"' in text.split("## Site mode", 1)[1]
+
+
+def test_the_deck_numbers_are_never_changed():
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    rules = guide.split("## Numbers from the deck", 1)[1].split("\n## ", 1)[0]
+    for phrase in ("exactly as in `WORK/deck/slides.md`", "same kind of chart", "every category and every series",
+                   "never leave a deck chart out", "never shown or said", "0.58 → 58%", "Before `stills`"):
+        assert phrase in rules, phrase
+    _, text = frontmatter("make")
+    step6 = text.split("## 6. Reference chapter", 1)[1].split("## 7.", 1)[0]
+    assert "Numbers from the deck" in step6
+    brief = text.split("## 3. Content brief", 1)[1].split("## 4.", 1)[0]
+    assert "chart" in brief and "values" in brief

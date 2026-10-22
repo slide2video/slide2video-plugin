@@ -133,7 +133,46 @@ def test_ingest_reads_chart_and_marks_it(tmp_path):
     deck = tmp_path / "deck.pptx"
     prs.save(str(deck))
     md = read_text(ingest.ingest(deck, tmp_path / "work") / "slides.md")
-    assert "[Chart]" in md and "Salt water" in md and "Before" in md
+    assert "[Chart: column clustered]" in md
+    assert "- Salt water: Before = 39, After = 43" in md
+
+
+def _chart_deck(tmp_path, kind, categories, series, number_format="General", label_format=None):
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.util import Inches
+    prs = Presentation()
+    s = prs.slides.add_slide(prs.slide_layouts[5])
+    s.shapes.title.text = "Chart"
+    data = CategoryChartData(number_format=number_format)
+    data.categories = categories
+    for name, values in series:
+        data.add_series(name, values)
+    chart = s.shapes.add_chart(kind, Inches(1), Inches(2), Inches(6), Inches(4), data).chart
+    if label_format:
+        chart.plots[0].has_data_labels = True
+        labels = chart.plots[0].data_labels
+        labels.number_format, labels.number_format_is_linked = label_format, False
+    deck = tmp_path / "deck.pptx"
+    prs.save(str(deck))
+    return read_text(ingest.ingest(deck, tmp_path / "work") / "slides.md")
+
+
+def test_ingest_gives_every_value_of_every_series_in_the_deck_format(tmp_path):
+    from pptx.enum.chart import XL_CHART_TYPE
+    md = _chart_deck(tmp_path, XL_CHART_TYPE.COLUMN_CLUSTERED, ["Q3 26", "Q4 26", "Q1 27", "Q2 27", "Q3 27"],
+                     [("Revenue", (43.0, 47.1, 41.8, 45.6, 48.2)), ("Costs", (30.0, 31.5, None, 32.0, 33.25))],
+                     number_format="0.0")
+    assert "- Revenue: Q3 26 = 43.0, Q4 26 = 47.1, Q1 27 = 41.8, Q2 27 = 45.6, Q3 27 = 48.2" in md
+    assert "- Costs: Q3 26 = 30.0, Q4 26 = 31.5, Q1 27 = (blank), Q2 27 = 32.0, Q3 27 = 33.3" in md
+
+
+def test_ingest_shows_a_pie_in_percent_when_the_deck_does(tmp_path):
+    from pptx.enum.chart import XL_CHART_TYPE
+    md = _chart_deck(tmp_path, XL_CHART_TYPE.PIE, ["Cafés", "Grocery", "Online", "Wholesale"],
+                     [("Share", (0.58, 0.21, 0.13, 0.08))], number_format="0%")
+    assert "[Chart: pie]" in md
+    assert "- Share: Cafés = 58%, Grocery = 21%, Online = 13%, Wholesale = 8%" in md
 
 
 def test_smartart_text_from_data_part():
@@ -150,3 +189,9 @@ def test_ingest_writes_the_slide_count(tmp_path):
     make_pptx(deck)
     out = ingest.ingest(deck, tmp_path / "work")
     assert read_json(out / "deck.json") == {"slides": 2}
+
+
+def test_ingest_uses_the_data_labels_format_the_deck_shows(tmp_path):
+    from pptx.enum.chart import XL_CHART_TYPE
+    md = _chart_deck(tmp_path, XL_CHART_TYPE.PIE, ["Cafés", "Grocery"], [("Share", (0.58, 0.42))], label_format="0.0%")
+    assert "- Share: Cafés = 58.0%, Grocery = 42.0%" in md
