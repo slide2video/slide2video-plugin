@@ -13,7 +13,7 @@ def _ex(name):
 
 
 def test_contract_version_is_the_plugin_major():
-    assert contract.PLUGIN == "2.3.1"
+    assert contract.PLUGIN == "2.3.2"
     assert contract.VERSION == 2
 
 
