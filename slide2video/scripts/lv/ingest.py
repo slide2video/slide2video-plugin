@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from pathlib import Path
 
 from . import paths
@@ -76,15 +77,54 @@ def _smartart_text(xml: bytes) -> str:
     return " / ".join(t.text.strip() for t in ET.fromstring(xml).iter(f"{_A}t") if t.text and t.text.strip())
 
 
+def _number(value, code: str) -> str:
+    """A chart value as the deck shows it: its format's decimal places, percent and currency sign, or as stored."""
+    if value is None:
+        return "(blank)"
+    from decimal import ROUND_HALF_UP, Decimal
+    code = (code or "General").split(";")[0]
+    if "General" in code or not re.search(r"[0#]", code):
+        return f"{value:g}"
+    v = Decimal(repr(float(value)))
+    pct = "%" in code
+    if pct:
+        v *= 100
+    m = re.search(r"\.([0#]+)", code)
+    v = v.quantize(Decimal(1).scaleb(-len(m.group(1)) if m else 0), rounding=ROUND_HALF_UP)
+    text = f"{v:,}" if "," in code else f"{v}"
+    sign = re.search(r"[$€£¥]", code)
+    return (sign.group(0) if sign else "") + text + ("%" if pct else "")
+
+
+def _shown_format(series, plot) -> str:
+    """The number format a series' values are shown in: its own or the plot's data-label format when it isn't the
+    source's, else the format stored with the values."""
+    for el in (series, plot):
+        own = el.xpath("./*[local-name()='dLbls']/*[local-name()='numFmt'][@sourceLinked='0']/@formatCode")
+        if own and "General" not in own[0]:
+            return own[0]
+    return next(iter(series.xpath("./*[local-name()='val']//*[local-name()='formatCode']/text()")), "")
+
+
+def _chart_text(ch) -> str:
+    """A chart's kind, title and every value of every series, one line per series, so nothing has to be guessed."""
+    kind = getattr(ch.chart_type, "name", str(ch.chart_type)).lower().replace("_", " ")
+    lines = [f"[Chart: {kind}]" + (f" {ch.chart_title.text_frame.text.strip()}" if ch.has_title else "")]
+    for plot in ch.plots:
+        cats = [str(c) for c in plot.categories]
+        for series in plot.series:
+            code = _shown_format(series._element, plot._element)
+            values = [_number(v, code) for v in series.values]
+            labels = cats if len(cats) == len(values) else [str(i) for i in range(1, len(values) + 1)]
+            lines.append(f"- {series.name}: " + ", ".join(f"{c} = {v}" for c, v in zip(labels, values)))
+    return "\n".join(lines)
+
+
 def _graphic_text(sh) -> str | None:
     """Text of a chart or SmartArt graphic frame, which python-pptx doesn't expose as text."""
     if getattr(sh, "has_chart", False) and sh.has_chart:
         try:
-            ch = sh.chart
-            bits = [ch.chart_title.text_frame.text.strip()] if ch.has_title else []
-            bits += [f"series: {', '.join(str(x.name) for x in ch.series)}",
-                     f"categories: {', '.join(str(c) for c in ch.plots[0].categories)}"]
-            return "[Chart] " + "; ".join(b for b in bits if b)
+            return _chart_text(sh.chart)
         except Exception:  # noqa: BLE001
             return "[Chart not read: ask the teacher what it shows, or ingest a PDF export of the deck]"
     data = sh._element.xpath(".//*[local-name()='relIds']")

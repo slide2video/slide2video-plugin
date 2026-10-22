@@ -65,7 +65,7 @@ Then check the teacher's instructions (what they asked for when they started) ag
 
 ## 3. Content brief
 
-Write `WORK/brief.md`. Per chapter: what the style's `brief` lists. Then a section **"The teacher's questions (left open)"**: every deck question with its slide number or file name, or `None found.` Finish with a section **"Possible issues in the slides"**: contradictions between slides, typos in key terms, definitions worded two ways. Show the teacher that section and ask how to handle each item (follow the slide, follow the correction, or leave it out).
+Write `WORK/brief.md`. Per chapter: what the style's `brief` lists. Then a section **"The teacher's questions (left open)"**: every deck question with its slide number or file name, or `None found.` Finish with a section **"Possible issues in the slides"**: contradictions between slides, typos in key terms, definitions worded two ways, and any chart whose values `slides.md` couldn't give (`[Chart not read: …]`). Show the teacher that section and ask how to handle each item (follow the slide, follow the correction, or leave it out).
 
 ## 4. Plan and approval gate
 
@@ -87,7 +87,7 @@ Follow the workflow in `guide.md` for chapter 1 in `WORK/ch1/`:
 1. Write `script.json` (narration per scene; `"music": "../music/bed.mp3"` only if music exists).
 2. `LV narrate "WORK/ch1"`. It prints which voice it used. If it had to fall back (for example the free Microsoft voice was unavailable, or ElevenLabs credits ran out), tell the teacher in one line; running `narrate` again later switches back, and finished takes are kept.
 3. Copy each image you use with `LV asset "WORK/deck/media/<file>" "WORK/ch1/assets/<name>.jpg"` (in a project folder, the target is in the `assets:` folder from `LV where "WORK/ch1"`) (it straightens, downscales to 1600 px and converts transparent PNGs; use `.png` as the target to keep transparency); for clips run `LV frames "WORK/clips/<name>.mp4" "WORK/ch1/assets/clip_<name>" [--max N]` (same `assets:` folder in a project; clips are in the `clips/` folder that `clip` printed).
-4. Write `scenes.js`.
+4. Write `scenes.js`. Every chart, table and number from the deck appears unchanged: follow "Numbers from the deck" in `guide.md` and do its check.
 5. `LV stills "WORK/ch1" <one time per scene>` and look at the `stills.jpg` it prints. Fix overlaps, text running off cards, things hidden behind captions, empty-looking scenes, and every `cue miss` warning. Repeat until clean (2–3 rounds is normal).
 6. `LV render "WORK/ch1"`. Rendering takes about a minute per minute of video on a fast computer and several on a slow laptop: use the Bash tool's longest timeout (10 minutes), and for long chapters on slow machines run it in the background and check its output.
 7. Verify: `render` prints the video length next to the narration length (they should match), and saves four frames of the finished video to the `final.jpg` it prints; look at them.

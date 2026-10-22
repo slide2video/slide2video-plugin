@@ -33,6 +33,16 @@ How to build one chapter video with the slide2video engine. **LV** = the full `u
 ## Assets
 Copy each deck image you use with `LV asset "WORK/deck/media/<file>" "WORK/chN/assets/<name>.jpg"` (straightened, at most 1600 px, transparent PNGs flattened; use a `.png` target to keep transparency). Use the contact sheets to pick them. A missing asset, clip frame or scene stops `stills` and `render` with an error naming it.
 
+## Numbers from the deck
+The deck's numbers are its facts. The video shows them clearly and beautifully; it never changes them.
+- Every number, unit and label shown or said is exactly as in `WORK/deck/slides.md` (or the other files the teacher gave): no rounding or re-rounding, no recomputing, averaging, converting or estimating. "Down 0.8 points" stays 0.8.
+- A chart in the deck (`[Chart: …]` in `slides.md`, with one line of values per series) is drawn as the same kind of chart (column, bar, line, pie…) with every category and every series, in the deck's order and with the deck's values. Never drop a category or a series, never add one, never merge charts or build a new chart out of other slides' numbers, and never leave a deck chart out.
+- A table keeps every row and column it has in the deck. Revealing rows one at a time is fine; the finished scene shows them all.
+- A number the deck doesn't state (a total, a difference, a growth rate, an average) is never shown or said, even when it's easy to work out.
+- Allowed: saying a number in words for the voice ("forty eight point two million dollars"); highlighting it, animating it or choosing the order of the reveal; showing a pie's shares that add up to 1 as the same percentages (0.58 → 58%).
+- If a chart reads `[Chart not read: …]` or a value is unclear, don't guess: it goes in the brief's "Possible issues in the slides" and is asked about.
+- Before `stills`, check every chapter: find each number in its `script.json` and `scenes.js` in `slides.md`, and for each deck chart and table the chapter covers, check that every one of its values is on screen. Fix any difference before going on.
+
 ## Narration style
 - Text-to-speech friendly: spell symbols as spoken ("C O two" or "carbon dioxide", "ten point three percent", "three hundred milliliters"); no abbreviations like "e.g."; no emoji in `say`. Captions show the `say` text, so keep it clean.
-- Never invent facts or statistics beyond `brief.md`.
+- Never invent facts or statistics beyond `brief.md`, and say the deck's numbers exactly (see "Numbers from the deck").
