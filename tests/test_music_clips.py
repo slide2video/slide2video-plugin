@@ -68,3 +68,28 @@ def test_frames(tmp_path):
     assert clips.frames(mp4, tmp_path / "clip_c") == 24
     assert clips.frames(mp4, tmp_path / "clip_c", max_frames=10) == 10
     assert (tmp_path / "clip_c/0001.jpg").exists()
+
+
+def test_clips_are_off_until_the_new_model(monkeypatch, tmp_path, capsys):
+    from lv import cli, config
+    assert config.CLIPS_ENABLED is False
+    monkeypatch.setattr(clips, "veo", lambda *a, **k: pytest.fail("no clip should be made"))
+    (tmp_path / "photo.jpg").write_bytes(b"x")
+    assert cli.main(["clip", str(tmp_path / "photo.jpg"), "--work", str(tmp_path / "w"), "--name", "kelp", "--prompt", "p"]) == 1
+    assert "AI clips are off" in capsys.readouterr().err
+
+
+def test_an_estimate_with_clips_is_refused_while_they_are_off(monkeypatch, tmp_path, capsys):
+    from lv import cli, keys
+    monkeypatch.setattr(keys, "get", lambda *a, **k: None)
+    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "1", "--json"]) == 1
+    assert "--clips 0" in capsys.readouterr().err
+    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "0", "--music", "--json"]) == 0
+
+
+def test_the_skills_plan_no_clips_while_they_are_off():
+    from pathlib import Path
+    make = (Path(__file__).parents[1] / "slide2video/skills/make/SKILL.md").read_text(encoding="utf-8")
+    assert "AI clips are off for now" in make
+    assert "LV clip " not in make
+    assert "--clips 0" in make

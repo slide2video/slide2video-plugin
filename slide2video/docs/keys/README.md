@@ -8,7 +8,7 @@
 |---|---|---|
 | Narrated videos | Nothing: the free Microsoft voice is used | $0 |
 | The most natural voice | An ElevenLabs key | Free plan: about 1 video a month. Starter: $6/month, about 4 videos. |
-| Background music and a few AI-animated clips from your photos | A Google Gemini key, with billing | About $0.08 per music track and $0.40 per clip, roughly $2–3 per unit, with a $5 minimum prepayment |
+| Background music (AI clips are off for now) | A Google Gemini key, with billing | About $0.08 per music track, with a $5 minimum prepayment |
 
 ## Step by step
 

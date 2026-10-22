@@ -147,7 +147,8 @@ def test_site_mode_refuses_a_project_registered_in_settings(monkeypatch, tmp_pat
 
 def test_clip_name_cannot_leave_the_clips_folder(monkeypatch, tmp_path, capsys):
     import pytest
-    from lv import clips
+    from lv import clips, config
+    monkeypatch.setattr(config, "CLIPS_ENABLED", True, raising=False)
     monkeypatch.setattr(clips, "veo", lambda *a, **k: pytest.fail("no clip should be made"))
     (tmp_path / "photo.jpg").write_bytes(b"x")
     for site_mode in (False, True):
