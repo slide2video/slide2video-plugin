@@ -93,6 +93,10 @@ def gemini_root() -> str:
     return _root("LV_GEMINI_ROOT", GEMINI_ROOT)
 
 VEO_MODEL = "veo-3.1-lite-generate-preview"
+# Google shut VEO_MODEL down on 2026-10-22 and named no similar model; AI clips stay off until they move to its successor.
+CLIPS_ENABLED = False
+CLIPS_OFF = ("AI clips are off for now: Google retired the video model slide2video used. "
+             "Videos work without them; plan no clips (--clips 0).")
 VEO_SECONDS = 8
 VEO_PRICE_PER_SECOND = 0.05                # USD at 720p
 LYRIA_MODEL = "lyria-3.5"

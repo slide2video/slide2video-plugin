@@ -24,7 +24,7 @@ Call `mcp__claude-in-chrome__tabs_context_mcp`. If the Claude in Chrome tools ar
 
 ## 1. Explain the cost (before anything else)
 
-Music and AI clips need a Google account with billing turned on (there's no free tier for them), a minimum $5 prepayment, and cost about $0.40 per clip and $0.08 per music track: roughly $2–3 for a whole unit. Use a **personal** Google account; school accounts often have AI Studio turned off. Ask whether they want to go ahead.
+Background music needs a Google account with billing turned on (there's no free tier for it), a minimum $5 prepayment, and costs about $0.08 per music track. (AI clips are off for now: Google retired the video model slide2video used.) Use a **personal** Google account; school accounts often have AI Studio turned off. Ask whether they want to go ahead.
 
 ## 2. Create the key
 

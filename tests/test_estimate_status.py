@@ -57,9 +57,9 @@ def test_breakdown_fits_the_plan_card():
 
 def test_estimate_json_command(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(keys, "get", lambda *a, **k: None)
-    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "1", "--music", "--json"]) == 0
+    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "0", "--music", "--json"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["usd"] == estimate.gemini_usd(1, True)
+    assert out["usd"] == estimate.gemini_usd(0, True)
     assert out["items"][0] == {"label": "Narration (free voice)", "usd": 0}
 
 
@@ -71,6 +71,6 @@ def test_breakdown_carries_quantities():
 
 def test_estimate_json_command_prints_quantities(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(keys, "get", lambda *a, **k: None)
-    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "1", "--music", "--json"]) == 0
+    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "0", "--music", "--json"]) == 0
     q = json.loads(capsys.readouterr().out)["quantities"]
-    assert (q["chapters"], q["minutes"], q["clips"], q["music"]) == (2, 3, 1, True)
+    assert (q["chapters"], q["minutes"], q["clips"], q["music"]) == (2, 3, 0, True)

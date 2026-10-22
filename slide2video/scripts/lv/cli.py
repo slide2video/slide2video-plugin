@@ -260,8 +260,10 @@ def dispatch(args) -> int:
     if args.cmd == "ingest":
         ingest.ingest(args.deck, args.work or ingest.default_work(args.deck))
         return 0
-    from . import estimate, status
+    from . import config, estimate, status
     if args.cmd == "estimate":
+        if args.clips and not config.CLIPS_ENABLED:
+            raise UserError(config.CLIPS_OFF)
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
         paid = bool(keys.get("ELEVENLABS_API_KEY", required=False))
         if args.json:
@@ -278,6 +280,8 @@ def dispatch(args) -> int:
         print(music.make_bed(args.work.resolve(), args.prompt))
         return 0
     if args.cmd == "clip":
+        if not config.CLIPS_ENABLED:
+            raise UserError(config.CLIPS_OFF)
         clips.make_clip(args.image, args.prompt, args.name, args.work.resolve(), args.frac)
         return 0
     if args.cmd == "frames":
