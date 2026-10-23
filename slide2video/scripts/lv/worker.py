@@ -38,10 +38,12 @@ LIMIT = re.compile(r"(?:5-hour|weekly|usage|session) limit (?:reached|hit)|Claud
 LIMIT_SUFFIX = {".mp4": "video", ".vtt": "captions", ".jpg": "stills", ".jpeg": "stills", ".png": "stills"}
 RESET = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", re.I)
 # Claude Code reads these from the folder it runs in; a turn could plant them for the next turn. Never part of a lesson.
-CLAUDE_CONFIG = (".claude", ".mcp.json", "CLAUDE.md", "CLAUDE.local.md")
+# AGENTS.md too: Claude Code reads it natively. --setting-sources "" keeps both instruction files out today; this
+# guard is for the day it doesn't.
+CLAUDE_CONFIG = (".claude", ".mcp.json", "CLAUDE.md", "CLAUDE.local.md", "AGENTS.md")
 # Edit(...) rules cover every file-editing tool (Write too); Claude Code ignores Write(...) rules.
 DENIED = ["WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "Edit(./CLAUDE.md)",
-          "Edit(./CLAUDE.local.md)"]
+          "Edit(./CLAUDE.local.md)", "Edit(./AGENTS.md)"]
 # Never an API key or another provider (CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY go with every other CLAUDE_CODE_*).
 DROPPED_ENV = ("LESSON_VIDEOS_PROJECT", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "ANTHROPIC_API_KEY",
                "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
