@@ -16,7 +16,8 @@
           "start": {"type": "number", "minimum": 0},
           "dur": {"type": "number", "minimum": 0},
           "label": {"type": "string"},
-          "first_words": {"type": "string"}
+          "first_words": {"type": "string"},
+          "slide": {"type": "integer", "minimum": 1, "description": "The deck slide (numbered as in the deck, hidden slides included) the scene shows; absent when none does"}
         }
       }
     }
