@@ -74,7 +74,7 @@ The rename to slide2video left these unchanged on purpose, because the website,
 the worker, saved projects and existing video projects depend on them: the Python
 package `lv`; env vars `LV_*` and `LESSON_VIDEOS_*`; headers `X-LV-Plugin` and
 `X-LV-Contract`; the contents and schemas of `slide2video/site-contract/`
-(`{"plugin": "2.4.0"}`, the version the website is built for); the Keychain entry; and
+(`{"plugin": "2.4.1"}`, the version the website is built for); the Keychain entry; and
 the `lesson-videos/` folder inside a website video project folder (worker `_inside`,
 `_publish`, `timing_for`, `deck.json` paths). Do not rename them.
 
