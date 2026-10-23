@@ -92,3 +92,20 @@ def test_missing_tts_permission_says_how_to_fix(make_chapter):
     with pytest.raises(UserError) as e:
         narrate.narrate(ch, speak_fn=denied)
     assert "Text to Speech" in str(e.value) and "elevenlabs.io/app/developers/api-keys" in str(e.value)
+
+
+def test_a_scene_names_a_slide_of_the_deck(make_chapter, fake_speak):
+    from lv.util import write_json
+    ch = make_chapter([{"id": "one", "say": "Hello.", "slide": 2}, {"id": "two", "say": "Bye."}])
+    write_json(ch.parent / "deck" / "deck.json", {"slides": 3})
+    narrate.narrate(ch, speak_fn=fake_speak)  # a deck slide, and a scene with none: fine
+    for bad in (4, 0, "2", True, 1.5):
+        ch = make_chapter([{"id": "one", "say": "Hello.", "slide": bad}])
+        with pytest.raises(UserError, match=r'Scene "one": "slide" must be a slide number of the deck \(1 to 3\)'):
+            narrate.narrate(ch, speak_fn=fake_speak)
+
+
+def test_a_slide_number_without_the_deck_only_has_to_be_positive(make_chapter, fake_speak):
+    narrate.narrate(make_chapter([{"id": "one", "say": "Hello.", "slide": 9}]), speak_fn=fake_speak)
+    with pytest.raises(UserError, match=r'"slide" must be a slide number of the deck\.'):
+        narrate.narrate(make_chapter([{"id": "one", "say": "Hello.", "slide": -1}]), speak_fn=fake_speak)

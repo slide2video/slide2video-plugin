@@ -690,3 +690,14 @@ def test_a_second_watch_says_which_site(lessons, monkeypatch, lv_pid):
 
 def test_disconnected_line_names_the_serve_command():
     assert worker.disconnected_line().endswith("run /slide2video:serve.")
+
+
+def test_timing_names_the_slide_each_scene_shows(tmp_path):
+    _chapter(tmp_path)
+    ch = tmp_path / "lesson-videos" / "_work" / "ch1"
+    spec = json.loads((ch / "script.json").read_text(encoding="utf-8"))
+    spec["scenes"][1]["slide"] = 3
+    write_json(ch / "script.json", spec)
+    scenes = worker.timing_for(ch)["scenes"]
+    assert "slide" not in scenes[0]  # the hook shows no slide
+    assert scenes[1]["slide"] == 3

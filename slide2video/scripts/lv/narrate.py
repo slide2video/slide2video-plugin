@@ -93,10 +93,24 @@ def narration_error(e: net.ApiError, done: int, total: int) -> str:
     return msg
 
 
+def check_slides(spec: dict, ch: Path) -> None:
+    """Each scene's optional `slide` is a slide number of the deck (1 to its count, when ingest recorded one)."""
+    deck = paths.lesson(Path(ch).resolve().parent).work / "deck" / "deck.json"
+    count = read_json(deck).get("slides") if deck.exists() else None
+    for sc in spec["scenes"]:
+        n = sc.get("slide")
+        if n is None:
+            continue
+        if type(n) is not int or n < 1 or (count is not None and n > count):
+            span = f" (1 to {count})" if count is not None else ""
+            raise UserError(f'Scene "{sc.get("id")}": "slide" must be a slide number of the deck{span}.')
+
+
 def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, cached_only: bool = False) -> dict:
     """Voice every scene with the first voice in the chain that works for the whole chapter."""
     p = paths.chapter(ch)
     spec = read_json(p.code / "script.json")
+    check_slides(spec, ch)
     if speak_fn is not None:  # a single, caller-supplied voice (tests, tools)
         return _narrate(p, spec, "elevenlabs", speak_fn, workers, cached_only)
     order = voices.chain(spec)

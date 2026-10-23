@@ -181,15 +181,22 @@ def error_card(message: str, log: str, now=None, detect_limit: bool = False) -> 
 
 
 def timing_for(ch_dir: Path) -> dict | None:
-    """Scene marks for the player: id, start, length, a label and the first words of the narration."""
+    """Scene marks for the player: id, start, length, a label, the first words of the narration and the deck slide the
+    scene shows (`slide`, only when script.json names one)."""
     try:
         T = narrate.read_timing(ch_dir)
-        say = {s["id"]: s.get("say", "") for s in read_json(paths.chapter(ch_dir).code / "script.json")["scenes"]}
+        spec = {s["id"]: s for s in read_json(paths.chapter(ch_dir).code / "script.json")["scenes"]}
     except (OSError, ValueError, KeyError, UserError):
         return None
-    return {"duration": T["duration"], "scenes": [
-        {"id": s["id"], "start": s["start"], "dur": s["dur"], "label": s["id"].replace("_", " ").replace("-", " ").title(),
-         "first_words": " ".join(say.get(s["id"], "").split()[:8])} for s in T["scenes"]]}
+
+    def mark(s: dict) -> dict:
+        sc = spec.get(s["id"], {})
+        m = {"id": s["id"], "start": s["start"], "dur": s["dur"], "label": s["id"].replace("_", " ").replace("-", " ").title(),
+             "first_words": " ".join(sc.get("say", "").split()[:8])}
+        if type(sc.get("slide")) is int:
+            m["slide"] = sc["slide"]
+        return m
+    return {"duration": T["duration"], "scenes": [mark(s) for s in T["scenes"]]}
 
 
 def _alive(pid: int, platform: str = sys.platform, kernel32=None, run=subprocess.run) -> bool:

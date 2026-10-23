@@ -368,3 +368,12 @@ def test_the_deck_numbers_are_never_changed():
     assert "Numbers from the deck" in step6
     brief = text.split("## 3. Content brief", 1)[1].split("## 4.", 1)[0]
     assert "chart" in brief and "values" in brief
+
+
+def test_scenes_name_the_deck_slide_they_show():
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    assert '`slide` (the number of the deck slide' in guide
+    sample = json.loads((PLUGIN / "skills/make/references/sample/script.json").read_text(encoding="utf-8"))
+    slides = {s["id"]: s.get("slide") for s in sample["scenes"]}
+    assert slides == {"hook": 1, "evaporation": 2, "condensation": 3, "precipitation": 4, "tq": 6,
+                      "q1": None, "a1": None, "outro": None}
