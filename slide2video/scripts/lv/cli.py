@@ -130,12 +130,13 @@ def main(argv=None) -> int:
 
 
 def _site_mode_paths_ok(args) -> None:
-    """In site mode every path argument must stay inside the lesson folder (the current directory), and no
-    registered project folder (env or settings file) may redirect output elsewhere."""
+    """In site mode every path argument must stay inside the lesson folder (LV_SITE_ROOT, which the worker sets; else the
+    current directory, which Claude could change with cd), and no registered project folder (env or settings file) may
+    redirect output elsewhere."""
     from . import project
     if os.environ.get("LESSON_VIDEOS_PROJECT") or project.project_home() is not None:
         raise UserError("A slide2video project folder can't be used while working for slide2video.com.")
-    root = Path.cwd().resolve()
+    root = Path(os.environ.get("LV_SITE_ROOT") or Path.cwd()).resolve()
     for v in vars(args).values():
         for item in (v if isinstance(v, list) else [v]):
             if isinstance(item, Path):
@@ -198,6 +199,15 @@ def dispatch(args) -> int:
             print(f"{args.file}: not readable JSON ({e})")
             return 1
         bad = contract.problems("card", obj)
+        if not bad and obj.get("kind") == "review":   # the worker's own path rule, checked now rather than after the turn
+            from .worker import _inside
+            folder = Path(os.environ.get("LV_SITE_ROOT") or Path.cwd())
+            for field in ("video", "captions", "stills"):
+                if obj.get(field):
+                    try:
+                        _inside(folder, obj[field], field)
+                    except UserError as e:
+                        bad.append(f"{field}: {e} Use the path `render` printed.")
         print("card ok" if not bad else "\n".join(bad))
         return 0 if not bad else 1
     if args.cmd == "pair":

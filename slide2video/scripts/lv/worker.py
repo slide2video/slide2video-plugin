@@ -36,7 +36,9 @@ CONTENT_TYPES = {".mp4": "video/mp4", ".vtt": "text/vtt", ".jpg": "image/jpeg", 
                  ".png": "image/png", ".json": "application/json"}
 LIMIT = re.compile(r"(?:5-hour|weekly|usage|session) limit (?:reached|hit)|Claude usage limit", re.I)
 LIMIT_SUFFIX = {".mp4": "video", ".vtt": "captions", ".jpg": "stills", ".jpeg": "stills", ".png": "stills"}
-RESET = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", re.I)
+RESET = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)(?:\s*\(([A-Za-z_]+(?:/[A-Za-z0-9_+-]+)+|UTC)\))?", re.I)
+MAX_UPLOAD = 100 * 1024 * 1024  # the website takes at most this much in one file
+GROUP_GRACE = 5                # seconds Claude's process group gets after SIGTERM before SIGKILL
 # Claude Code reads these from the folder it runs in; a turn could plant them for the next turn. Never part of a lesson.
 # AGENTS.md too: Claude Code reads it natively. --setting-sources "" keeps both instruction files out today; this
 # guard is for the day it doesn't.
@@ -56,9 +58,6 @@ IDLE, RAN, STOP, BUSY = "idle", "ran", "stop", "busy"
 STOP_FINISH_TIMEOUT = 10       # seconds: a stopped step is handed back once, quickly, or left to its lease
 STOPPED = ("Stopped on this computer before this step finished. It starts again when the computer is making videos "
            "again.")
-STILL_ACTIVE = 259             # GetExitCodeProcess: the process hasn't exited
-PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-ERROR_ACCESS_DENIED = 5
 
 
 def disconnected_line() -> str:
@@ -118,7 +117,7 @@ def claude_command(lv: str) -> list[str]:
             "--disallowedTools", *DENIED]
 
 
-def _site_env(private: Path, api_key: bool = False) -> dict:
+def _site_env(private: Path, api_key: bool = False, root: Path | None = None) -> dict:
     """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
     file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one.
     Variables a parent Claude Code session set are dropped (the job is its own session), and so is every way to use an
@@ -137,6 +136,8 @@ def _site_env(private: Path, api_key: bool = False) -> dict:
                 env[k] = os.environ[k]
         env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     env["LV_SITE_MODE"] = "1"
+    if root is not None:   # the lesson folder the site-mode path guard holds every path to, wherever Claude cds
+        env["LV_SITE_ROOT"] = str(Path(root).resolve())
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
     env["BASH_DEFAULT_TIMEOUT_MS"] = env["BASH_MAX_TIMEOUT_MS"] = BASH_TIMEOUT_MS
     return env
@@ -151,24 +152,110 @@ def _clear_claude_config(folder: Path) -> None:
             p.unlink()
 
 
+class LeaseLost(Exception):
+    """The website gave this step to someone else (a heartbeat answered 409): Claude is stopped, nothing is sent."""
+
+
+# set by the heartbeat when the website says this computer no longer holds the turn; cleared at each turn's start
+_turn_stop = threading.Event()
+
+
+def _private_dir(cwd: Path) -> Path:
+    """A new private folder for Claude's settings, never inside the lesson folder (where Claude's file tools could plant
+    one), even when TMPDIR points there."""
+    d = Path(tempfile.mkdtemp(prefix="lv-site-"))
+    r, lesson = d.resolve(), Path(cwd).resolve()
+    if r == lesson or lesson in r.parents:
+        shutil.rmtree(d, ignore_errors=True)
+        config.home().mkdir(parents=True, exist_ok=True)
+        d = Path(tempfile.mkdtemp(prefix="lv-site-", dir=config.home()))
+    return d
+
+
+def _kill_group(proc: subprocess.Popen) -> None:
+    """Stop Claude and everything it started (uv, the renderer, ffmpeg): its whole process group (POSIX) or process
+    tree (Windows)."""
+    if proc.poll() is not None and os.name == "nt":
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, timeout=30)
+        else:
+            os.killpg(proc.pid, signal.SIGTERM)
+            try:
+                proc.wait(timeout=GROUP_GRACE)
+            except subprocess.TimeoutExpired:
+                pass
+            os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError, subprocess.SubprocessError):
+        pass
+    try:
+        proc.wait(timeout=GROUP_GRACE)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def _run_in_group(cmd: list[str], *, timeout: float, **kw) -> subprocess.CompletedProcess:
+    """subprocess.run, but Claude runs in its own process group, and the whole group is stopped when it times out, when
+    the website takes the step back (_turn_stop: LeaseLost) or when the worker itself is stopped, so the renderer and
+    ffmpeg never keep writing into the lesson folder while the next step starts."""
+    if os.name == "nt":
+        kw["creationflags"] = kw.get("creationflags", 0) | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kw["start_new_session"] = True
+    proc = subprocess.Popen(cmd, **kw)
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                return subprocess.CompletedProcess(cmd, proc.wait(timeout=max(0.1, min(5.0, deadline - time.monotonic()))))
+            except subprocess.TimeoutExpired:
+                if _turn_stop.is_set():
+                    raise LeaseLost() from None
+                if time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(cmd, timeout) from None
+    except BaseException:
+        _kill_group(proc)
+        raise
+
+
 def run_claude(cmd: list[str], cwd: Path, log: Path, api_key: bool = False) -> int:
     _clear_claude_config(cwd)
-    private = Path(tempfile.mkdtemp(prefix="lv-site-"))
+    private = _private_dir(cwd)
     try:
         with open(log, "w", encoding="utf-8") as f:
-            return subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                  env=_site_env(private, api_key=api_key), timeout=CLAUDE_TIMEOUT).returncode
+            return _run_in_group(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                 env=_site_env(private, api_key=api_key, root=cwd), timeout=CLAUDE_TIMEOUT).returncode
     finally:
         shutil.rmtree(private, ignore_errors=True)
 
 
+def _zone(name: str | None):
+    """The time zone Claude's message names ("resets 3pm (America/Los_Angeles)"), or None for this computer's own."""
+    if not name:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("UTC" if name.upper() == "UTC" else name)
+    except Exception:  # noqa: BLE001  unknown name, or no time zone data (Windows without tzdata)
+        return None
+
+
 def _reset_time(log: str, now: dt.datetime) -> dt.datetime:
+    """When the usage limit resets, from Claude's "resets 3pm" (in the zone it names, else this computer's), across a
+    daylight-saving change too: the wall time is found on the right day first, and its offset comes from the zone."""
     m = RESET.search(log)
     if not m:
         return now + dt.timedelta(hours=1)
     hour = int(m.group(1)) % 12 + (12 if m.group(3).lower() == "pm" else 0)
-    t = now.replace(hour=hour, minute=int(m.group(2) or 0), second=0, microsecond=0)
-    return t if t > now else t + dt.timedelta(days=1)
+    zone = _zone(m.group(4))
+    # wall-clock time in the zone, without an offset; with no zone, this computer's own local time
+    local = now.astimezone(zone).replace(tzinfo=None) if zone else now.astimezone().replace(tzinfo=None)
+    t = local.replace(hour=hour, minute=int(m.group(2) or 0), second=0, microsecond=0)
+    if t <= local:
+        t += dt.timedelta(days=1)
+    # a naive time made aware: in the zone (ZoneInfo gives that day's offset), else by the system's rules for that day
+    return t.replace(tzinfo=zone) if zone else t.astimezone()
 
 
 def error_card(message: str, log: str, now=None, detect_limit: bool = False) -> dict:
@@ -201,53 +288,48 @@ def timing_for(ch_dir: Path) -> dict | None:
     return {"duration": T["duration"], "scenes": [mark(s) for s in T["scenes"]]}
 
 
-def _alive(pid: int, platform: str = sys.platform, kernel32=None, run=subprocess.run) -> bool:
-    """Whether the run that wrote a lock file is still going: the process exists and, where `ps` can tell, is a
-    slide2video (or older lesson-videos) one (a pid left in an old lock file may since belong to another program)."""
-    if pid <= 0:
-        return False
-    if platform == "win32":  # never os.kill(pid, 0) here: on Windows that sends Ctrl-C
-        import ctypes
-        k = kernel32 or ctypes.windll.kernel32
-        h = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-        if not h:
-            return k.GetLastError() == ERROR_ACCESS_DENIED  # exists, but someone else's
+class _Lock:
+    """An OS lock on an open file (flock on POSIX, msvcrt on Windows): the kernel releases it when the process ends,
+    however it ends, so a stale lock never needs taking over and two runs can never both hold it. The file stays."""
+
+    def __init__(self, fd: int):
+        self.fd = fd
+
+    def release(self) -> None:
         try:
-            code = ctypes.c_ulong()
-            return not k.GetExitCodeProcess(h, ctypes.byref(code)) or code.value == STILL_ACTIVE
+            if os.name == "nt":
+                import msvcrt
+                os.lseek(self.fd, 0, os.SEEK_SET)
+                msvcrt.locking(self.fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self.fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
         finally:
-            k.CloseHandle(h)
-    try:
-        os.kill(pid, 0)
-    except PermissionError:
-        pass                                 # alive, owned by someone else
-    except OSError:                          # ProcessLookupError and the like: gone
-        return False
-    try:
-        r = run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return True                          # can't tell: leave the lock alone
-    return r.returncode != 0 or "slide2video" in r.stdout or "lesson-videos" in r.stdout
+            os.close(self.fd)
 
 
-def _lock(root: Path, name: str = ".worker.lock") -> Path | None:
+def _lock(root: Path, name: str = ".worker.lock") -> _Lock | None:
+    """The run lock, or None while another run holds it."""
     root.mkdir(parents=True, exist_ok=True)
-    f = root / name
+    fd = os.open(root / name, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        fd = os.open(f, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        try:
-            pid = int(read_text(f).strip())
-        except (ValueError, OSError):
-            pid = 0
-        if _alive(pid):
-            return None                      # another run is alive
-        f.unlink(missing_ok=True)            # stale
-        return _lock(root, name)
-    os.write(fd, str(os.getpid()).encode())
-    os.close(fd)
-    return f
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    try:   # who holds it, for a person looking; nothing reads it
+        os.ftruncate(fd, 0)
+        os.write(fd, str(os.getpid()).encode())
+    except OSError:
+        pass
+    return _Lock(fd)
 
 
 def _last_line(f: Path) -> str:
@@ -283,9 +365,12 @@ def _notes(f: Path) -> list[str]:
 
 
 class _Heartbeat(threading.Thread):
+    """Renews the turn's lease every HEARTBEAT seconds. A 409 means the website no longer gives this computer the
+    turn (its lease ran out and it went to another run): `lost` is set and so is _turn_stop, which stops Claude."""
+
     def __init__(self, turn_id: str, progress: Path):
         super().__init__(daemon=True)
-        self.turn_id, self.progress, self.done = turn_id, progress, threading.Event()
+        self.turn_id, self.progress, self.done, self.lost = turn_id, progress, threading.Event(), threading.Event()
 
     def run(self):
         while not self.done.wait(HEARTBEAT):
@@ -295,8 +380,19 @@ class _Heartbeat(threading.Thread):
                 if notes := _notes(self.progress.with_name("notes.txt")):
                     body["notes"] = notes
                 site.call(f"/api/device/turns/{self.turn_id}/heartbeat", body)
+            except net.ApiError as e:
+                if e.status == 409:
+                    self.lost.set()
+                    _turn_stop.set()
+                    return
             except Exception:  # noqa: BLE001  a missed heartbeat only shortens the lease
                 pass
+
+    def stop(self) -> None:
+        """No more beats, and none still in flight (one landing after the finish would be refused anyway)."""
+        self.done.set()
+        if self.is_alive():
+            self.join(timeout=60)
 
 
 def _sha256(f: Path) -> str:
@@ -316,7 +412,16 @@ def _fetch_inputs(turn: dict, folder: Path) -> None:
         if hashlib.sha256(data).hexdigest() != f["sha256"]:
             raise UserError(f"{f['name']} arrived damaged; try again.")
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(data)
+        if dest.is_symlink():   # never written through: a link planted at in/<name> could point anywhere
+            dest.unlink()
+        fd, tmp = tempfile.mkstemp(prefix=".fetch-", dir=dest.parent)
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+            os.replace(tmp, dest)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
 
 
 def _upload(turn_id: str, path: str, data: bytes, content_type: str) -> None:
@@ -325,11 +430,18 @@ def _upload(turn_id: str, path: str, data: bytes, content_type: str) -> None:
 
 
 def _next_version(folder: Path, chapter: int) -> int:
+    """The chapter's next version number; taken for good only by _keep_version, once its files are uploaded (a failed
+    upload doesn't leave a gap: v1, v3)."""
     f = folder / "site" / "versions.json"
     d = read_json(f) if f.exists() else {}
-    d[str(chapter)] = d.get(str(chapter), 0) + 1
+    return d.get(str(chapter), 0) + 1
+
+
+def _keep_version(folder: Path, chapter: int, version: int) -> None:
+    f = folder / "site" / "versions.json"
+    d = read_json(f) if f.exists() else {}
+    d[str(chapter)] = max(d.get(str(chapter), 0), version)
     write_json(f, d)
-    return d[str(chapter)]
 
 
 def _inside(folder: Path, rel: str, field: str) -> Path:
@@ -344,6 +456,10 @@ def _publish(card: dict, folder: Path, turn_id: str) -> dict:
     if card["kind"] != "review":
         return card
     local = {k: _inside(folder, card[k], k) for k in ("video", "captions", "stills") if card.get(k)}
+    for f in local.values():
+        if f.stat().st_size > MAX_UPLOAD:
+            raise UserError(f"{f.name} is {f.stat().st_size / 1024 / 1024:.0f} MB, more than the {MAX_UPLOAD // 1024 // 1024} MB "
+                            "slide2video.com takes in one file. Make the chapter shorter, or ask for a smaller video.")
     ch = card["chapter"]
     card = {k: v for k, v in card.items() if k not in ("timing", "version")}  # only the worker sets these
     card["version"] = _next_version(folder, ch)
@@ -355,6 +471,7 @@ def _publish(card: dict, folder: Path, turn_id: str) -> dict:
     if timing:
         _upload(turn_id, f"{base}/timing.json", json.dumps(timing).encode("utf-8"), "application/json")
         card["timing"] = f"{base}/timing.json"
+    _keep_version(folder, ch, card["version"])
     return card
 
 
@@ -456,13 +573,17 @@ def _run_turn(turn: dict, claude, out, finish: bool = True, card_out: Path | Non
     out(f"Working on “{turn['project']['title']}” ({kind}).")
     log: Path | None = None
     beat: _Heartbeat | None = None
+    _turn_stop.clear()
     try:
         if kind != "delete" and turn["project"]["style"] != "school":
             raise UserError(SCHOOL_ONLY)
         folder = project_dir(turn["project"])
         if kind == "delete":
             shutil.rmtree(folder, ignore_errors=True)
-            card = {"contract": contract.VERSION, "kind": "done", "message": "Removed from this computer."}
+            if folder.exists() or folder.is_symlink():   # locked, in use, or not ours to remove: say so, keep the tombstone
+                card = error_card(f"Couldn't remove {folder.name} from this computer. Close anything using it and try again.", "")
+            else:
+                card = {"contract": contract.VERSION, "kind": "done", "message": "Removed from this computer."}
         else:
             sitedir = folder / "site"
             sitedir.mkdir(parents=True, exist_ok=True)
@@ -474,7 +595,14 @@ def _run_turn(turn: dict, claude, out, finish: bool = True, card_out: Path | Non
             beat.start()
             card = _claude_turn(turn, folder, sitedir, log, claude)
             card = _with_slides(card, folder)
-    except KeyboardInterrupt:  # Ctrl-C, or SIGTERM from "stop" in Claude Code: subprocess.run has killed Claude
+    except LeaseLost:  # the website gave the step to another run: nothing more is sent for it
+        if beat is not None:
+            beat.stop()
+        out("This step was given to another run (this computer's turn ran out), so its result isn't sent.")
+        if not finish and card_out is not None:
+            _card_if_missing(card_out, lambda: _hand_back_card(_log_text(log)))
+        return 1
+    except KeyboardInterrupt:  # Ctrl-C, or SIGTERM from "stop" in Claude Code: Claude's process group is stopped
         if beat is not None:
             beat.done.set()
         if finish:
@@ -492,7 +620,10 @@ def _run_turn(turn: dict, claude, out, finish: bool = True, card_out: Path | Non
         card = error_card(f"This step failed on this computer: {e}", _log_text(log))
     finally:
         if beat is not None:
-            beat.done.set()
+            beat.stop()
+    if beat is not None and beat.lost.is_set():   # lost while the card was being made: nothing is sent
+        out("This step was given to another run (this computer's turn ran out), so its result isn't sent.")
+        return 1
     if not finish:
         try:
             _write_card(card_out, card)
@@ -523,17 +654,18 @@ def _once(claude, out, start: bool = False) -> tuple[str, int]:
         turn = site.call("/api/device/next" + ("?start=1" if start else ""))
         if not turn:
             return IDLE, 0
-        if turn.get("stop") is True:
+        if isinstance(turn, dict) and turn.get("stop") is True:
             return STOP, 0
         bad = contract.problems("turn", turn)
         if bad:
-            tid = (turn.get("turn") or {}).get("id")
+            inner = turn.get("turn") if isinstance(turn, dict) else None
+            tid = inner.get("id") if isinstance(inner, dict) else None
             if tid:
                 _finish(tid, error_card("This job doesn't match what this plugin understands: " + "; ".join(bad[:3]), ""))
             return RAN, 1
         return RAN, _run_turn(turn, claude or run_claude, out)
     finally:
-        lock.unlink(missing_ok=True)
+        lock.release()
 
 
 def _claude_runner(claude, api_key: bool):
@@ -626,7 +758,7 @@ def _run_given(turn_file: Path, card_out: Path, api_key: bool, claude, out) -> i
     try:
         return _run_turn(turn, claude or run_claude, out, finish=False, card_out=card_out)
     finally:
-        lock.unlink(missing_ok=True)
+        lock.release()
 
 
 def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, awake_off=awake.release,
@@ -700,4 +832,4 @@ def watch(claude=None, out=print, sleep=time.sleep, awake_on=awake.keep_awake, a
         if awake:
             awake_off(handle)
         _restore_sigterm(previous)
-        guard.unlink(missing_ok=True)
+        guard.release()

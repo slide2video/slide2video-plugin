@@ -13,7 +13,7 @@ def _ex(name):
 
 
 def test_contract_version_is_the_plugin_major():
-    assert contract.PLUGIN == "2.4.1"
+    assert contract.PLUGIN == "2.4.2"
     assert contract.VERSION == 2
 
 
@@ -108,3 +108,62 @@ def test_error_card_reason_is_a_short_string():
     base = {"contract": 2, "kind": "error", "message": "m"}
     assert contract.problems("card", {**base, "reason": "busy"}) == []
     assert contract.problems("card", {**base, "reason": "x" * 41})
+
+
+# --- review fixes (slide2video-site#7) -----------------------------------------------------------------------------------
+
+def test_a_card_without_a_kind_gets_one_plain_problem():
+    card = _ex("card-questions.json")
+    del card["kind"]
+    found = contract.problems("card", card)
+    assert any("'kind' is a required property" in p for p in found)
+    assert not any("questions" in p for p in found)   # no noise from the kind-specific rules
+
+
+@pytest.mark.parametrize("value", ["tomorrow", "2026-10-24", "2026-10-24T15:00:00", "2026-13-40T25:00:00Z", "2026-10-24 15:00:00Z"])
+def test_retry_after_must_be_an_rfc3339_date_time(value):
+    card = _ex("card-error.json")
+    card["retry_after"] = value
+    assert any("retry_after" in p for p in contract.problems("card", card)), value
+
+
+@pytest.mark.parametrize("value", [None, "2026-10-24T15:00:00Z", "2026-10-24T15:00:00.5-07:00"])
+def test_retry_after_takes_a_date_time_or_null(value):
+    card = _ex("card-error.json")
+    card["retry_after"] = value
+    assert contract.problems("card", card) == []
+
+
+@pytest.mark.parametrize("kind", ["chat", "", "START", None])
+def test_turn_kind_must_be_one_the_plugin_knows(kind):
+    turn = _ex("turn-start.json")
+    turn["turn"]["kind"] = kind
+    assert any("kind" in p for p in contract.problems("turn", turn))
+
+
+@pytest.mark.parametrize("change", [
+    lambda t: t.pop("scenes"), lambda t: t.update(duration=-1), lambda t: t["scenes"][0].pop("start"),
+    lambda t: t["scenes"][0].update(dur="5"), lambda t: t["scenes"][0].update(slide=0),
+], ids=["no scenes", "negative duration", "scene without start", "string dur", "slide 0"])
+def test_a_malformed_timing_is_refused(change):
+    timing = _ex("timing.json")
+    change(timing)
+    assert contract.problems("timing", timing)
+
+
+def test_card_command_checks_a_review_cards_files_as_the_worker_will(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("LV_SITE_ROOT", str(tmp_path))
+    (tmp_path / "lesson-videos").mkdir()
+    (tmp_path / "lesson-videos" / "Chapter 1.mp4").write_bytes(b"mp4")
+    (tmp_path / "elsewhere.mp4").write_bytes(b"mp4")
+    card = {**_ex("card-review.json"), "video": "lesson-videos/Chapter 1.mp4"}
+    card.pop("captions", None)
+    card.pop("stills", None)
+    f = tmp_path / "card.json"
+    f.write_text(json.dumps(card), encoding="utf-8")
+    assert cli.main(["card", str(f)]) == 0
+    capsys.readouterr()
+    f.write_text(json.dumps({**card, "video": "elsewhere.mp4"}), encoding="utf-8")
+    assert cli.main(["card", str(f)]) == 1
+    out = capsys.readouterr().out
+    assert "video:" in out and "lesson-videos" in out and "render" in out

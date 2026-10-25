@@ -181,7 +181,8 @@ Card formats (all start with `"contract": 2`, `"kind"` and a one-line `"message"
   `detail`); `"other": true` lets the teacher type their own answer. Mark the option you'd choose by default with
   `"recommended": true` (at most one per question); the website shows it as Claude's suggestion and never picks it for
   the teacher.
-- `"plan"`: `"markdown"` and `"estimate"` as above.
+- `"plan"`: `"markdown"` and `"estimate"` as above. `estimate.usd` is the plan's whole cost in US dollars, one
+  number (a free voice counts as $0); take it from the `--json` output, never add up the lines `LV estimate` prints.
 - `"review"`: `"chapter": N`, `"video"` (the MP4 path relative to this folder, e.g.
   `"lesson-videos/Chapter 1 - The Water Cycle.mp4"`), `"captions"` (its `.vtt`), `"stills"` (the `final.jpg`
   that `render` printed, relative to this folder; files outside `lesson-videos/` are refused). Write
@@ -189,7 +190,7 @@ Card formats (all start with `"contract": 2`, `"kind"` and a one-line `"message"
 - `"done"`: `"chapters": [{"chapter": 1, "title": "…"}]` and `"readme"` (the README text from step 8).
 
 Card file paths must be inside `lesson-videos/`: video `.mp4`, captions `.vtt`, stills `.jpg`, `.jpeg` or `.png`.
-Anything else makes the card an error.
+Anything else makes the card an error. Use the paths `render` printed; `LV card` checks them too.
 
 If something fails that the teacher must fix (a deck that can't be read, a key that was rejected), write a
 `"questions"` card with one question whose `"id"` is `"problem"` and whose options say what to do next, and a message that explains the problem

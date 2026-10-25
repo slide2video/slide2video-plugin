@@ -1,6 +1,7 @@
 import datetime as dt
 import shutil
 import hashlib
+import time
 import json
 import os
 import subprocess
@@ -14,6 +15,15 @@ from lv.util import read_json, write_json, write_text
 
 DECK = b"pretend pptx bytes"
 PRJ = "prj_0123456789abcdefghijkl"
+
+
+def free(lessons, name=".worker.lock") -> bool:
+    """Nothing holds that lock (its file stays: an OS lock on it, released when the run ends)."""
+    held = worker._lock(lessons, name)
+    if held is None:
+        return False
+    held.release()
+    return True
 
 
 def _turn(kind="start", tid="trn_0123456789abcdefghijkl", path="in/water-cycle.pptx", style="school", **extra):
@@ -90,7 +100,7 @@ def test_given_project_folder_is_used_as_is(paired, lessons, tmp_path, monkeypat
     assert worker.run_once(claude=fake) == 0
     assert fake.calls[0][1] == given
     assert (given / "in" / "water-cycle.pptx").read_bytes() == DECK
-    assert not any(lessons.iterdir())
+    assert [p.name for p in lessons.iterdir()] in ([], [".worker.lock"])  # only the run lock's file
 
 
 def test_blank_project_folder_setting_changes_nothing(lessons, monkeypatch):
@@ -226,7 +236,7 @@ def test_non_school_style_is_an_error_without_claude(paired, lessons):
 
 def test_live_lock_makes_a_second_run_exit(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
-    (lessons / ".worker.lock").write_text(str(lv_pid), encoding="utf-8")
+    holder = worker._lock(lessons, ".worker.lock")  # another run holds it
     paired.turns.append(_turn())
     assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
     assert paired.finished == [] and len(paired.turns) == 1
@@ -238,7 +248,7 @@ def test_stale_lock_is_taken_over(paired, lessons):
     paired.turns.append(_turn())
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
-    assert len(paired.finished) == 1 and not (lessons / ".worker.lock").exists()
+    assert len(paired.finished) == 1 and free(lessons, ".worker.lock")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX liveness check")
@@ -251,66 +261,10 @@ def test_lock_held_by_a_live_process_that_isnt_a_worker_is_stale(paired, lessons
         paired.turns.append(_turn())
         paired.files["fil_0123456789abcdefghijkl"] = DECK
         assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
-        assert len(paired.finished) == 1 and not (lessons / ".worker.lock").exists()
+        assert len(paired.finished) == 1 and free(lessons, ".worker.lock")
     finally:
         other.kill()
         other.wait()
-
-
-def test_alive_on_posix_trusts_kill_and_then_ps(monkeypatch):
-    monkeypatch.setattr(worker.os, "kill", lambda pid, sig: None)
-    ps = lambda out, code=0: (lambda cmd, **kw: subprocess.CompletedProcess(cmd, code, out, ""))
-    assert worker._alive(42, platform="darwin", run=ps("/usr/bin/python3 /x/slide2video.py worker --watch\n"))
-    assert worker._alive(42, platform="darwin", run=ps("/usr/bin/python3 /x/lesson-videos.py worker --watch\n"))  # a 1.0.x worker still running
-    assert not worker._alive(42, platform="darwin", run=ps("/Applications/Safari.app/Contents/MacOS/Safari\n"))
-    assert worker._alive(42, platform="darwin", run=ps("", 1))          # ps failed: can't tell, so alive
-
-    def no_ps(cmd, **kw):
-        raise FileNotFoundError("ps")
-    assert worker._alive(42, platform="darwin", run=no_ps)                # no ps: alive
-
-    def gone(pid, sig):
-        raise ProcessLookupError
-    monkeypatch.setattr(worker.os, "kill", gone)
-    assert not worker._alive(42, platform="darwin", run=ps("lesson-videos"))
-
-
-def test_worker_prompt_and_messages_use_the_new_name():
-    assert worker.PROMPT == "Run /slide2video:make in site mode for this folder."
-    assert worker.disconnected_line() == "Disconnected from the website. To start again, run /slide2video:serve."
-
-
-class FakeKernel32:
-    """OpenProcess / GetExitCodeProcess / CloseHandle, for the Windows branch of _alive."""
-    def __init__(self, handle=7, exit_code=259, last_error=0):
-        self.handle, self.exit_code, self.last_error, self.opened, self.closed = handle, exit_code, last_error, [], []
-
-    def OpenProcess(self, access, inherit, pid):
-        self.opened.append((access, inherit, pid))
-        return self.handle
-
-    def GetExitCodeProcess(self, handle, ref):
-        ref._obj.value = self.exit_code
-        return 1
-
-    def GetLastError(self):
-        return self.last_error
-
-    def CloseHandle(self, handle):
-        self.closed.append(handle)
-        return 1
-
-
-def test_alive_on_windows_asks_the_kernel_and_never_signals(monkeypatch):
-    def no_kill(pid, sig):  # os.kill(pid, 0) on Windows sends Ctrl-C to the process
-        raise AssertionError("os.kill on Windows")
-    monkeypatch.setattr(worker.os, "kill", no_kill)
-    k = FakeKernel32()
-    assert worker._alive(42, platform="win32", kernel32=k)
-    assert k.opened == [(0x1000, False, 42)] and k.closed == [7]
-    assert not worker._alive(42, platform="win32", kernel32=FakeKernel32(exit_code=0))       # exited
-    assert not worker._alive(42, platform="win32", kernel32=FakeKernel32(handle=0, last_error=87))  # no such process
-    assert worker._alive(42, platform="win32", kernel32=FakeKernel32(handle=0, last_error=5))  # access denied: alive
 
 
 def test_heartbeat_sends_the_progress_line(paired, lessons, monkeypatch):
@@ -392,7 +346,7 @@ def test_run_claude_removes_planted_claude_config_and_cleans_the_env(monkeypatch
         seen.update(kw)
         seen["left"] = sorted(p.name for p in tmp_path.iterdir())
         return type("R", (), {"returncode": 0})()
-    monkeypatch.setattr(worker.subprocess, "run", fake_run)
+    monkeypatch.setattr(worker, "_run_in_group", fake_run)
     worker.run_claude(["claude"], tmp_path, tmp_path / "in" / "claude.log")
     assert seen["left"] == ["in"]
     env = seen["env"]
@@ -407,7 +361,7 @@ def test_site_mode_env_is_set_for_claude(monkeypatch, tmp_path):
     def fake_run(cmd, **kw):
         seen.update(kw)
         return type("R", (), {"returncode": 0})()
-    monkeypatch.setattr(worker.subprocess, "run", fake_run)
+    monkeypatch.setattr(worker, "_run_in_group", fake_run)
     worker.run_claude(["claude"], tmp_path, tmp_path / "log")
     assert seen["env"]["LV_SITE_MODE"] == "1"
 
@@ -469,7 +423,7 @@ def test_outgoing_card_is_redacted(paired, lessons):
 def test_claude_env_hides_registered_projects(monkeypatch, tmp_path):
     seen = {}
     monkeypatch.setenv("LESSON_VIDEOS_PROJECT", "/somewhere")
-    monkeypatch.setattr(worker.subprocess, "run", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
+    monkeypatch.setattr(worker, "_run_in_group", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
     worker.run_claude(["claude"], tmp_path, tmp_path / "log")
     env = seen["env"]
     assert "LESSON_VIDEOS_PROJECT" not in env and env["LV_SITE_MODE"] == "1"
@@ -487,7 +441,7 @@ def test_claude_settings_folder_is_removed_after_a_timeout(monkeypatch, tmp_path
         seen.update(kw)
         assert Path(kw["env"]["LESSON_VIDEOS_SETTINGS"]).parent.is_dir()
         raise worker.subprocess.TimeoutExpired(cmd, 1)
-    monkeypatch.setattr(worker.subprocess, "run", fake_run)
+    monkeypatch.setattr(worker, "_run_in_group", fake_run)
     with pytest.raises(worker.subprocess.TimeoutExpired):
         worker.run_claude(["claude"], tmp_path, tmp_path / "log")
     assert not Path(seen["env"]["LESSON_VIDEOS_SETTINGS"]).parent.exists()
@@ -572,7 +526,7 @@ def test_claude_always_runs_on_the_subscription(monkeypatch, tmp_path):
         monkeypatch.setenv(var, "set-by-parent")
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "subscription-login")
     seen = {}
-    monkeypatch.setattr(worker.subprocess, "run", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
+    monkeypatch.setattr(worker, "_run_in_group", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
     worker.run_claude(["claude"], tmp_path, tmp_path / "log")
     env = seen["env"]
     for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
@@ -683,7 +637,7 @@ def test_lessons_root_has_no_pro_part(lessons, monkeypatch):
 def test_a_second_watch_says_which_site(lessons, monkeypatch, lv_pid):
     monkeypatch.delenv("LV_SITE_URL", raising=False)
     lessons.mkdir(parents=True, exist_ok=True)
-    (lessons / ".worker-watch.lock").write_text(str(lv_pid), encoding="utf-8")
+    holder = worker._lock(lessons, ".worker-watch.lock")  # another run holds it
     lines = []
     assert worker.watch(out=lines.append) == 0
     assert lines == ["This computer is already making videos for slide2video.com (another window is running it)."]
@@ -702,3 +656,176 @@ def test_timing_names_the_slide_each_scene_shows(tmp_path):
     scenes = worker.timing_for(ch)["scenes"]
     assert "slide" not in scenes[0]  # the hook shows no slide
     assert scenes[1]["slide"] == 3
+
+
+# --- review fixes (slide2video-site#1–#9) -------------------------------------------------------------------------------
+
+def test_the_run_lock_is_held_by_one_run_and_freed_when_its_process_ends(lessons, tmp_path):
+    lessons.mkdir(parents=True)
+    first = worker._lock(lessons)
+    assert first is not None and worker._lock(lessons) is None    # two runs can never both hold it
+    first.release()
+    again = worker._lock(lessons)
+    assert again is not None
+    again.release()
+    # a run that dies holding it (no cleanup at all) leaves nothing to take over: the OS freed it
+    scripts = Path(worker.__file__).resolve().parents[1]
+    code = ("import os, sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); from lv import worker; "
+            "assert worker._lock(Path(sys.argv[2])) is not None; os._exit(9)")
+    assert subprocess.run([sys.executable, "-c", code, str(scripts), str(lessons)]).returncode == 9
+    assert free(lessons)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+def test_a_timeout_stops_claudes_children_too(tmp_path):
+    pidfile = tmp_path / "child.pid"
+    # "Claude" starts a long child (the renderer) and waits on it
+    code = ("import subprocess, sys, time; c = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+            f"open({str(pidfile)!r}, 'w').write(str(c.pid)); time.sleep(60)")
+    with pytest.raises(subprocess.TimeoutExpired):
+        worker._run_in_group([sys.executable, "-c", code], timeout=2, stdin=subprocess.DEVNULL)
+    child = int(pidfile.read_text())
+    time.sleep(0.5)
+    with pytest.raises(ProcessLookupError):
+        os.kill(child, 0)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+def test_a_lost_lease_stops_claude_at_once(tmp_path):
+    worker._turn_stop.set()
+    try:
+        started = time.monotonic()
+        with pytest.raises(worker.LeaseLost):
+            worker._run_in_group([sys.executable, "-c", "import time; time.sleep(60)"], timeout=600, stdin=subprocess.DEVNULL)
+        assert time.monotonic() - started < 20
+    finally:
+        worker._turn_stop.clear()
+
+
+def test_a_409_heartbeat_stops_the_step_and_nothing_is_sent(paired, lessons, monkeypatch):
+    monkeypatch.setattr(worker, "HEARTBEAT", 0.05)
+    paired.heartbeat_status = 409
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    lines = []
+
+    def slow(cwd):  # Claude still working when the website takes the step back
+        deadline = time.monotonic() + 5
+        while not worker._turn_stop.is_set() and time.monotonic() < deadline:
+            time.sleep(0.02)
+    assert worker._once(_claude_writing(QUESTIONS, also=slow), lines.append)[1] == 1
+    assert paired.finished == [] and paired.heartbeats
+    assert any("given to another run" in l for l in lines)
+
+
+def test_the_heartbeat_is_joined_before_the_finish(paired, lessons, monkeypatch):
+    monkeypatch.setattr(worker, "HEARTBEAT", 0.01)
+    order = []
+    real = worker.site.call
+
+    def call(path, *a, **kw):
+        order.append(path.rsplit("/", 1)[-1])
+        if path.endswith("/heartbeat"):
+            time.sleep(0.2)   # a beat still in flight when Claude is done
+        return real(path, *a, **kw)
+    monkeypatch.setattr(worker.site, "call", call)
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(QUESTIONS, also=lambda cwd: time.sleep(0.1))) == 0
+    assert order[-1] == "finish" and "heartbeat" not in order[order.index("finish"):]
+
+
+def test_a_delete_that_couldnt_remove_the_folder_says_so(paired, lessons, monkeypatch):
+    folder = worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"})
+    write_text(folder / "in" / "x.txt", "x")
+    monkeypatch.setattr(worker.shutil, "rmtree", lambda *a, **k: None)   # locked, in use
+    paired.turns.append(_turn("delete", delete=True))
+    assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 1
+    card = paired.finished[0][1]
+    assert card["kind"] == "error" and "Couldn't remove" in card["message"] and folder.exists()
+
+
+def test_the_reset_time_follows_the_zone_claude_names_across_daylight_saving():
+    from zoneinfo import ZoneInfo
+    la = ZoneInfo("America/Los_Angeles")
+    now = dt.datetime(2026, 3, 7, 22, 0, tzinfo=la)          # the night before clocks go forward
+    card = worker.error_card("x", "usage limit reached · resets 3pm (America/Los_Angeles)", now=now, detect_limit=True)
+    assert card["retry_after"] == "2026-03-08T15:00:00-07:00"   # PDT, not the -08:00 of the night before
+    utc = worker.error_card("x", "usage limit reached · resets 9am (UTC)", now=now, detect_limit=True)["retry_after"]
+    assert dt.datetime.fromisoformat(utc) == dt.datetime(2026, 3, 8, 9, 0, tzinfo=dt.timezone.utc)
+    # an unknown zone falls back to this computer's own
+    assert worker.error_card("x", "usage limit reached · resets 3pm (Mars/Olympus)", now=now, detect_limit=True)["retry_after"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="time.tzset is POSIX")
+def test_the_reset_time_uses_this_computers_rules_for_that_day(monkeypatch):
+    monkeypatch.setenv("TZ", "America/New_York")
+    time.tzset()
+    try:
+        now = dt.datetime(2026, 11, 1, 0, 30).astimezone()            # EDT; clocks go back at 2am
+        got = worker._reset_time("resets 3pm", now)
+        assert got.isoformat() == "2026-11-01T15:00:00-05:00"       # EST that afternoon
+    finally:
+        monkeypatch.delenv("TZ")
+        time.tzset()
+
+
+def test_a_video_too_big_to_upload_is_an_error_before_anything_is_sent(paired, lessons, monkeypatch):
+    monkeypatch.setattr(worker, "MAX_UPLOAD", 1)
+    paired.turns.append(_turn("approve"))
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(REVIEW, also=_chapter)) == 1
+    card = paired.finished[0][1]
+    assert card["kind"] == "error" and "slide2video.com takes in one file" in card["message"]
+    assert paired.uploads == {}
+
+
+def test_a_failed_upload_doesnt_use_up_a_version_number(paired, lessons):
+    paired.fail_uploads = True
+    paired.turns.append(_turn("approve"))
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(REVIEW, also=_chapter)) == 1
+    paired.fail_uploads = False
+    paired.turns.append(_turn("approve", tid="trn_2123456789abcdefghijkl"))
+    assert worker.run_once(claude=_claude_writing(REVIEW, also=_chapter)) == 0
+    assert paired.finished[-1][1]["version"] == 1
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need admin rights on Windows")
+def test_a_deck_is_never_written_through_a_planted_link(paired, lessons, tmp_path):
+    folder = worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"})
+    (folder / "in").mkdir(parents=True)
+    target = tmp_path / "elsewhere.txt"
+    target.write_text("keep", encoding="utf-8")
+    (folder / "in" / "water-cycle.pptx").symlink_to(target)
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 0
+    assert target.read_text(encoding="utf-8") == "keep"
+    deck = folder / "in" / "water-cycle.pptx"
+    assert not deck.is_symlink() and deck.read_bytes() == DECK
+
+
+def test_claudes_private_folder_is_never_inside_the_lesson_even_with_tmpdir_there(tmp_path, monkeypatch):
+    lesson = tmp_path / "lesson"
+    lesson.mkdir()
+    monkeypatch.setattr(worker.tempfile, "tempdir", str(lesson))
+    d = worker._private_dir(lesson)
+    try:
+        assert lesson.resolve() not in d.resolve().parents
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_claude_gets_the_lesson_root_for_the_path_guard(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(worker, "_run_in_group", lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
+    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    assert seen["env"]["LV_SITE_ROOT"] == str(tmp_path.resolve())
+
+
+@pytest.mark.parametrize("turn", [{"turn": "trn_x"}, {"turn": None}, ["not", "a", "turn"]], ids=["string", "null", "list"])
+def test_a_malformed_turn_is_refused_without_crashing(paired, lessons, turn):
+    paired.turns.append(turn)
+    assert worker.run_once(claude=_claude_writing(QUESTIONS)) == 1
+    assert paired.finished == []
