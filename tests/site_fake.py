@@ -15,6 +15,7 @@ class FakeSite:
         self.heartbeat_bodies = []
         self.pair_polls_pending, self.pair_expired, self.contract = 1, False, 2
         self.fail_uploads = False
+        self.heartbeat_status = 204   # what a heartbeat is answered (409: this computer no longer holds the turn)
         self.latest, self.plugin_headers, self.refuse = None, [], None
         self.stop_next, self.next_queries, self.fail_next = False, [], 0
         self.finish_statuses = []   # statuses to answer finish with, one per call, before accepting
@@ -84,6 +85,8 @@ class FakeSite:
                         body = json.loads(self._body())
                         site.heartbeats.append((tid, body["progress"]))
                         site.heartbeat_bodies.append(body)
+                        if site.heartbeat_status != 204:
+                            return self._send(site.heartbeat_status, {"error": "This computer doesn't hold that turn."})
                         return self._send(204)
                     if action == "files" and method == "PUT":
                         if site.fail_uploads:

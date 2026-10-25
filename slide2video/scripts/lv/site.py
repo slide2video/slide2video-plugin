@@ -13,7 +13,7 @@ import time
 
 import lv
 from . import config, contract, net, version
-from .util import UserError, read_json, write_json
+from .util import UserError, read_json
 
 UPDATE = f"Update the slide2video plugin on this computer: {version.STEPS}."
 LATEST: str | None = None  # the plugin version the website said it is built for (X-LV-Latest), last seen
@@ -64,7 +64,9 @@ class KeychainStore:
         _check_token(token)
         line = f"add-generic-password -U -s {self.service} -a {site} -w {token}\n"
         r = subprocess.run(["security", "-i"], input=line, capture_output=True, encoding="utf-8")
-        if r.returncode != 0 or "error" in (r.stderr or "").lower():
+        # `security -i` exits 0 even when a command in it fails; a failure is its "security: <call>: <reason>" line
+        # (any other stderr, such as a warning that mentions the word error, is not one)
+        if r.returncode != 0 or re.search(r"^security: \w+", r.stderr or "", re.M):
             raise UserError("Couldn't save the connection in the macOS Keychain. Unlock the Keychain (or allow access "
                             "when macOS asks) and run the pairing again.") from None
 
@@ -80,22 +82,50 @@ class FileStore:
 
     def _read(self) -> dict:
         f = self._file()
-        return read_json(f) if f.exists() else {}
+        if not f.exists():
+            return {}
+        try:
+            d = read_json(f)
+        except (OSError, ValueError):
+            d = None
+        if not isinstance(d, dict):
+            raise UserError(f"This computer's saved connection ({f}) is damaged. Run {cmd('setup')} and connect this "
+                            "computer again.") from None
+        return d
 
     def get(self, site: str) -> str | None:
         return self._read().get(site)
 
     def set(self, site: str, token: str) -> None:
-        d = self._read()
+        try:
+            d = self._read()
+        except UserError:   # a damaged file is replaced by this new connection
+            d = {}
         d[site] = token
-        write_json(self._file(), d)
-        if os.name == "posix":
-            os.chmod(self._file(), 0o600)
+        self._write(d)
+
+    def _write(self, d: dict) -> None:
+        """The file, readable only by this user from the first byte: written to a new 0600 file, then moved into place."""
+        f = self._file()
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_name(f".{f.name}.{os.getpid()}.tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(d, indent=1, ensure_ascii=False) + "\n")
+            os.replace(tmp, f)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def delete(self, site: str) -> None:
-        d = self._read()
+        try:
+            d = self._read()
+        except UserError:   # damaged: nothing usable to keep
+            self._file().unlink(missing_ok=True)
+            return
         if d.pop(site, None) is not None:
-            write_json(self._file(), d)
+            self._write(d)
 
 
 store = KeychainStore() if sys.platform == "darwin" and shutil.which("security") else FileStore()
@@ -153,6 +183,8 @@ def pair(name=None, sleep=None, out=print, clock=time.monotonic) -> str:
                 continue
             if e.status == 410:
                 break
+            if e.status in (0, 429) or e.status >= 500:   # the network or the website was briefly away: keep waiting
+                continue
             raise
         token = _check_token(got.get("token"))
         store.set(site_url(), token)

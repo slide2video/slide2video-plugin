@@ -64,7 +64,7 @@ def test_api_key_mode_needs_a_key(monkeypatch, tmp_path):
 def test_api_key_flag_reaches_claude_launch(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     seen = {}
-    monkeypatch.setattr(worker.subprocess, "run",
+    monkeypatch.setattr(worker, "_run_in_group",
                         lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
     runner = worker._claude_runner(None, True)
     runner(["claude"], tmp_path, tmp_path / "log")

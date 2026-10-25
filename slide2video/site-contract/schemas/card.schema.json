@@ -12,7 +12,7 @@
   },
   "allOf": [
     {
-      "if": {"properties": {"kind": {"const": "questions"}}},
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "questions"}}},
       "then": {
         "required": ["questions"],
         "properties": {
@@ -44,7 +44,7 @@
       }
     },
     {
-      "if": {"properties": {"kind": {"const": "plan"}}},
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "plan"}}},
       "then": {
         "required": ["markdown", "estimate"],
         "properties": {
@@ -85,7 +85,7 @@
       }
     },
     {
-      "if": {"properties": {"kind": {"const": "review"}}},
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "review"}}},
       "then": {
         "required": ["chapter", "video"],
         "properties": {
@@ -105,7 +105,7 @@
       }
     },
     {
-      "if": {"properties": {"kind": {"const": "done"}}},
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "done"}}},
       "then": {
         "properties": {
           "chapters": {
@@ -118,7 +118,7 @@
       }
     },
     {
-      "if": {"properties": {"kind": {"const": "error"}}},
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "error"}}},
       "then": {
         "properties": {
           "reason": {"type": "string", "minLength": 1, "maxLength": 40},

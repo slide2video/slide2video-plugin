@@ -80,7 +80,7 @@ def test_given_turn_with_api_key_passes_the_key_to_claude(paired, lessons, tmp_p
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-0123")
     paired.files["fil_0123456789abcdefghijkl"] = DECK
     seen = {}
-    monkeypatch.setattr(worker.subprocess, "run",
+    monkeypatch.setattr(worker, "_run_in_group",
                         lambda cmd, **kw: seen.update(kw) or type("R", (), {"returncode": 0})())
     out = tmp_path / "card.json"
     worker.run_given(_turn_file(tmp_path), out, api_key=True, out=lambda *_: None)

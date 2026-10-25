@@ -7,7 +7,7 @@ import pytest
 
 import lv
 from lv import site, worker
-from test_worker import DECK, QUESTIONS, _claude_writing, _turn, lessons, lv_pid  # noqa: F401  (fixtures)
+from test_worker import DECK, QUESTIONS, _claude_writing, _turn, free, lessons, lv_pid  # noqa: F401  (fixtures)
 
 
 class Awake:
@@ -48,7 +48,7 @@ def test_watch_runs_queued_turns_back_to_back_then_stops(paired, lessons):
     assert code == 0 and len(paired.finished) == 2 and len(fake.calls) == 2
     assert any("Disconnected from the website" in l and "/slide2video:serve" in l for l in lines)
     assert a.on == 1 and a.off == 1
-    assert not (lessons / ".worker-watch.lock").exists() and not (lessons / ".worker.lock").exists()
+    assert free(lessons, ".worker-watch.lock") and free(lessons, ".worker.lock")
 
 
 def test_watch_first_call_sends_start_so_a_stale_stop_is_ignored(paired, lessons):
@@ -63,15 +63,14 @@ def test_watch_first_call_sends_start_so_a_stale_stop_is_ignored(paired, lessons
 
 def test_watch_waits_on_a_once_run_and_still_sends_start_first(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
-    lock = lessons / ".worker.lock"
-    lock.write_text(str(lv_pid), encoding="utf-8")  # a live `worker --once` holds the lock
+    holder = worker._lock(lessons, ".worker.lock")  # a live `worker --once` holds the lock
     paired.stop_next = True  # stale Disconnect mark
     n, lines = {"n": 0}, []
 
     def sleep(s):
         n["n"] += 1
         if n["n"] == 1:
-            lock.unlink()
+            holder.release()
         elif n["n"] == 3:
             paired.stop_next = True  # a real Disconnect ends the run
     a = Awake()
@@ -135,7 +134,7 @@ def test_watch_stops_when_not_paired(paired, lessons):
     assert code == 1 and "isn't connected to 127.0.0.1" in lines[-1]
     assert a.on == 0 and a.off == 0 and paired.next_queries == []  # found out before keep-awake started
     assert not any(l.startswith("Making videos for") for l in lines)
-    assert not (lessons / ".worker-watch.lock").exists()
+    assert free(lessons, ".worker-watch.lock")
 
 
 def test_watch_stops_with_the_websites_refusal(paired, lessons):
@@ -153,7 +152,7 @@ def test_watch_stops_on_contract_mismatch_from_an_older_website(paired, lessons)
 
 def test_second_watcher_is_refused(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
-    (lessons / ".worker-watch.lock").write_text(str(lv_pid), encoding="utf-8")
+    holder = worker._lock(lessons, ".worker-watch.lock")  # another run holds it
     code, lines, sleeps, a = _watch(_claude_writing(QUESTIONS))
     assert code == 0 and "already making videos" in lines[-1] and a.on == 0 and paired.next_queries == []
 
@@ -164,7 +163,7 @@ def test_watch_cleans_up_on_sigterm_style_interrupt(paired, lessons):
     a = Awake()
     code = worker.watch(claude=_claude_writing(QUESTIONS), out=lambda l: None, sleep=interrupted,
                         awake_on=a.keep, awake_off=a.release)
-    assert code == 0 and a.off == 1 and not (lessons / ".worker-watch.lock").exists()
+    assert code == 0 and a.off == 1 and free(lessons, ".worker-watch.lock")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="no SIGTERM to send to oneself on Windows")
@@ -179,7 +178,7 @@ def test_watch_turns_a_real_sigterm_into_a_clean_stop_and_restores_the_handler(p
         code = worker.watch(claude=_claude_writing(QUESTIONS), out=lines.append, sleep=terminated,
                             awake_on=a.keep, awake_off=a.release)
         assert code == 0 and a.off == 1 and lines[-1].startswith("Stopped.")
-        assert not (lessons / ".worker-watch.lock").exists()
+        assert free(lessons, ".worker-watch.lock")
         assert signal.getsignal(signal.SIGTERM) is ours
     finally:
         signal.signal(signal.SIGTERM, before)
@@ -201,7 +200,7 @@ def test_stop_during_a_step_hands_the_step_back_to_start_again(paired, lessons):
     assert "starts again" in card["message"]
     retry = dt.datetime.fromisoformat(card["retry_after"])
     assert before - dt.timedelta(seconds=1) <= retry <= dt.datetime.now().astimezone() + dt.timedelta(seconds=1)
-    assert not (lessons / ".worker-watch.lock").exists() and not (lessons / ".worker.lock").exists()
+    assert free(lessons, ".worker-watch.lock") and free(lessons, ".worker.lock")
 
 
 def test_stop_during_a_step_sends_once_quickly_and_never_waits_on_a_failure(paired, lessons, monkeypatch):
@@ -218,7 +217,7 @@ def test_stop_during_a_step_sends_once_quickly_and_never_waits_on_a_failure(pair
     code, lines, sleeps, a = _watch(_stopped_claude)
     assert code == 0 and paired.finished == [] and a.off == 1
     assert seen == [(10, 0)]
-    assert not (lessons / ".worker-watch.lock").exists() and not (lessons / ".worker.lock").exists()
+    assert free(lessons, ".worker-watch.lock") and free(lessons, ".worker.lock")
 
 
 def test_run_once_says_disconnected_on_a_stop(paired, lessons):

@@ -218,3 +218,56 @@ def test_cli_has_no_site_option():
         for cmd in (["pair"], ["worker", "--status"]):
             with pytest.raises(SystemExit):
                 cli.build_parser().parse_args([*cmd, "--site", site_arg])
+
+
+# --- review fixes (slide2video-site#8) -----------------------------------------------------------------------------------
+
+def test_keychain_set_trusts_securitys_own_failure_line_not_any_word_error(monkeypatch):
+    monkeypatch.setattr(site.subprocess, "run", lambda argv, **kw: _Done(stderr="note: no error handling needed\n"))
+    site.KeychainStore().set("https://slide2video.com", "s2v_secret-token-0123456789ab")   # saved
+    failed = "security: SecKeychainItemCreateFromContent (<default>): The user name or passphrase you entered is not correct.\n"
+    monkeypatch.setattr(site.subprocess, "run", lambda argv, **kw: _Done(stderr=failed))   # exit 0, but it failed
+    with pytest.raises(UserError):
+        site.KeychainStore().set("https://slide2video.com", "s2v_secret-token-0123456789ab")
+
+
+def test_file_store_says_pair_again_when_its_file_is_damaged(tmp_path, monkeypatch):
+    s = site.FileStore()
+    s._file().parent.mkdir(parents=True, exist_ok=True)
+    s._file().write_text("{not json", encoding="utf-8")
+    with pytest.raises(UserError) as e:
+        s.get("https://slide2video.com")
+    assert "connect this computer again" in str(e.value)
+    s.set("https://slide2video.com", "s2v_x")   # pairing again replaces it
+    assert s.get("https://slide2video.com") == "s2v_x"
+    s._file().write_text("[]", encoding="utf-8")
+    s.delete("https://slide2video.com")
+    assert not s._file().exists()
+
+
+def test_file_store_is_private_from_the_first_byte(tmp_path, monkeypatch):
+    import os
+    modes = []
+    real = os.open
+
+    def spy(path, flags, mode=0o777, *a, **kw):
+        if str(path).endswith(".tmp"):
+            modes.append(mode)
+        return real(path, flags, mode, *a, **kw)
+    monkeypatch.setattr(site.os, "open", spy)
+    site.FileStore().set("https://slide2video.com", "s2v_x")
+    assert modes == [0o600]
+    assert not list(site.FileStore()._file().parent.glob(".*.tmp"))
+
+
+def test_pair_keeps_waiting_through_a_network_blip(fake_site, monkeypatch):
+    real, failed = site.call, []
+
+    def flaky(path, *a, **kw):
+        if path.endswith("/pair/poll") and not failed:
+            failed.append(path)
+            raise net.ApiError(0, "connection reset", path)
+        return real(path, *a, **kw)
+    monkeypatch.setattr(site, "call", flaky)
+    assert site.pair(name="Test Mac", sleep=lambda s: None, out=lambda s: None) == "user@example.org"
+    assert failed and site.store.get(fake_site.url) == fake_site.token
