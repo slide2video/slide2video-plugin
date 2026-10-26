@@ -17,11 +17,11 @@ def plan_chars(chapters: int, minutes: float) -> int:
 
 
 def gemini_usd(clips: int, music: bool) -> float:
-    return round(clips * config.VEO_SECONDS * config.VEO_PRICE_PER_SECOND + (config.LYRIA_PRICE if music else 0), 2)
+    return round(clips * config.CLIP_PRICE + (config.LYRIA_PRICE if music else 0), 2)
 
 
 def report(chars: int, clips: int, music: bool, paid_voice: bool = True) -> str:
-    clip_usd = config.VEO_SECONDS * config.VEO_PRICE_PER_SECOND
+    clip_usd = config.CLIP_PRICE
     lines = [
         f"Narration: about {chars:,} ElevenLabs characters (Free plan: 10,000 a month; Starter: 30,000 a month). "
         "Allow about 20% extra for re-recorded scenes." if paid_voice else
@@ -35,14 +35,14 @@ def report(chars: int, clips: int, music: bool, paid_voice: bool = True) -> str:
 def breakdown(chars: int, clips: int, music: bool, paid_voice: bool = True,
               chapters: int | None = None, minutes: float | None = None) -> dict:
     """The plan card's estimate as data: the dollar total and one line per part (the same numbers as `report`)."""
-    clip_usd = config.VEO_SECONDS * config.VEO_PRICE_PER_SECOND
+    clip_usd = config.CLIP_PRICE
     items = [{"label": "Narration (ElevenLabs)", "usd": 0, "detail": f"about {chars:,} characters of your ElevenLabs plan"}
              if paid_voice else {"label": "Narration (free voice)", "usd": 0}]
     if music:
         items.append({"label": "Background music", "usd": round(config.LYRIA_PRICE, 2)})
     if clips:
         items.append({"label": f"{clips} short animated clip{'' if clips == 1 else 's'}", "usd": round(clips * clip_usd, 2),
-                      "detail": f"{config.VEO_SECONDS:g} seconds each"})
+                      "detail": f"{config.CLIP_SECONDS:g} seconds each"})
     out = {"usd": gemini_usd(clips, music), "items": items}
     if chapters is not None:
         out["quantities"] = {"chapters": chapters, "minutes": minutes, "clips": clips, "music": bool(music), "chars": chars}

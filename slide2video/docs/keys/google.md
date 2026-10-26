@@ -1,11 +1,11 @@
 # Google Gemini key, step by step
 
-A Gemini key lets slide2video add soft background music. It's optional: videos work without it. (AI clips from your photos are off for now: Google retired the video model slide2video used.)
+A Gemini key lets slide2video add soft background music and a few short AI-animated clips made from your photos. It's optional: videos work without it.
 
 ## Before you start: the cost
 
-- Google has no free tier for music. You turn on billing and make a **$5 minimum prepayment**.
-- About **$0.08 per music track**.
+- Google has no free tier for music and clips. You turn on billing and make a **$5 minimum prepayment**.
+- About **$0.08 per music track** and **about $1 per 10-second clip**: roughly $2–4 for a whole unit.
 - Use a **personal** Google account. School accounts often have AI Studio turned off.
 
 ## Make the key
@@ -32,7 +32,7 @@ A Gemini key lets slide2video add soft background music. It's optional: videos w
 
    ![The Monthly spend cap card with Edit spend cap](../images/google-spend-cap.webp)
 
-Billing is only confirmed the first time music is made, because testing it costs money.
+Billing is only confirmed the first time music or a clip is made, because testing it costs money.
 
 ## Save it
 

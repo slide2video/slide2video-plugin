@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     m = sub.add_parser("music", help="one Lyria music bed (~$0.08) into _work/music/bed.mp3")
     m.add_argument("work", type=Path)
     m.add_argument("--prompt", required=True)
-    c = sub.add_parser("clip", help="one Veo clip (~$0.40) from a photo into _work/clips/")
+    c = sub.add_parser("clip", help="one AI clip (~$1.02, 10 seconds) from a photo into _work/clips/")
     c.add_argument("image", type=Path)
     c.add_argument("--work", type=Path, required=True)
     c.add_argument("--name", required=True)
@@ -272,8 +272,6 @@ def dispatch(args) -> int:
         return 0
     from . import config, estimate, status
     if args.cmd == "estimate":
-        if args.clips and not config.CLIPS_ENABLED:
-            raise UserError(config.CLIPS_OFF)
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
         paid = bool(keys.get("ELEVENLABS_API_KEY", required=False))
         if args.json:
@@ -290,8 +288,6 @@ def dispatch(args) -> int:
         print(music.make_bed(args.work.resolve(), args.prompt))
         return 0
     if args.cmd == "clip":
-        if not config.CLIPS_ENABLED:
-            raise UserError(config.CLIPS_OFF)
         clips.make_clip(args.image, args.prompt, args.name, args.work.resolve(), args.frac)
         return 0
     if args.cmd == "frames":

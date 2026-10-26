@@ -59,11 +59,11 @@ Then open the keys page in their browser with `LV open https://elevenlabs.io/app
 4. Optional but recommended: put a limit in **Per credit refresh period** (for example 30000) so the key can never spend more.
 5. Click **Create Key** and **Copy** the key. It is shown only once.
 
-## 4. Gemini key (optional: background music)
+## 4. Gemini key (optional: music and AI video clips)
 
-Ask whether they want soft background music. (AI clips from their photos are off for now: Google retired the video model slide2video used.) If not, and they chose the free voice in step 3, skip to step 7: there are no keys to enter. Videos still work.
+Ask whether they want background music and a few short AI-animated clips made from their photos. If not, and they chose the free voice in step 3, skip to step 7: there are no keys to enter. Videos still work.
 
-If yes, explain: this needs a Google account with billing turned on (Google has no free tier for these), a minimum $5 prepayment, and costs about $0.08 per music track. Use a **personal** Google account: school accounts often have AI Studio turned off.
+If yes, explain: this needs a Google account with billing turned on (Google has no free tier for these), a minimum $5 prepayment, and costs about $1 per 10-second clip and $0.08 per music track, roughly $2–4 for a whole unit. Use a **personal** Google account: school accounts often have AI Studio turned off.
 
 Run `LV open https://aistudio.google.com/api-keys` and guide them:
 1. Sign in, accept the terms.

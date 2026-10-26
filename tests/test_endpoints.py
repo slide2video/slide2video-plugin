@@ -17,9 +17,11 @@ def test_roots_ignore_blank_and_trailing_slash(monkeypatch):
     monkeypatch.setenv("LV_GEMINI_ROOT", "https://proxy.test/g/")
     assert config.eleven_root() == "https://api.elevenlabs.io/v1"
     assert config.gemini_root() == "https://proxy.test/g"
-    assert clips.retarget("https://generativelanguage.googleapis.com/v1beta/files/a:download?alt=media") == \
-        "https://proxy.test/g/files/a:download?alt=media"
-    assert clips.retarget("https://other.test/x") == "https://other.test/x"
+    seen = []
+    monkeypatch.setenv("GEMINI_API_KEY", "AIzaSyD-abcdefghijklmnopqrstuvwxyz12345")
+    video = {"steps": [{"type": "model_output", "content": [{"type": "video", "data": "TVA0"}]}]}
+    assert clips.omni(b"png", "p", request=lambda url, **kw: seen.append(url) or video) == b"MP4"
+    assert seen == ["https://proxy.test/g/interactions"]   # the clip goes where LV_GEMINI_ROOT says
 
 
 def test_no_module_formats_a_vendor_constant_directly():

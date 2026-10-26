@@ -38,27 +38,47 @@ def test_prep_crops_to_720p(tmp_path):
         assert im.size == (1280, 720)
 
 
-def test_veo_polls_then_downloads(tmp_path):
+def test_a_clip_is_one_omni_flash_interaction_answered_at_once(tmp_path):
     Image.new("RGB", (1600, 900), "blue").save(tmp_path / "a.png")
     calls = []
-    def fake(url, data=None, headers=None, timeout=None, raw=False, **kw):
-        calls.append(url)
-        if url.endswith(":predictLongRunning"):
-            assert data["parameters"]["resolution"] == "720p"
-            return {"name": "operations/abc"}
-        if url.endswith("operations/abc"):
-            return {"done": len(calls) > 2, "response": {"generateVideoResponse": {"generatedSamples": [{"video": {"uri": "https://dl.test/v.mp4"}}]}}}
-        assert raw
-        return b"MP4DATA"
-    out = clips.make_clip(tmp_path / "a.png", "kelp swaying", "kelp", tmp_path, request=fake, sleep=lambda s: None, strip=False)
-    assert out.read_bytes() == b"MP4DATA" and calls[-1] == "https://dl.test/v.mp4"
+
+    def fake(url, data=None, headers=None, timeout=None, retries=None, **kw):
+        calls.append((url, data, headers, retries))
+        return {"status": "completed", "usage": {"total_output_tokens": 57920},
+                "steps": [{"type": "thought", "content": [{"type": "thought", "text": "..."}]},
+                          {"type": "model_output", "content": [{"type": "video", "mime_type": "video/mp4",
+                                                                 "data": base64.b64encode(b"MP4DATA").decode()}]}]}
+    out = clips.make_clip(tmp_path / "a.png", "kelp swaying", "kelp", tmp_path, request=fake, strip=False)
+    assert out.read_bytes() == b"MP4DATA"
+    [(url, data, headers, retries)] = calls
+    assert url.endswith("/v1beta/interactions") and headers == {"x-goog-api-key": KEY}
+    assert data["model"] == "gemini-omni-1.1-flash" and data["generation_config"] == {"video_config": {"task": "image_to_video"}}
+    assert data["response_format"] == {"type": "video", "resolution": "720p", "aspect_ratio": "16:9"}
+    assert (data["background"], data["store"], data["stream"]) == (False, False, False)
+    assert [p["type"] for p in data["input"]] == ["image", "text"] and data["input"][1]["text"] == "kelp swaying"
+    assert retries == 0   # a retry after a failed answer could pay for a second clip
 
 
-def test_veo_safety_filter_message():
-    op = {"done": True, "response": {"generateVideoResponse": {"raiMediaFilteredCount": 1, "raiMediaFilteredReasons": ["person"]}}}
+@pytest.mark.parametrize("resp, says", [
+    ({"status": "completed", "steps": [{"type": "model_output", "content": [{"type": "text", "text": "I can't make that video."}]}]},
+     "I can't make that video."),
+    ({"status": "failed", "steps": []}, "status: failed"),
+    ({}, "status: none"),
+], ids=["refused in words", "failed", "empty"])
+def test_no_video_says_why(resp, says):
     with pytest.raises(UserError) as e:
-        clips.result_uri(op)
-    assert "safety filter" in str(e.value)
+        clips.video_of(resp)
+    assert "made no clip" in str(e.value) and says in str(e.value)
+
+
+def test_a_clip_api_error_never_shows_the_key(tmp_path):
+    Image.new("RGB", (1600, 900), "blue").save(tmp_path / "a.png")
+
+    def fake(url, **kw):
+        raise net.ApiError(429, "RESOURCE_EXHAUSTED: billing " + KEY, url)
+    with pytest.raises(UserError) as e:
+        clips.make_clip(tmp_path / "a.png", "x", "kelp", tmp_path, request=fake, strip=False)
+    assert KEY not in str(e.value)
 
 
 def test_frames(tmp_path):
@@ -70,26 +90,18 @@ def test_frames(tmp_path):
     assert (tmp_path / "clip_c/0001.jpg").exists()
 
 
-def test_clips_are_off_until_the_new_model(monkeypatch, tmp_path, capsys):
-    from lv import cli, config
-    assert config.CLIPS_ENABLED is False
-    monkeypatch.setattr(clips, "veo", lambda *a, **k: pytest.fail("no clip should be made"))
-    (tmp_path / "photo.jpg").write_bytes(b"x")
-    assert cli.main(["clip", str(tmp_path / "photo.jpg"), "--work", str(tmp_path / "w"), "--name", "kelp", "--prompt", "p"]) == 1
-    assert "AI clips are off" in capsys.readouterr().err
-
-
-def test_an_estimate_with_clips_is_refused_while_they_are_off(monkeypatch, tmp_path, capsys):
-    from lv import cli, keys
+def test_clips_are_on_and_priced_from_config(monkeypatch, tmp_path, capsys):
+    from lv import cli, config, keys
     monkeypatch.setattr(keys, "get", lambda *a, **k: None)
-    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "1", "--json"]) == 1
-    assert "--clips 0" in capsys.readouterr().err
-    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "0", "--music", "--json"]) == 0
+    assert cli.main(["estimate", str(tmp_path), "--chapters", "2", "--minutes", "3", "--clips", "2", "--music", "--json"]) == 0
+    import json
+    est = json.loads(capsys.readouterr().out)
+    assert est["usd"] == round(2 * config.CLIP_PRICE + config.LYRIA_PRICE, 2)
+    assert {"label": "2 short animated clips", "usd": round(2 * config.CLIP_PRICE, 2), "detail": "10 seconds each"} in est["items"]
 
 
-def test_the_skills_plan_no_clips_while_they_are_off():
+def test_the_make_skill_offers_clips_again():
     from pathlib import Path
     make = (Path(__file__).parents[1] / "slide2video/skills/make/SKILL.md").read_text(encoding="utf-8")
-    assert "AI clips are off for now" in make
-    assert "LV clip " not in make
-    assert "--clips 0" in make
+    assert "AI clips are off" not in make
+    assert "LV clip " in make and "--clips <K>" in make and "A clip is 10 seconds" in make
