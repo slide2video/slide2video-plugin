@@ -66,7 +66,7 @@ def test_check_reports_credits_without_leaking(monkeypatch):
     text = repr(rows)
     assert EL not in text
     assert rows[0][1] is True and "28,766 characters left" in rows[0][2]
-    assert rows[1] == ("Gemini", True, "not set (optional): no music")
+    assert rows[1] == ("Gemini", True, "not set (optional): no music, no AI clips")
 
 
 def test_check_rejected_key_without_leaking(monkeypatch):

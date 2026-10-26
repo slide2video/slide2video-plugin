@@ -8,9 +8,9 @@ from lv.util import write_json, write_text
 
 def test_plan_estimate():
     assert estimate.plan_chars(5, 5) == 22500
-    assert estimate.gemini_usd(2, True) == 0.88
+    assert estimate.gemini_usd(2, True) == 2.12   # two $1.02 clips and the $0.08 music
     r = estimate.report(22500, 2, True)
-    assert "22,500" in r and "$0.88" in r and "20%" in r
+    assert "22,500" in r and "$2.12" in r and "20%" in r
     free = estimate.report(22500, 0, False, paid_voice=False)
     assert "free voice" in free and "$0.00" in free
 
@@ -41,7 +41,7 @@ def test_status_stages(tmp_path):
 
 def test_breakdown_lists_what_report_says():
     b = estimate.breakdown(22500, 2, True)
-    assert b["usd"] == estimate.gemini_usd(2, True) == 0.88
+    assert b["usd"] == estimate.gemini_usd(2, True) == 2.12
     assert [i["label"] for i in b["items"]] == ["Narration (ElevenLabs)", "Background music", "2 short animated clips"]
     assert round(sum(i["usd"] for i in b["items"]), 2) == b["usd"]
     assert "22,500 characters" in b["items"][0]["detail"]

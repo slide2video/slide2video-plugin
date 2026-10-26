@@ -19,7 +19,7 @@ Students get to rewatch the lesson in your words: every definition, example and 
 - Animated diagrams and your own slide images, revealed in sync with the narration.
 - Captions, "test tip" and "trap" callouts.
 - A short pause-and-answer quiz and a recap. Questions already in your deck are shown but never answered: they stay yours.
-- Optional background music. (AI clips from your photos are off for now: Google retired the video model slide2video used.)
+- Optional background music and a few AI-animated clips made from your photos.
 
 Videos are 4–6 minutes by default; you choose the length.
 
@@ -37,12 +37,12 @@ Videos are 4–6 minutes by default; you choose the length.
 
 Invited to slide2video.com? Upload from any computer, and your own computer at home makes the videos: [Connect a computer to slide2video.com](docs/install/slide2video.md).
 
-## Optional: a better voice and music
+## Optional: a better voice, music and clips
 
 With no accounts at all, videos use a free Microsoft voice and cost nothing beyond your Claude plan.
 
 - **ElevenLabs** for the most natural voice: the free plan covers about one video a month; Starter is $6/month.
-- **Google Gemini** for music (about $0.08 a track), with a $5 minimum prepayment.
+- **Google Gemini** for music (about $0.08 a track) and AI clips (about $1 for a 10-second clip): roughly $2–4 per unit, with a $5 minimum prepayment.
 
 [How to get the keys, step by step](docs/keys/README.md). Claude can do the clicking for you with the Claude in Chrome extension.
 

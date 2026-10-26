@@ -92,13 +92,11 @@ def gemini_root() -> str:
     """The Gemini address: LV_GEMINI_ROOT if set and not blank, else the vendor's."""
     return _root("LV_GEMINI_ROOT", GEMINI_ROOT)
 
-VEO_MODEL = "veo-3.1-lite-generate-preview"
-# Google shut VEO_MODEL down on 2026-10-22 and named no similar model; AI clips stay off until they move to its successor.
-CLIPS_ENABLED = False
-CLIPS_OFF = ("AI clips are off for now: Google retired the video model slide2video used. "
-             "Videos work without them; plan no clips (--clips 0).")
-VEO_SECONDS = 8
-VEO_PRICE_PER_SECOND = 0.05                # USD at 720p
+# Gemini Omni Flash (image to video), Veo's successor on the Gemini API since Google shut Veo there on 2026-10-22
+CLIP_MODEL = "gemini-omni-1.1-flash"
+CLIP_SECONDS = 10                          # one generation; there is no length setting
+# USD for one 720p clip: about 58,000 video tokens at $17.50 per 1M, plus about 1,200 input tokens at $1.50 per 1M
+CLIP_PRICE = 1.02
 LYRIA_MODEL = "lyria-3.5"
 LYRIA_PRICE = 0.08                         # USD per track
 

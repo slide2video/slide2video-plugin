@@ -16,7 +16,7 @@ from .util import UserError, read_text, write_text
 
 VARS = {
     "ELEVENLABS_API_KEY": "ElevenLabs (most natural narration, optional)",
-    "GEMINI_API_KEY": "Gemini (music, optional)",
+    "GEMINI_API_KEY": "Gemini (music and AI clips, optional)",
 }
 ENV_SECRETS = ("ANTHROPIC_API_KEY", "LV_SITE_TOKEN")
 TEMPLATE = """# slide2video API keys
@@ -228,11 +228,11 @@ def check(request=None) -> list[tuple[str, bool, str]]:
                 rows.append(("ElevenLabs", False, f"{mask(el)}; {hint}"))
     gm = get("GEMINI_API_KEY", required=False)
     if not gm:
-        rows.append(("Gemini", True, "not set (optional): no music"))
+        rows.append(("Gemini", True, "not set (optional): no music, no AI clips"))
     else:
         try:
             request(f"{config.gemini_root()}/models?pageSize=1", headers={"x-goog-api-key": gm}, timeout=30)
-            rows.append(("Gemini", True, f"{mask(gm)}; key works. Billing is checked the first time music is made."))
+            rows.append(("Gemini", True, f"{mask(gm)}; key works. Billing is checked the first time music or a clip is made."))
         except net.ApiError as e:
             blocked = net.blocked_hint(urllib.parse.urlparse(config.gemini_root()).netloc) if e.status == 0 else ""
             hint = blocked or ("the key was rejected: create a new one and paste it again" if e.status in (400, 401, 403) else str(e))

@@ -1,9 +1,8 @@
-"""Veo image-to-video clips from deck photos, and their JPEG frames for the engine's clip()."""
+"""AI image-to-video clips from deck photos (Gemini Omni Flash), and their JPEG frames for the engine's clip()."""
 from __future__ import annotations
 
 import base64
 import io
-import time
 from pathlib import Path
 
 from . import config, keys, net, paths, tools
@@ -29,49 +28,38 @@ def prep(image: Path, frac: float = 0.5) -> bytes:
     return b.getvalue()
 
 
-def result_uri(op: dict) -> str:
-    if op.get("error"):
-        raise UserError(f"Veo failed: {op['error'].get('message', 'no reason given')}")
-    resp = (op.get("response") or {}).get("generateVideoResponse") or {}
-    samples = resp.get("generatedSamples") or []
-    if not samples:
-        if resp.get("raiMediaFilteredCount") or resp.get("raiMediaFilteredReasons"):
-            reasons = "; ".join(resp.get("raiMediaFilteredReasons") or []) or "no reason given"
-            raise UserError(f"Veo's safety filter dropped the clip ({reasons}). Try another photo or prompt (photos of children are often refused).")
-        raise UserError("Veo finished without a video and without a reason; try again.")
-    uri = (samples[0].get("video") or {}).get("uri")
-    if not uri:
-        raise UserError("Veo finished without a video link; try again.")
-    return uri
+def video_of(resp: dict) -> bytes:
+    """The clip in an Interactions answer (a `video` part of a `model_output` step, inline), or why there is none."""
+    texts = []
+    for step in resp.get("steps") or []:
+        for part in (step.get("content") or []) if isinstance(step, dict) else []:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "video" and part.get("data"):
+                return base64.b64decode(part["data"])
+            if part.get("type") == "text" and isinstance(part.get("text"), str) and step.get("type") == "model_output":
+                texts.append(part["text"].strip())
+    said = " ".join(t for t in texts if t)[:300]
+    raise UserError("The video model made no clip" + (f": {said}" if said else f" (status: {resp.get('status') or 'none'})")
+                    + ". Try another photo or prompt (photos of people, and of children above all, are often refused).")
 
 
-def retarget(uri: str) -> str:
-    """A link under the vendor's Gemini address is rewritten to the configured one; any other link is unchanged."""
-    if uri.startswith(config.GEMINI_ROOT):
-        return config.gemini_root() + uri[len(config.GEMINI_ROOT):]
-    return uri
-
-
-def veo(image_png: bytes, prompt: str, request=None, sleep=time.sleep, max_polls: int = 60) -> bytes:
+def omni(image_png: bytes, prompt: str, request=None) -> bytes:
+    """One 10-second 720p 16:9 clip from the photo: Gemini Omni Flash through the Interactions API, answered at once
+    (no polling) with the video inline."""
     request = request or net.request
     h = {"x-goog-api-key": keys.get("GEMINI_API_KEY")}
-    payload = {"instances": [{"prompt": prompt, "image": {"bytesBase64Encoded": base64.b64encode(image_png).decode("ascii"),
-                                                          "mimeType": "image/png"}}],
-               "parameters": {"aspectRatio": "16:9", "durationSeconds": config.VEO_SECONDS, "resolution": "720p",
-                              "personGeneration": "allow_adult"}}
+    payload = {"model": config.CLIP_MODEL,
+               "input": [{"type": "image", "data": base64.b64encode(image_png).decode("ascii"), "mime_type": "image/png"},
+                         {"type": "text", "text": prompt}],
+               "generation_config": {"video_config": {"task": "image_to_video"}},
+               "response_format": {"type": "video", "resolution": "720p", "aspect_ratio": "16:9"},
+               "background": False, "store": False, "stream": False}
     try:
-        op = request(f"{config.gemini_root()}/models/{config.VEO_MODEL}:predictLongRunning", data=payload, headers=h, timeout=60)
-        name = op.get("name") or ""
-        if not name:
-            raise UserError("Veo didn't start the job; try again.")
-        for _ in range(max_polls):
-            sleep(10)
-            op = request(f"{config.gemini_root()}/{name}", headers=h, timeout=60)
-            if op.get("done"):
-                return request(retarget(result_uri(op)), headers=h, timeout=300, raw=True)
+        resp = request(f"{config.gemini_root()}/interactions", data=payload, headers=h, timeout=900, retries=0)
     except net.ApiError as e:
         raise net.gemini_error(e, "AI clip") from None
-    raise UserError(f"Veo was still working after {max_polls * 10 // 60} minutes; try again later.")
+    return video_of(resp)
 
 
 def check_name(name: str) -> str:
@@ -82,17 +70,16 @@ def check_name(name: str) -> str:
     return name
 
 
-def make_clip(image: Path, prompt: str, name: str, work: Path, frac: float = 0.5, request=None, sleep=time.sleep,
-              strip: bool = True) -> Path:
+def make_clip(image: Path, prompt: str, name: str, work: Path, frac: float = 0.5, request=None, strip: bool = True) -> Path:
     check_name(name)
     out = paths.lesson(work).sources / "clips" / f"{name}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(veo(prep(image, frac), prompt, request=request, sleep=sleep))
+    out.write_bytes(omni(prep(image, frac), prompt, request=request))
     write_text(out.with_suffix(".txt"), f"source: {Path(image).name}\nprompt: {prompt}\n")
     if strip:  # one frame per second, side by side, to check the subject doesn't drift
         run(tools.ffmpeg(), "-v", "error", "-y", "-i", out, "-vf", "fps=1,scale=320:-2,tile=8x1", "-frames:v", "1",
             out.with_name(f"{name}-strip.jpg"))
-    print(f"clip {out} (~${config.VEO_SECONDS * config.VEO_PRICE_PER_SECOND:.2f})")
+    print(f"clip {out} (~${config.CLIP_PRICE:.2f})")
     return out
 
 
