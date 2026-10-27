@@ -195,11 +195,16 @@ def test_invalid_card_is_an_error(paired, lessons):
 
 
 def test_usage_limit_sets_retry_after():
-    now = dt.datetime(2026, 10, 14, 10, 0, tzinfo=dt.timezone(dt.timedelta(hours=-7)))
+    # "resets 3pm" names no zone, so it is 3pm on this computer's clock: build "now" and the expected times on that
+    # clock too (CI runs in UTC, a maintainer's Mac in Pacific time). A zone Claude names is pinned by
+    # test_the_reset_time_follows_the_zone_claude_names_across_daylight_saving.
+    now = dt.datetime(2026, 10, 14, 10, 0).astimezone()
     card = worker.error_card("Claude stopped.", "5-hour limit reached ∙ resets 3pm\n", now=now, detect_limit=True)
-    assert card["retry_after"] == "2026-10-14T15:00:00-07:00" and "usage limit" in card["message"]
-    later = now.replace(hour=16)
-    assert worker.error_card("x", "5-hour limit reached ∙ resets 3pm", now=later, detect_limit=True)["retry_after"].startswith("2026-10-15T15:00")
+    assert card["retry_after"] == dt.datetime(2026, 10, 14, 15, 0).astimezone().isoformat()
+    assert "usage limit" in card["message"]
+    later = dt.datetime(2026, 10, 14, 16, 0).astimezone()
+    got = worker.error_card("x", "5-hour limit reached ∙ resets 3pm", now=later, detect_limit=True)["retry_after"]
+    assert got == dt.datetime(2026, 10, 15, 15, 0).astimezone().isoformat()
     assert worker.error_card("x", "some other failure", now=now, detect_limit=True)["retry_after"] is None
 
 

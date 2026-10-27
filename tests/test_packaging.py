@@ -80,6 +80,16 @@ def test_edge_tts_floor_has_the_v2_token_fix():
     assert tuple(map(int, floor.split("."))) >= (7, 3, 1)
 
 
+def test_inline_deps_carry_tzdata_and_the_pillow_security_floor():
+    """Windows has no system time zone database, so without the tzdata package zoneinfo can't read the zone Claude names
+    in a usage-limit message ("resets 3pm (America/Los_Angeles)"). Pillow 13.0.0 is the security release; a lower floor
+    lets a teacher's cached script environment keep an older, vulnerable Pillow."""
+    script = (PLUGIN / "scripts/slide2video.py").read_text(encoding="utf-8")
+    assert re.search(r'"tzdata(>=[\d.]+)?"', script)
+    floor = re.search(r'"pillow>=([\d.]+)"', script).group(1)
+    assert tuple(map(int, floor.split("."))) >= (13, 0, 0)
+
+
 def test_skills_say_where_to_find_the_scripts_when_skill_dir_is_empty():
     """Seen in a claude.ai session: ${CLAUDE_SKILL_DIR} came through empty and the skill copy lived elsewhere."""
     for name in ("make", "setup", "serve"):
