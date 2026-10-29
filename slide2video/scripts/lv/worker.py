@@ -102,15 +102,17 @@ def read_rule(folder: PurePath) -> str:
 
 
 def claude_command(lv: str) -> list[str]:
-    """Claude Code pinned to this job: one model (config.CLAUDE_MODEL), no user, project or local settings (so no
-    hooks, extra allow rules or permission mode of the teacher's own), no MCP servers, this plugin loaded explicitly,
-    and anything not allowed below is refused without asking (nobody is there to answer)."""
+    """Claude Code pinned to this job: one model (config.CLAUDE_MODEL) at one effort (config.CLAUDE_EFFORT), no user,
+    project or local settings (so no hooks, extra allow rules or permission mode of the teacher's own), no MCP servers,
+    this plugin loaded explicitly, and anything not allowed below is refused without asking (nobody is there to
+    answer)."""
     claude = shutil.which("claude")
     if not claude:
         raise UserError("Claude Code isn't installed on this computer (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
     model = os.environ.get("LV_CLAUDE_MODEL") or config.CLAUDE_MODEL
-    return [claude, "-p", PROMPT, "--model", model,
+    effort = os.environ.get("LV_CLAUDE_EFFORT") or config.CLAUDE_EFFORT
+    return [claude, "-p", PROMPT, "--model", model, *([] if effort == "default" else ["--effort", effort]),
             "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
             "--plugin-dir", str(config.PLUGIN_ROOT),
             "--allowedTools", f"Bash({lv}:*)", "Read(./**)", read_rule(config.PLUGIN_ROOT), "Edit(./**)",

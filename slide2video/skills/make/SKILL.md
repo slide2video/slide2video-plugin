@@ -122,7 +122,10 @@ below. **Never ask in chat** and never wait for an answer: do the work for this 
 check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
 
 - **Commands:** use the command in `site/lv.txt` exactly, in place of the command at the top of this skill (it is
-  the same plugin with absolute paths). Only that command, file reading and file editing are allowed.
+  the same plugin with absolute paths). Only that command, file reading and file editing are allowed. Run each command
+  as its own Bash call that starts with the text of `site/lv.txt`, followed by its arguments: never `cd`, a variable,
+  `eval` or another command before it, and never `;`, `&&` or a pipe. Anything else is refused. Read and write files
+  (progress, notes, cards) with the file tools, not the shell.
 - Some commands are switched off in site mode (`open`, `pair`, `worker`, `init`, and `keys` except `keys check`); don't try them.
 - **Replaces the chat steps:** site mode replaces every "ask the teacher" and "tell the teacher" in steps 0–8:
   questions go in a `questions` card, notices go in the card's `message`.

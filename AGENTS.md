@@ -50,6 +50,8 @@ Each is optional; with none set, behaviour is unchanged.
 
 - `LV_ELEVEN_ROOT`, `LV_GEMINI_ROOT`: the address used for ElevenLabs / Gemini calls instead of the vendor's.
 - `LV_SITE_TOKEN`: the website token, taken from the environment instead of the Keychain or file store.
+- `LV_CLAUDE_MODEL`, `LV_CLAUDE_EFFORT`: the model and effort website jobs run Claude Code with, instead of
+  `config.CLAUDE_MODEL` (`opus`) and `config.CLAUDE_EFFORT` (`low`); `LV_CLAUDE_EFFORT=default` passes no `--effort`.
 - `worker --api-key`: run Claude Code with the key in `ANTHROPIC_API_KEY` instead of the computer's sign-in.
 - `worker --turn TURN.json --card-out CARD.json`: run the turn in that file and write the resulting card to the
   second file, without taking a job from the website or finishing one.
@@ -74,7 +76,7 @@ The rename to slide2video left these unchanged on purpose, because the website,
 the worker, saved projects and existing video projects depend on them: the Python
 package `lv`; env vars `LV_*` and `LESSON_VIDEOS_*`; headers `X-LV-Plugin` and
 `X-LV-Contract`; the contents and schemas of `slide2video/site-contract/`
-(`{"plugin": "2.5.1"}`, the version the website is built for); the Keychain entry; and
+(`{"plugin": "2.5.2"}`, the version the website is built for); the Keychain entry; and
 the `lesson-videos/` folder inside a website video project folder (worker `_inside`,
 `_publish`, `timing_for`, `deck.json` paths). Do not rename them.
 
