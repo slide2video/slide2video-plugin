@@ -55,6 +55,7 @@
     },
     "feedback": {"type": ["string", "null"], "maxLength": 4000},
     "notes": {"type": "array"},
+    "mode": {"enum": ["basic", "normal", "premium"]},
     "delete": {"type": "boolean"}
   }
 }

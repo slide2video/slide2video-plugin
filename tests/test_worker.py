@@ -328,6 +328,35 @@ def test_claude_command_effort_is_low_unless_overridden(monkeypatch):
     assert "--effort" not in worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
 
 
+@pytest.mark.parametrize("mode, kind, expected", [
+    (None, "start", ("opus", "low")), (None, "approve", ("opus", "low")),
+    ("basic", "start", ("sonnet", "default")), ("basic", "answer", ("sonnet", "default")),
+    ("basic", "change", ("sonnet", "default")), ("basic", "approve", ("opus", "low")),
+    ("basic", "continue", ("opus", "low")), ("basic", "feedback", ("opus", "low")),
+    ("normal", "start", ("opus", "low")), ("normal", "revise", ("opus", "low")),
+    ("premium", "start", ("opus", "default")), ("premium", "approve", ("opus", "default")),
+    ("unknown", "approve", ("opus", "low")),
+])
+def test_render_mode_picks_model_and_effort(monkeypatch, mode, kind, expected):
+    monkeypatch.delenv("LV_CLAUDE_MODEL", raising=False)
+    monkeypatch.delenv("LV_CLAUDE_EFFORT", raising=False)
+    assert worker.model_and_effort(kind, mode) == expected
+
+
+def test_render_mode_reaches_claude_and_overrides_still_win(monkeypatch):
+    monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
+    monkeypatch.delenv("LV_CLAUDE_MODEL", raising=False)
+    monkeypatch.delenv("LV_CLAUDE_EFFORT", raising=False)
+    cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"', "start", "basic")
+    assert _flag(cmd, "--model") == ["sonnet"] and "--effort" not in cmd
+    cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"', "approve", "premium")
+    assert _flag(cmd, "--model") == ["opus"] and "--effort" not in cmd
+    monkeypatch.setenv("LV_CLAUDE_MODEL", "haiku")
+    monkeypatch.setenv("LV_CLAUDE_EFFORT", "max")
+    cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"', "start", "basic")
+    assert _flag(cmd, "--model") == ["haiku"] and _flag(cmd, "--effort") == ["max"]
+
+
 def test_claude_command_pins_claude_codes_configuration(monkeypatch):
     monkeypatch.delenv("LV_CLAUDE_MODEL", raising=False)
     monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")

@@ -59,6 +59,8 @@ Each is optional; with none set, behaviour is unchanged.
 - `LV_NARRATORS`: a comma-separated list of the narrator voices that may be used, from `elevenlabs`, `edge`,
   `system` and `none`.
 - Plan cards may carry `estimate.quantities`; error cards may carry a short `reason`.
+- A turn may carry `mode` (`basic`, `normal`, `premium`): the model and effort it runs with (`config.RENDER_MODES`;
+  basic plans with Sonnet). With no mode, `normal`. `LV_CLAUDE_MODEL` / `LV_CLAUDE_EFFORT` still override it.
 
 A publish runs `S2V_PUBLISH=1 uv run pytest -q`, which needs the maintainer's local `.private-terms.txt`
 (git-ignored; one term per line). `tests/test_public_repo.py` scans every tracked text file for those terms.
@@ -76,7 +78,7 @@ The rename to slide2video left these unchanged on purpose, because the website,
 the worker, saved projects and existing video projects depend on them: the Python
 package `lv`; env vars `LV_*` and `LESSON_VIDEOS_*`; headers `X-LV-Plugin` and
 `X-LV-Contract`; the contents and schemas of `slide2video/site-contract/`
-(`{"plugin": "2.5.2"}`, the version the website is built for); the Keychain entry; and
+(`{"plugin": "2.5.3"}`, the version the website is built for); the Keychain entry; and
 the `lesson-videos/` folder inside a website video project folder (worker `_inside`,
 `_publish`, `timing_for`, `deck.json` paths). Do not rename them.
 

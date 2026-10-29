@@ -101,17 +101,24 @@ def read_rule(folder: PurePath) -> str:
     return f"Read(/{path}/**)"
 
 
-def claude_command(lv: str) -> list[str]:
-    """Claude Code pinned to this job: one model (config.CLAUDE_MODEL) at one effort (config.CLAUDE_EFFORT), no user,
-    project or local settings (so no hooks, extra allow rules or permission mode of the teacher's own), no MCP servers,
-    this plugin loaded explicitly, and anything not allowed below is refused without asking (nobody is there to
-    answer)."""
+def model_and_effort(kind: str = "", mode: str | None = None) -> tuple[str, str]:
+    """The model and effort a turn runs with: its rendering mode's (config.RENDER_MODES), for a planning turn or one that
+    builds, else config.CLAUDE_MODEL and config.CLAUDE_EFFORT. LV_CLAUDE_MODEL and LV_CLAUDE_EFFORT override both."""
+    model, effort = config.CLAUDE_MODEL, config.CLAUDE_EFFORT
+    if mode in config.RENDER_MODES:
+        model, effort = config.RENDER_MODES[mode]["planning" if kind in config.PLANNING_TURNS else "building"]
+    return os.environ.get("LV_CLAUDE_MODEL") or model, os.environ.get("LV_CLAUDE_EFFORT") or effort
+
+
+def claude_command(lv: str, kind: str = "", mode: str | None = None) -> list[str]:
+    """Claude Code pinned to this job: one model at one effort (model_and_effort), no user, project or local settings
+    (so no hooks, extra allow rules or permission mode of the teacher's own), no MCP servers, this plugin loaded
+    explicitly, and anything not allowed below is refused without asking (nobody is there to answer)."""
     claude = shutil.which("claude")
     if not claude:
         raise UserError("Claude Code isn't installed on this computer (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
-    model = os.environ.get("LV_CLAUDE_MODEL") or config.CLAUDE_MODEL
-    effort = os.environ.get("LV_CLAUDE_EFFORT") or config.CLAUDE_EFFORT
+    model, effort = model_and_effort(kind, mode)
     return [claude, "-p", PROMPT, "--model", model, *([] if effort == "default" else ["--effort", effort]),
             "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
             "--plugin-dir", str(config.PLUGIN_ROOT),
@@ -555,7 +562,7 @@ def _claude_turn(turn: dict, folder: Path, sitedir: Path, log: Path, claude) -> 
     lv = lv_command()
     write_text(sitedir / "lv.txt", lv + "\n")
     card_file = sitedir / "card.json"
-    code = claude(claude_command(lv), folder, log)
+    code = claude(claude_command(lv, turn["turn"]["kind"], turn.get("mode")), folder, log)
     if code != 0 or not card_file.exists():
         return error_card("Claude stopped before it finished this step.", _log_text(log), detect_limit=True)
     card = read_json(card_file)
