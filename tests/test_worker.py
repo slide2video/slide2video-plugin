@@ -318,6 +318,16 @@ def test_claude_command_model_can_be_overridden_for_comparisons(monkeypatch):
     assert _flag(worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"'), "--model") == ["sonnet"]
 
 
+def test_claude_command_effort_is_low_unless_overridden(monkeypatch):
+    monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")
+    monkeypatch.delenv("LV_CLAUDE_EFFORT", raising=False)
+    assert _flag(worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"'), "--effort") == ["low"]
+    monkeypatch.setenv("LV_CLAUDE_EFFORT", "high")
+    assert _flag(worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"'), "--effort") == ["high"]
+    monkeypatch.setenv("LV_CLAUDE_EFFORT", "default")   # Claude Code's own default: no flag at all
+    assert "--effort" not in worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
+
+
 def test_claude_command_pins_claude_codes_configuration(monkeypatch):
     monkeypatch.delenv("LV_CLAUDE_MODEL", raising=False)
     monkeypatch.setattr(worker.shutil, "which", lambda n: f"/usr/local/bin/{n}")

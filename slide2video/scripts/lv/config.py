@@ -75,6 +75,10 @@ SITE_URL = "https://slide2video.com"      # the website; LV_SITE_URL overrides i
 # Without it a job gets whatever default the account has that day (one lesson ran half on Fable, ~2.5x the cost).
 # LV_CLAUDE_MODEL overrides it (comparisons).
 CLAUDE_MODEL = "opus"
+# Its effort level. An eval on a 51-slide deck (2026-10-28) found low cost 25% less than Claude Code's default, finished
+# 25% sooner, with nearly the same script and pictures. LV_CLAUDE_EFFORT overrides it (comparisons); "default" passes
+# no --effort, so Claude Code's own default applies.
+CLAUDE_EFFORT = "low"
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
