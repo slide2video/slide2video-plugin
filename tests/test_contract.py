@@ -13,7 +13,7 @@ def _ex(name):
 
 
 def test_contract_version_is_the_plugin_major():
-    assert contract.PLUGIN == "2.5.2"
+    assert contract.PLUGIN == "2.5.3"
     assert contract.VERSION == 2
 
 
@@ -167,3 +167,10 @@ def test_card_command_checks_a_review_cards_files_as_the_worker_will(tmp_path, c
     assert cli.main(["card", str(f)]) == 1
     out = capsys.readouterr().out
     assert "video:" in out and "lesson-videos" in out and "render" in out
+
+
+def test_a_turn_may_name_its_rendering_mode():
+    turn = _ex("turn-start.json")
+    assert contract.problems("turn", {**turn, "mode": "basic"}) == []
+    assert contract.problems("turn", {**turn, "mode": "premium"}) == []
+    assert contract.problems("turn", {**turn, "mode": "fastest"}) != []

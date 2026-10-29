@@ -79,6 +79,15 @@ CLAUDE_MODEL = "opus"
 # 25% sooner, with nearly the same script and pictures. LV_CLAUDE_EFFORT overrides it (comparisons); "default" passes
 # no --effort, so Claude Code's own default applies.
 CLAUDE_EFFORT = "low"
+# A website job may name its rendering mode (turn "mode"), the model and effort it runs with: "planning" turns read the
+# deck and write or change the plan, every other turn builds video. "normal" is the default above; a job with no mode
+# (an older website, or a teacher's own computer) runs it. "default" effort passes no --effort.
+PLANNING_TURNS = ("start", "answer", "change")
+RENDER_MODES = {
+    "basic": {"planning": ("sonnet", "default"), "building": ("opus", "low")},
+    "normal": {"planning": ("opus", "low"), "building": ("opus", "low")},
+    "premium": {"planning": ("opus", "default"), "building": ("opus", "default")},
+}
 
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
