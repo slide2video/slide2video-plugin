@@ -279,34 +279,143 @@
     o.emojis.forEach((e, i) => emoji(ctx, e, W / 2 + (i - (o.emojis.length - 1) / 2) * 150, 800 + Math.sin(t * 2 + i) * 10, 96, { scale: pop(t, 1.2 + i * 0.15) }));
   }
   // ---------- intro: the opening scene as a short motion piece, never a copy of the deck's title slide ----------
-  // intro(g, t, s, {look, title, kicker, sub, by, logo, name, photo, main, accent, emojis, at}); see guide.md.
-  const INTRO_LOOKS = {
-    polished: { main: '#0B2545', accent: '#2563EB' }, cinematic: { main: '#134E6F', accent: '#FFC145' },
-    calm: { main: '#1F7A6D', accent: '#4FC3F7' }, energetic: { main: '#16212E', accent: '#FF6B57' },
-    playful: { main: '#0B2545', accent: '#FF6B57' },
+  // intro(g, t, s, {mood, title, kicker, sub, by, logo, name, photo, main, accent, panel, emojis, at}); see guide.md.
+  // Every text colour is checked against what is behind it (4.5:1 at least) and moved toward black or white until
+  // it reads; the text block shrinks, and at worst is cut short, so it stays between the logo and the captions.
+  const MOODS = {
+    polished: { main: '#0B2545', accent: '#2563EB', stagger: 0.09, dur: 0.75 },
+    cinematic: { main: '#134E6F', accent: '#FFC145', stagger: 0.09, dur: 0.9 },
+    calm: { main: '#1F7A6D', accent: '#4FC3F7', stagger: 0.07, dur: 1.0 },
+    energetic: { main: '#16212E', accent: '#FF6B57', stagger: 0.12, dur: 0.35 },
+    playful: { main: '#0B2545', accent: '#FF6B57', stagger: 0.09, dur: 0.6 },
   };
-  function hexRgb(c) { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || '')); if (!m) return [11, 37, 69]; const n = parseInt(m[1], 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
-  function mix(a, b, k, alpha = 1) { const x = hexRgb(a), y = hexRgb(b); return `rgba(${x.map((v, i) => Math.round(lerp(v, y[i], clamp(k)))).join(',')},${alpha})`; }
-  // Largest size (down to min) at which str fits maxLines lines of maxW.
-  function fitSize(ctx, str, o, size, min, maxLines) { while (size > min && measure(ctx, str, { ...o, size }).lines > maxLines) size -= 4; return size; }
-  // Title drawn word by word: 'rise' (slides up out of a mask), 'slam' (lands from big), 'bounce' (pops in),
-  // 'focus' (blur to sharp), 'fade' (soft rise). Word i starts at at + i * stagger. Returns the block's height.
-  function kinetic(ctx, str, x, y, t, at, mode, o = {}) {
-    o = { size: 110, weight: 800, color: '#fff', accent: C.coral, lh: 1.06, maxW: 1200, stagger: 0.09, dur: 0.7, ...o };
-    const lines = wrapRich(ctx, str, o), lh = o.size * o.lh; let i = 0;
+  const INTRO_KEYS = ['mood', 'title', 'kicker', 'sub', 'by', 'logo', 'name', 'photo', 'main', 'accent', 'panel', 'emojis', 'at'];
+  const AT_KEYS = ['logo', 'kicker', 'title', 'sub', 'by'], INK = '#16212E', WHITE = '#FFFFFF', BLACK = '#000000';
+  const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+  const hexRgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const toHex = v => '#' + v.map(x => Math.round(clamp(x, 0, 255)).toString(16).padStart(2, '0')).join('');
+  const mixHex = (a, b, k) => { const x = hexRgb(a), y = hexRgb(b); return toHex(x.map((v, i) => lerp(v, y[i], clamp(k)))); };
+  const rgba = (c, a) => `rgba(${hexRgb(c).join(',')},${a})`;
+  function lum(c) { return hexRgb(c).reduce((s, v, i) => { v /= 255; return s + [0.2126, 0.7152, 0.0722][i] * (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); }, 0); }
+  function contrast(a, b) { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  // c, moved toward black (on light colours) or white (on dark ones) until it reads at min:1 on every colour of `on`.
+  function readable(c, on, min) {
+    on = [].concat(on); const ok = x => on.every(b => contrast(x, b) >= min);
+    if (ok(c)) return c;
+    const to = on.reduce((s, b) => s + lum(b), 0) / on.length > 0.179 ? BLACK : WHITE;
+    for (let k = 0.05; k < 1; k += 0.05) { const x = mixHex(c, to, k); if (ok(x)) return x; }
+    return to;
+  }
+  function introOptions(o) {
+    const fail = m => { throw new Error(`Engine.intro: ${m}`); };
+    if (o === null || typeof o !== 'object' || Array.isArray(o)) fail('the fourth argument is { mood, title, ... }');
+    if (Object.hasOwn(o, 'look')) fail('`look` is now `mood`: one of ' + Object.keys(MOODS).join(', '));
+    for (const k of Object.keys(o)) if (!INTRO_KEYS.includes(k)) fail(`unknown option "${k}"; use ${INTRO_KEYS.join(', ')}`);
+    if (typeof o.mood !== 'string' || !Object.hasOwn(MOODS, o.mood)) fail(`unknown mood ${JSON.stringify(o.mood)}; use one of ${Object.keys(MOODS).join(', ')}`);
+    if (typeof o.title !== 'string' || !o.title.trim()) fail("title must be the title slide's title, a non-empty string");
+    for (const k of ['kicker', 'sub', 'by', 'name', 'logo', 'photo']) if (o[k] != null && typeof o[k] !== 'string') fail(`${k} must be a string, not ${JSON.stringify(o[k])}`);
+    for (const k of ['main', 'accent']) if (o[k] != null && !isHex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
+    if (o.panel != null && typeof o.panel !== 'boolean') fail('panel must be true or false');
+    if (o.photo != null && o.mood !== 'cinematic') fail('photo is drawn only by the cinematic mood');
+    if (o.emojis != null && !(Array.isArray(o.emojis) && o.emojis.every(e => typeof e === 'string'))) fail("emojis must be a list like ['🌍', '📜']");
+    if (o.emojis?.length && o.mood !== 'playful') fail('emojis are drawn only by the playful mood');
+    const at = o.at ?? {};
+    if (at === null || typeof at !== 'object' || Array.isArray(at)) fail('at must be { logo, kicker, title, sub, by } times in seconds');
+    for (const [k, v] of Object.entries(at)) {
+      if (!AT_KEYS.includes(k)) fail(`unknown at.${k}; use ${AT_KEYS.join(', ')}`);
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) fail(`at.${k} must be a time in seconds, not ${JSON.stringify(v)}`);
+    }
+    const d = MOODS[o.mood];
+    return { kicker: o.kicker || '', sub: o.sub || '', by: o.by || '', name: o.name || '', logo: o.logo || null, photo: o.photo || null,
+      emojis: o.emojis || [], panel: o.panel, title: o.title, mood: o.mood, main: o.main || d.main, accent: o.accent || d.accent, at };
+  }
+
+  // ---- text: wrapping that also breaks scripts written without spaces, shrinking, cutting short ----
+  const NOSPACE = /[฀-໿က-႟ក-៿⺀-鿿ꥠ-퟿豈-﫿︰-﹏＀-￯]/;
+  const segmenters = {};
+  function pieces(s, granularity) {
+    try { segmenters[granularity] ||= new Intl.Segmenter(undefined, { granularity }); return [...segmenters[granularity].segment(s)].map(x => x.segment); }
+    catch (e) { return Array.from(s); }
+  }
+  // Lines of runs, like wrapRich, but Chinese, Japanese, Thai... and any word wider than maxW also break inside.
+  function introWrap(ctx, str, o) {
+    const toks = [];
+    for (const r of parseRich(str)) for (const w of r.s.split(/(\s+)/)) {
+      if (!w) continue;
+      ctx.font = fontStr(o, r.bold);
+      if (/^\s+$/.test(w)) { toks.push({ acc: r.acc, bold: r.bold, s: ' ', w: ctx.measureText(' ').width, sp: true }); continue; }
+      const parts = (NOSPACE.test(w) ? pieces(w, 'word') : [w]).flatMap(p => ctx.measureText(p).width > o.maxW ? pieces(p, 'grapheme') : [p]);
+      for (const p of parts) toks.push({ acc: r.acc, bold: r.bold, s: p, w: ctx.measureText(p).width });
+    }
+    const lines = [[]]; let lw = 0;
+    for (const tk of toks) {
+      const L = lines[lines.length - 1];
+      if (tk.sp) { if (L.length) { L.push(tk); lw += tk.w; } continue; }
+      if (lw + tk.w > o.maxW && L.length) { while (L.length && L[L.length - 1].sp) L.pop(); lines.push([]); lw = 0; }
+      lines[lines.length - 1].push(tk); lw += tk.w;
+    }
+    return lines.map(L => { while (L.length && L[L.length - 1].sp) L.pop(); return { runs: L, w: L.reduce((a, r) => a + r.w, 0) }; }).filter(L => L.runs.length);
+  }
+  // At most n lines; when lines are dropped, the last one kept ends with an ellipsis.
+  function cutLines(ctx, lines, n, o) {
+    if (lines.length <= n) return lines;
+    if (n <= 0) return [];
+    const out = lines.slice(0, n), runs = [...out[n - 1].runs];
+    ctx.font = fontStr(o, false); const ew = ctx.measureText('…').width;
+    let w = out[n - 1].w;
+    while (runs.length > 1 && (w + ew > o.maxW || runs[runs.length - 1].sp)) w -= runs.pop().w;
+    const last = runs[runs.length - 1];
+    runs.push({ acc: last.acc, bold: last.bold, s: '…', w: ew });
+    out[n - 1] = { runs, w: w + ew };
+    return out;
+  }
+  const SLOTS = { title: { weight: 800, lh: 1.06 }, sub: { weight: 600, lh: 1.22 }, by: { weight: 500, lh: 1.22 }, kick: { weight: 800, lh: 1.22 } };
+  // Sizes and lines for the kicker, title, sub and by lines that fit maxH: the title shrinks first (to 64 px, then to
+  // 44 px over four lines), then sub and by (to 34 and 30 px), then lines are cut short, last of all the title's.
+  function introLayout(ctx, o, st, maxH) {
+    const size = { title: st.size, sub: 46, by: 36, kick: 30 }, n = { title: 3, sub: 3, by: 2, kick: 1 };
+    const text = { title: o.title, sub: o.sub, by: o.by, kick: o.kicker.toUpperCase() };
+    const maxW = k => k === 'kick' ? st.maxW - (st.badge ? 60 : 80) : st.maxW;
+    const wrap = k => text[k] ? introWrap(ctx, text[k], { size: size[k], weight: SLOTS[k].weight, maxW: maxW(k) }) : [];
+    const build = () => {
+      const L = {};
+      for (const k of ['kick', 'title', 'sub', 'by']) L[k] = cutLines(ctx, wrap(k), n[k], { size: size[k], weight: SLOTS[k].weight, maxW: maxW(k) });
+      const h = (L.kick.length ? 70 : 0) + L.title.length * size.title * SLOTS.title.lh + (st.rule ? 40 : 0)
+        + (L.sub.length ? 16 + L.sub.length * size.sub * SLOTS.sub.lh : 0) + (L.by.length ? 12 + L.by.length * size.by * SLOTS.by.lh : 0)
+        + (st.extra || 0);
+      return { L, h, size: { ...size } };
+    };
+    while (size.title > 64 && wrap('title').length > 3) size.title -= 4;
+    if (wrap('title').length > 3) { n.title = 4; while (size.title > 44 && wrap('title').length > 4) size.title -= 4; }
+    let r = build();
+    while (r.h > maxH && size.title > 64) { size.title -= 4; r = build(); }
+    while (r.h > maxH && (size.sub > 34 || size.by > 30)) { size.sub = Math.max(34, size.sub - 2); size.by = Math.max(30, size.by - 2); r = build(); }
+    while (r.h > maxH && size.title > 44) { size.title -= 4; r = build(); }
+    while (r.h > maxH && (n.by > 0 || n.sub > 0 || n.title > 1)) {
+      if (n.by > 1) n.by--; else if (n.sub > 1) n.sub--; else if (n.title > 2) n.title--; else if (n.by) n.by = 0; else if (n.sub) n.sub = 0; else n.title--;
+      r = build();
+    }
+    return r;
+  }
+  const pieceCount = lines => lines.reduce((s, L) => s + L.runs.filter(r => !r.sp).length, 0);
+  // One laid-out block at (x, y). With a mode, its pieces come in one by one ('rise', 'slam', 'bounce', 'focus',
+  // 'fade'); without, the block slides in as one at `at`. Returns its height.
+  function drawBlock(ctx, lines, x, y, size, slot, o, t, at, mode, stagger = 0, dur = 0.7) {
+    const f = { size, weight: SLOTS[slot].weight }, lh = size * SLOTS[slot].lh; let i = 0;
     lines.forEach((L, li) => {
-      const top = y + li * lh, base = top + o.size * 0.82; let cx = x;
+      const top = y + li * lh, base = top + size * 0.82; let cx = x;
       for (const r of L.runs) {
-        if (/^\s+$/.test(r.s)) { cx += r.w; continue; }
-        const k = P(t, at + i++ * o.stagger, o.dur, mode === 'bounce' ? E.back : E.out);
+        if (r.sp) { cx += r.w; continue; }
+        const k = mode ? P(t, at + i++ * stagger, dur, mode === 'bounce' ? E.back : E.out) : P(t, at, 0.7);
         if (k > 0) {
-          ctx.save(); ctx.font = fontStr(o, r.bold); ctx.fillStyle = r.acc ? o.accent : o.color; ctx.textBaseline = 'alphabetic';
+          ctx.save(); ctx.font = fontStr(f, r.bold); ctx.fillStyle = r.acc ? o.accent : o.color; ctx.textBaseline = 'alphabetic';
           if (o.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4; }
-          const mx = cx + r.w / 2, my = base - o.size * 0.35;
-          if (mode === 'rise') { ctx.beginPath(); ctx.rect(cx - 30, top - o.size * 0.15, r.w + 60, o.size * 1.25); ctx.clip(); ctx.fillText(r.s, cx, base + (1 - k) * o.size * 1.3); }
-          else if (mode === 'slam') { const z = 1 + 0.7 * (1 - k); ctx.globalAlpha *= clamp(k * 2.5); ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, o.size * 0.35); }
-          else if (mode === 'bounce') { ctx.globalAlpha *= clamp(k * 3); ctx.translate(mx, my); ctx.scale(Math.max(0, k), Math.max(0, k)); ctx.rotate((1 - k) * 0.25); ctx.fillText(r.s, -r.w / 2, o.size * 0.35); }
-          else if (mode === 'focus') { const z = 1 + 0.12 * (1 - k); ctx.globalAlpha *= k; if (k < 1) ctx.filter = `blur(${((1 - k) * 14).toFixed(1)}px)`; ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, o.size * 0.35); }
+          const mx = cx + r.w / 2, my = base - size * 0.35;
+          if (!mode) { ctx.globalAlpha *= k; ctx.fillText(r.s, cx + (1 - k) * 40, base); }
+          else if (mode === 'rise') { ctx.beginPath(); ctx.rect(cx - 30, top - size * 0.15, r.w + 60, size * 1.25); ctx.clip(); ctx.fillText(r.s, cx, base + (1 - k) * size * 1.3); }
+          else if (mode === 'slam') { const z = 1 + 0.7 * (1 - k); ctx.globalAlpha *= clamp(k * 2.5); ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else if (mode === 'bounce') { ctx.globalAlpha *= clamp(k * 3); ctx.translate(mx, my); ctx.scale(Math.max(0, k), Math.max(0, k)); ctx.rotate((1 - k) * 0.25); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else if (mode === 'focus') { const z = 1 + 0.12 * (1 - k); ctx.globalAlpha *= k; if (k < 1) ctx.filter = `blur(${((1 - k) * 14).toFixed(1)}px)`; ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
           else { ctx.globalAlpha *= k; ctx.fillText(r.s, cx, base + (1 - k) * 26); }
           ctx.restore();
         }
@@ -315,133 +424,208 @@
     });
     return lines.length * lh;
   }
-  function wordCount(str) { return String(str || '').replace(/[*_]/g, '').split(/\s+/).filter(Boolean).length; }
-  // The logo (an Engine.assets key) at (x, y), h tall, on a white pill when panel; else the name as text; else nothing.
-  function introLogo(ctx, o, k, x, y, h, panel, color) {
-    if (k <= 0) return;
-    ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.translate((1 - k) * -50, 0);
-    if (o.logo) {
-      const im = imgs[o.logo]; const ar = im && im.naturalWidth ? im.naturalWidth / im.naturalHeight : 3;
-      const w = Math.min(560, h * ar);
-      if (panel) card(ctx, x - 28, y - 20, w + 56, h + 40, { fill: '#fff', r: 22 });
-      img(ctx, o.logo, x, y, w, h, { fit: 'contain' });
-    } else if (o.name) {
-      if (panel) { const m = measure(ctx, o.name, { size: 40, weight: 800 }); card(ctx, x - 28, y - 20, m.w + 56, h + 40, { fill: '#fff', r: 22 }); }
-      text(ctx, o.name, x, y + (h - 49) / 2, { size: 40, weight: 800, color: panel ? C.ink : color });
-    }
-    ctx.restore();
-  }
-  // Height of introText's block, so a look can place it (centred, or resting on the bottom).
-  function introHeight(ctx, o, st) {
-    const fit = fitSize(ctx, o.title, { weight: 800, maxW: st.maxW }, st.size, 64, 3);
-    let h = (o.kicker ? 70 : 0) + measure(ctx, o.title, { size: fit, weight: 800, maxW: st.maxW, lh: 1.06 }).h + (st.rule ? 40 : 0);
-    if (o.sub) h += 16 + measure(ctx, o.sub, { size: 46, weight: 600, maxW: st.maxW }).h;
-    if (o.by) h += 12 + measure(ctx, o.by, { size: 36, weight: 500, maxW: st.maxW }).h;
-    return h;
-  }
-  // Kicker, title, sub and by lines, left-aligned at x; y = null centres the block between y 300 and 880.
-  function introText(ctx, t, o, a, x, y, st) {
-    if (y == null) y = clamp(590 - introHeight(ctx, o, st) / 2, 300, 880 - introHeight(ctx, o, st));
-    const fit = fitSize(ctx, o.title, { weight: 800, maxW: st.maxW }, st.size, 64, 3);
-    if (o.kicker) {
+  // Kicker, title, rule, sub and by, left-aligned at st.x: centred between st.y0 and st.y1, or resting on st.y1.
+  function introText(ctx, t, a, st, lay) {
+    const { L, size } = lay;
+    let y = st.anchor === 'bottom' ? st.y1 - lay.h : clamp(590 - lay.h / 2, st.y0, st.y1 - lay.h);
+    const top = y, x = st.x;
+    ctx.save();
+    if (st.skew) ctx.transform(1, 0, -st.skew, 1, st.skew * (top + lay.h / 2), 0);
+    if (L.kick.length) {
       const k = P(t, a.kicker, 0.6);
-      ctx.save(); ctx.globalAlpha *= k; ctx.fillStyle = st.kickColor; ctx.fillRect(x, y + 12, 56 * k, 6); ctx.restore();
-      text(ctx, o.kicker.toUpperCase(), x + 76 + (1 - k) * 30, y - 4, { size: 30, weight: 800, color: st.kickColor, alpha: k });
+      if (st.badge) badge(ctx, L.kick[0].runs.map(r => r.s).join(''), x, y + 22, { fill: st.badge, size: 30, scale: pop(t, a.kicker) });
+      else {
+        ctx.save(); ctx.globalAlpha *= k; ctx.fillStyle = st.kick; ctx.fillRect(x, y + 12, 56 * k, 6); ctx.restore();
+        drawBlock(ctx, L.kick, x + 76, y - 4, size.kick, 'kick', { color: st.kick, accent: st.kick }, t, a.kicker, null);
+      }
       y += 70;
     }
-    y += kinetic(ctx, o.title, x, y, t, a.title, st.mode, { size: fit, color: st.color, accent: st.accent, maxW: st.maxW, shadow: st.shadow, stagger: st.stagger, dur: st.dur });
+    y += drawBlock(ctx, L.title, x, y, size.title, 'title', { color: st.title, accent: st.accent, shadow: st.shadow }, t, a.title, st.mode, a.stagger, st.dur);
     if (st.rule) { const k = P(t, a.sub - 0.3, 0.9, E.inOut); ctx.save(); ctx.fillStyle = st.rule; ctx.fillRect(x, y + 18, 280 * k, 8); ctx.restore(); y += 40; }
-    if (o.sub) y += 16 + text(ctx, o.sub, x + (1 - P(t, a.sub, 0.7)) * 40, y + 16, { size: 46, weight: 600, color: st.subColor, alpha: P(t, a.sub, 0.7), maxW: st.maxW, accent: st.accent, shadow: st.shadow });
-    if (o.by) y += 12 + text(ctx, o.by, x + (1 - P(t, a.by, 0.7)) * 40, y + 12, { size: 36, weight: 500, color: st.subColor, alpha: 0.9 * P(t, a.by, 0.7), maxW: st.maxW, accent: st.accent, shadow: st.shadow });
+    if (L.sub.length) y += 16 + drawBlock(ctx, L.sub, x, y + 16, size.sub, 'sub', { color: st.sub, accent: st.accent, shadow: st.shadow }, t, a.sub, null);
+    if (L.by.length) y += 12 + drawBlock(ctx, L.by, x, y + 12, size.by, 'by', { color: st.by, accent: st.accent, shadow: st.shadow }, t, a.by, null);
+    ctx.restore();
     return y;
   }
-  function intro(ctx, t, s, o = {}) {
-    const look = INTRO_LOOKS[o.look] ? o.look : 'polished';
-    o = { title: '', kicker: '', sub: '', by: '', logo: null, name: '', photo: null, emojis: [], ...INTRO_LOOKS[look], ...o };
-    const M = o.main, A = o.accent, stagger = look === 'calm' ? 0.07 : look === 'energetic' ? 0.12 : 0.09;
-    const a = { logo: 0.15, kicker: 0.35, title: 0.55, ...(o.at || {}) };
-    const titleDone = a.title + Math.max(0, wordCount(o.title) - 1) * stagger + 0.7;
+
+  // ---- logo and photo ----
+  const tones = {}, scrims = {}, warnedIntro = new Set();
+  function warnOnce(m) { if (!warnedIntro.has(m)) { warnedIntro.add(m); console.warn(m); } }
+  function loaded(key) { return !!key && Object.hasOwn(imgs, key) && imgs[key].naturalWidth > 0; }
+  // The logo's average colour (by opacity), to keep it visible on its background.
+  function logoTone(key) {
+    if (Object.hasOwn(tones, key)) return tones[key];
+    let c = INK;
+    try {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 48; const x = cv.getContext('2d'); x.drawImage(imgs[key], 0, 0, 48, 48);
+      const d = x.getImageData(0, 0, 48, 48).data; let r = 0, g = 0, b = 0, w = 0;
+      for (let i = 0; i < d.length; i += 4) { const q = d[i + 3] / 255; r += d[i] * q; g += d[i + 1] * q; b += d[i + 2] * q; w += q; }
+      if (w > 0) c = toHex([r / w, g / w, b / w]);
+    } catch (e) { /* pixels unreadable: treat it as a dark logo */ }
+    return (tones[key] = c);
+  }
+  // How dark the photo is made behind the text: enough for white text at 7:1 on its brightest tenth there.
+  function photoScrim(key) {
+    if (Object.hasOwn(scrims, key)) return scrims[key];
+    let a = 0.62;
+    try {
+      const cv = document.createElement('canvas'); cv.width = 96; cv.height = 54; const x = cv.getContext('2d');
+      drawImg(x, imgs[key], 0, 0, 96, 54, { fit: 'cover', zoom: 1.1 });
+      const d = x.getImageData(0, 13, 70, 35).data, px = [];
+      for (let i = 0; i < d.length; i += 4) px.push(toHex([d[i], d[i + 1], d[i + 2]]));
+      px.sort((p, q) => lum(p) - lum(q)); const p90 = px[Math.floor(px.length * 0.9)];
+      a = 0.3; while (a < 0.95 && contrast(WHITE, mixHex(p90, BLACK, a * 0.85)) < 7) a += 0.03;
+    } catch (e) { /* pixels unreadable: keep the strong default */ }
+    return (scrims[key] = a);
+  }
+  // The logo (with the name beside it when both are given), or the name alone, at (x, y), h tall. A panel goes under
+  // it when the mood uses one (or `panel: true`), or when the logo would be hard to see on the background behind it.
+  function introLogo(ctx, o, k, x, y, h, st) {
+    if (k <= 0) return;
+    const logo = loaded(o.logo);
+    if (o.logo && !logo) warnOnce(`Engine.intro: no loaded Engine.assets() entry "${o.logo}" for the logo; drawing ${o.name ? 'the name' : 'no logo'} instead`);
+    if (!logo && !o.name) return;
+    const tone = logo ? logoTone(o.logo) : null, dark = readable(o.main, WHITE, 7);
+    let panel = o.panel ?? st.panel, fill = WHITE;
+    if (logo && !panel && contrast(tone, st.behind) < 2) { panel = true; fill = lum(st.behind) > 0.179 ? dark : WHITE; }
+    if (logo && panel && contrast(tone, fill) < 2) fill = fill === WHITE ? dark : WHITE;   // a light logo goes on a dark panel
+    const ar = logo ? imgs[o.logo].naturalWidth / imgs[o.logo].naturalHeight : 0, lw = logo ? Math.min(560, h * ar) : 0;
+    const nameColor = readable(panel ? (fill === WHITE ? INK : WHITE) : st.title, panel ? fill : st.behind, 4.5), nf = { size: 40, weight: 800 };
+    const nl = o.name ? cutLines(ctx, introWrap(ctx, o.name, { ...nf, maxW: 640 }), 1, { ...nf, maxW: 640 }) : [];
+    const nw = nl.length ? nl[0].w : 0, gap = logo && nw ? 28 : 0;
+    ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.translate((1 - k) * -50, 0);
+    if (panel) card(ctx, x - 28, y - 20, lw + gap + nw + 56, h + 40, { fill, r: 22 });
+    if (logo) img(ctx, o.logo, x, y, lw, h, { fit: 'contain' });
+    if (nl.length) drawBlock(ctx, nl, x + lw + gap, y + (h - 49) / 2, 40, 'kick', { color: nameColor, accent: nameColor }, 99, 0, null);
+    ctx.restore();
+  }
+
+  // ---- the moods ----
+  function introStyle(ctx, o, t, s) {
+    const M = o.main, A = o.accent;
+    if (o.mood === 'polished') {
+      const light = contrast(M, INK) > contrast(M, WHITE);
+      const base = light ? readable(M, INK, 7) : readable(M, WHITE, 7), ends = light ? [mixHex(base, WHITE, 0.35), base] : [base, mixHex(base, BLACK, 0.5)];
+      const text = light ? INK : WHITE, acc = readable(light ? A : mixHex(A, WHITE, 0.35), ends, 4.5);
+      return { x: 140, maxW: 1040, size: 116, y0: 260, y1: 880, mode: 'rise', panel: true, behind: ends[0], ends,
+        title: readable(text, ends, 7), accent: acc, kick: acc, sub: readable(mixHex(text, base, 0.14), ends, 4.5), by: readable(mixHex(text, base, 0.2), ends, 4.5),
+        rule: readable(A, ends, 3), tile: readable(A, ends, 3), ink: text, logo: [148, 110, 100] };
+    }
+    if (o.mood === 'cinematic') {
+      const photo = !!o.photo && loaded(o.photo);
+      if (o.photo && !photo) warnOnce(`Engine.intro: no loaded Engine.assets() entry "${o.photo}" for the photo; drawing a sky instead`);
+      const base = readable(M, WHITE, 7), behind = photo ? '#595959' : base;   // #595959: the scrimmed photo is at most this bright
+      const acc = readable(mixHex(A, WHITE, 0.15), behind, 4.5);
+      return { x: 140, maxW: 1250, size: 132, y0: 270, y1: 860, anchor: 'bottom', mode: 'focus', panel: true, behind: '#000000', photo, base,
+        title: WHITE, accent: acc, kick: acc, sub: readable('#EBEBEB', behind, 4.5), by: readable('#EBEBEB', behind, 4.5), shadow: true, logo: [148, 146, 84] };
+    }
+    if (o.mood === 'calm') {
+      const ends = [WHITE, mixHex(WHITE, M, 0.12)], acc = readable(M, ends, 4.5);
+      return { x: 140, maxW: 900, size: 100, y0: 260, y1: 880, mode: 'fade', panel: false, behind: WHITE, ends,
+        title: readable(mixHex(M, BLACK, 0.45), ends, 7), accent: acc, kick: acc, sub: readable('#3D4B5C', ends, 7), by: readable('#3D4B5C', ends, 7),
+        rule: readable(mixHex(A, M, 0.3), ends, 3), line: readable(M, ends, 3), logo: [148, 110, 100] };
+    }
+    if (o.mood === 'energetic') {
+      const base = readable(mixHex(M, '#08090C', 0.55), WHITE, 12), acc = readable(A, base, 4.5);
+      return { x: 160, maxW: 1000, size: 124, y0: 260, y1: 880, mode: 'slam', panel: true, behind: base, base, skew: 0.12,
+        title: WHITE, accent: acc, kick: acc, sub: readable(mixHex(WHITE, base, 0.12), base, 7), by: readable(mixHex(WHITE, base, 0.2), base, 4.5),
+        rule: readable(A, base, 3), logo: [148, 110, 100] };
+    }
+    const paper = C.paper, acc = readable(A, paper, 4.5);   // playful
+    return { x: 140, maxW: 1000, size: 108, y0: 260, y1: 880, mode: 'bounce', panel: false, behind: paper, badge: readable(A, WHITE, 4.5),
+      title: readable(M, paper, 4.5), accent: acc, kick: acc, sub: readable(C.sea, paper, 4.5), by: readable(C.sea, paper, 4.5),
+      extra: o.emojis.length ? 120 : 0, logo: [148, 110, 100] };
+  }
+  function intro(ctx, t, s, opts = {}) {
+    const o = introOptions(opts), mood = MOODS[o.mood], st = introStyle(ctx, o, t, s);
+    st.dur = mood.dur;
+    const lay = introLayout(ctx, o, st, st.y1 - st.y0), n = pieceCount(lay.L.title);
+    const stagger = Math.min(mood.stagger, 1.6 / Math.max(1, n - 1));
+    const a = { ...(o.mood === 'cinematic' ? { logo: 1.2, kicker: 0.9, title: 1.1 } : { logo: 0.15, kicker: 0.35, title: 0.55 }), ...o.at, stagger };
+    const titleDone = a.title + Math.max(0, n - 1) * stagger + mood.dur;
     if (a.sub == null) a.sub = titleDone + 0.15;
     if (a.by == null) a.by = a.sub + 0.6;
-    const r = rng(look.length * 977 + 13);
-    if (look === 'polished') {
-      const gr = ctx.createLinearGradient(0, 0, W, H); gr.addColorStop(0, mix(M, '#FFFFFF', 0.06)); gr.addColorStop(1, mix(M, '#000000', 0.5));
+    const M = o.main, A = o.accent, r = rng(o.mood.length * 977 + 13);
+    if (o.mood === 'polished') {
+      const gr = ctx.createLinearGradient(0, 0, W, H); gr.addColorStop(0, st.ends[0]); gr.addColorStop(1, st.ends[1]);
       ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
       for (let i = 0; i < 8; i++) for (let j = 0; j < 9; j++) {   // a field of tiles breathing in a slow wave (decoration, never data)
         const k = P(t, (i + j) * 0.045 - 0.25, 0.7, E.out), wv = 0.5 + 0.5 * Math.sin(t * 1.6 - (i + j) * 0.45), z = (14 + 30 * wv) * k;
         if (z <= 0) continue;
         const hot = (i * 3 + j * 5) % 11 === 0, cx = 1250 + i * 76, cy = 230 + j * 72;
-        ctx.save(); ctx.globalAlpha = hot ? 0.9 : 0.12 + 0.12 * wv; ctx.fillStyle = hot ? A : '#FFFFFF'; rr(ctx, cx - z / 2, cy - z / 2, z, z, z * 0.25); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.globalAlpha = hot ? 0.9 : 0.12 + 0.12 * wv; ctx.fillStyle = hot ? st.tile : st.ink; rr(ctx, cx - z / 2, cy - z / 2, z, z, z * 0.25); ctx.fill(); ctx.restore();
       }
       const sw = P(t, 0.2, 1.8, E.inOut);
       if (sw > 0 && sw < 1) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sx = lerp(-700, W + 300, sw); const lg = ctx.createLinearGradient(sx, 0, sx + 400, 0); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,0.10)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(sx + 200, 0); ctx.lineTo(sx + 600, 0); ctx.lineTo(sx + 200, H); ctx.lineTo(sx - 200, H); ctx.closePath(); ctx.fill(); ctx.restore(); }
-      introLogo(ctx, o, P(t, a.logo, 0.8), 148, 110, 100, true, '#fff');
-      introText(ctx, t, o, a, 140, null, { size: 116, maxW: 1040, mode: 'rise', color: '#fff', accent: mix(A, '#FFFFFF', 0.35), kickColor: mix(A, '#FFFFFF', 0.35), subColor: 'rgba(255,255,255,0.86)', rule: A, stagger, dur: 0.75 });
-    } else if (look === 'cinematic') {
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else if (o.mood === 'cinematic') {
       const kz = E.out(clamp(t / Math.max(6, s.dur || 10)));
-      if (o.photo) img(ctx, o.photo, 0, 0, W, H, { fit: 'cover', zoom: 1.18 - 0.14 * kz, panX: -0.4 + 0.5 * kz });
-      else {
-        const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, mix(A, '#FFFFFF', 0.4)); gr.addColorStop(0.55, mix(M, '#FFFFFF', 0.2)); gr.addColorStop(1, mix(M, '#000000', 0.4)); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
-        circle(ctx, 1450, 330 + 60 * (1 - kz), 150, mix(A, '#FFFFFF', 0.2), { alpha: 0.9 });
+      if (st.photo) {
+        img(ctx, o.photo, 0, 0, W, H, { fit: 'cover', zoom: 1.18 - 0.14 * kz, panX: -0.4 + 0.5 * kz });
+        const sa = photoScrim(o.photo), lg = ctx.createLinearGradient(0, 0, W, 0);
+        lg.addColorStop(0, `rgba(0,0,0,${sa})`); lg.addColorStop(0.72, `rgba(0,0,0,${sa * 0.85})`); lg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+      } else {
+        const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, st.base); gr.addColorStop(1, mixHex(st.base, BLACK, 0.6)); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+        circle(ctx, 1650, 330 + 60 * (1 - kz), 150, mixHex(A, WHITE, 0.2), { alpha: 0.9 });   // right of the text (x <= 1390)
         for (let i = 0; i < 40; i++) { const x = (r() * W + t * (10 + r() * 30)) % W, y = r() * H; circle(ctx, x, y, 1.5 + r() * 3, 'rgba(255,255,255,0.35)'); }
       }
-      const lg = ctx.createLinearGradient(0, 0, W * 0.75, 0); lg.addColorStop(0, 'rgba(0,0,0,0.62)'); lg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
       const bg2 = ctx.createLinearGradient(0, H * 0.45, 0, H); bg2.addColorStop(0, 'rgba(0,0,0,0)'); bg2.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = bg2; ctx.fillRect(0, 0, W, H);
       const hb = lerp(H / 2 - 170, 92, P(t, 0.05, 1.7, E.inOut));   // letterbox opening like a curtain
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, hb); ctx.fillRect(0, H - hb, W, hb);
-      introLogo(ctx, o, P(t, Math.max(a.logo, 1.2), 0.8), 148, 146, 84, true, '#fff');
-      const st = { size: 132, maxW: 1250, mode: 'focus', color: '#fff', accent: mix(A, '#FFFFFF', 0.15), kickColor: mix(A, '#FFFFFF', 0.15), subColor: 'rgba(255,255,255,0.92)', shadow: true, stagger, dur: 0.9 };
-      introText(ctx, t, o, { ...a, title: Math.max(a.title, 0.9) }, 140, Math.max(270, 860 - introHeight(ctx, o, st)), st);
-    } else if (look === 'calm') {
-      const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(1, mix('#FFFFFF', M, 0.12)); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else if (o.mood === 'calm') {
+      const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, st.ends[0]); gr.addColorStop(1, st.ends[1]); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
       const cx = 1530, cy = 500;
-      circle(ctx, cx, cy, 150 * (0.85 + 0.15 * P(t, 0, 1.2)) * (1 + 0.012 * Math.sin(t * 1.4)), mix(M, '#FFFFFF', 0.86));
-      for (let i = 0; i < 5; i++) circle(ctx, cx, cy, (170 + i * 64) * (1 + 0.015 * Math.sin(t * 0.9 - i * 0.7)), null, { stroke: mix(M, '#FFFFFF', 0.45 + i * 0.1), lw: 3, alpha: (0.7 - i * 0.12) * P(t, i * 0.18, 1.4) });
+      circle(ctx, cx, cy, 150 * (0.85 + 0.15 * P(t, 0, 1.2)) * (1 + 0.012 * Math.sin(t * 1.4)), mixHex(M, WHITE, 0.86));
+      for (let i = 0; i < 5; i++) circle(ctx, cx, cy, (170 + i * 64) * (1 + 0.015 * Math.sin(t * 0.9 - i * 0.7)), null, { stroke: mixHex(M, WHITE, 0.45 + i * 0.1), lw: 3, alpha: (0.7 - i * 0.12) * P(t, i * 0.18, 1.4) });
       // a calm pulse line through the rings, then a soft light travelling along it
       const ys = x => { const d = (x - cx) / 40; return cy + (Math.abs(d) < 3.2 ? -Math.sin(d * Math.PI / 1.6) * 70 * Math.exp(-d * d / 4) : 0); };
       const pk = P(t, 0.3, 2.2, E.inOut), x0 = 1140, x1 = W + 20;
-      ctx.save(); ctx.strokeStyle = M; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+      ctx.save(); ctx.strokeStyle = st.line; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
       for (let x = x0; x <= lerp(x0, x1, pk); x += 6) x === x0 ? ctx.moveTo(x, ys(x)) : ctx.lineTo(x, ys(x)); ctx.stroke(); ctx.restore();
-      if (t > 2.5) { const px = lerp(x0, x1, ((t - 2.5) * 0.18) % 1); circle(ctx, px, ys(px), 22, mix(A, '#FFFFFF', 0.3), { alpha: 0.35 }); circle(ctx, px, ys(px), 9, A); }
-      introLogo(ctx, o, P(t, a.logo, 1.0), 148, 110, 100, false, mix(M, '#000000', 0.3));
-      introText(ctx, t, o, a, 140, null, { size: 100, maxW: 900, mode: 'fade', color: mix(M, '#000000', 0.45), accent: M, kickColor: M, subColor: '#3D4B5C', rule: mix(A, M, 0.3), stagger, dur: 1.0 });
-    } else if (look === 'energetic') {
-      ctx.fillStyle = mix(M, '#08090C', 0.55); ctx.fillRect(0, 0, W, H);
+      if (t > 2.5) { const px = lerp(x0, x1, ((t - 2.5) * 0.18) % 1); circle(ctx, px, ys(px), 22, mixHex(A, WHITE, 0.3), { alpha: 0.35 }); circle(ctx, px, ys(px), 9, A); }
+      introLogo(ctx, o, P(t, a.logo, 1.0), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else if (o.mood === 'energetic') {
+      ctx.fillStyle = st.base; ctx.fillRect(0, 0, W, H);
       for (let i = 0; i < 4; i++) {   // stripes slashing in from the right
-        const k = P(t, i * 0.07, 0.5, E.out), x = 1080 + i * 190 + (1 - k) * 1300 - t * 6;
-        ctx.save(); ctx.globalAlpha = [0.95, 0.55, 0.3, 0.15][i]; ctx.fillStyle = i ? mix(A, '#FFFFFF', 0.1 * i) : A;
+        const k = P(t, i * 0.07, 0.5, E.out), x = 1180 + i * 190 + (1 - k) * 1300 - t * 6;
+        ctx.save(); ctx.globalAlpha = [0.95, 0.55, 0.3, 0.15][i]; ctx.fillStyle = i ? mixHex(A, WHITE, 0.1 * i) : A;
         ctx.beginPath(); ctx.moveTo(x + 300, 0); ctx.lineTo(x + 420, 0); ctx.lineTo(x + 120, H); ctx.lineTo(x, H); ctx.closePath(); ctx.fill(); ctx.restore();
       }
       ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineCap = 'round';
       for (let i = 0; i < 28; i++) { const y = 60 + r() * 960, len = 120 + r() * 260, sp = 900 + r() * 1100, x = ((r() * (W + 600) - t * sp) % (W + 600) + W + 600) % (W + 600) - 300; ctx.lineWidth = 2 + r() * 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke(); }
       ctx.restore();
-      let sh = 0; for (let i = 0; i < wordCount(o.title); i++) { const tk = a.title + i * stagger + 0.25; if (t > tk) sh += 9 * Math.exp(-(t - tk) * 16); }
+      let sh = 0; for (let i = 0; i < n; i++) { const tk = a.title + i * stagger + 0.25; if (t > tk) sh += 9 * Math.exp(-(t - tk) * 16); }
       ctx.save(); ctx.translate(sh * noise(1, t * 40), sh * noise(2, t * 40));
-      introLogo(ctx, o, P(t, a.logo, 0.5), 148, 110, 100, true, '#fff');
-      ctx.save(); ctx.transform(1, 0, -0.12, 1, 60, 0);
-      introText(ctx, t, o, a, 140, null, { size: 124, maxW: 1000, mode: 'slam', color: '#fff', accent: A, kickColor: A, subColor: 'rgba(255,255,255,0.88)', rule: A, stagger, dur: 0.35 });
-      ctx.restore(); ctx.restore();
+      introLogo(ctx, o, P(t, a.logo, 0.5), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+      ctx.restore();
     } else {   // playful
-      bg(ctx, 'paper');
-      const cols = [C.coral, C.sun, C.teal, C.purple, C.leaf, C.pink, C.water];
-      for (let i = 0; i < 16; i++) {
-        const right = i < 10, x = right ? 1180 + r() * 620 : 140 + r() * 1700, y = right ? 160 + r() * 700 : (i % 2 ? 60 + r() * 60 : 860 + r() * 40);
-        const k = pop(t, i * 0.06 - 0.3), sz = 26 + r() * 46, rot = t * (r() - 0.5) * 0.8, fy = y + 14 * Math.sin(t * 1.3 + i), col = cols[i % cols.length];
-        if (k <= 0) continue;
-        ctx.save(); ctx.translate(x, fy); ctx.rotate(rot); ctx.scale(k, k); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 9; ctx.lineCap = 'round';
-        const kind = i % 5; ctx.beginPath();
-        if (kind === 0) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.fill(); }
-        else if (kind === 1) { ctx.moveTo(0, -sz / 2); ctx.lineTo(sz / 2, sz / 2); ctx.lineTo(-sz / 2, sz / 2); ctx.closePath(); ctx.fill(); }
-        else if (kind === 2) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.stroke(); }
-        else if (kind === 3) { ctx.moveTo(-sz / 2, 0); ctx.lineTo(sz / 2, 0); ctx.moveTo(0, -sz / 2); ctx.lineTo(0, sz / 2); ctx.stroke(); }
-        else { for (let j = 0; j <= 12; j++) { const px = -sz + j * sz / 6, py = Math.sin(j * 1.2) * sz / 5; j ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
-        ctx.restore();
-      }
-      introLogo(ctx, o, P(t, a.logo, 0.6), 148, 118, 84, false, C.navy);
-      if (o.kicker) badge(ctx, o.kicker.toUpperCase(), 140, 330, { fill: A, size: 30, scale: pop(t, a.kicker) });
-      const y = kinetic(ctx, o.title, 140, 390, t, a.title, 'bounce', { size: fitSize(ctx, o.title, { weight: 800, maxW: 1000 }, 108, 64, 3), color: M, accent: A, maxW: 1000, stagger, dur: 0.6 });
-      if (o.sub) text(ctx, o.sub, 140, 410 + y, { size: 46, weight: 600, color: C.sea, alpha: P(t, a.sub, 0.6), maxW: 1000 });
-      o.emojis.forEach((e, i) => emoji(ctx, e, 200 + i * 140, 800 + Math.sin(t * 2 + i) * 10, 90, { scale: pop(t, a.by + i * 0.12) }));
+      introPlayfulBackdrop(ctx, t, o, st);
+      introLogo(ctx, o, P(t, a.logo, 0.6), ...st.logo, st);
+      const end = introText(ctx, t, a, st, lay);
+      o.emojis.forEach((e, i) => emoji(ctx, e, st.x + 60 + i * 140, end + 60 + Math.sin(t * 2 + i) * 8, 90, { scale: pop(t, a.by + i * 0.12) }));
+    }
+  }
+  // Paper with colourful shapes popping in and floating, kept clear of the text (right of x 1200, above y 100).
+  function introPlayfulBackdrop(ctx, t, o, st) {
+    bg(ctx, 'paper');
+    const r = rng(8 * 977 + 13), cols = [C.coral, C.sun, C.teal, C.purple, C.leaf, C.pink, C.water];
+    for (let i = 0; i < 16; i++) {
+      const right = i < 12, x = right ? 1220 + r() * 600 : 620 + r() * 1200, y = right ? 160 + r() * 700 : 40 + r() * 50;
+      const k = pop(t, i * 0.06 - 0.3), sz = 26 + r() * 46, rot = t * (r() - 0.5) * 0.8, fy = y + 14 * Math.sin(t * 1.3 + i), col = cols[i % cols.length];
+      if (k <= 0) continue;
+      ctx.save(); ctx.translate(x, fy); ctx.rotate(rot); ctx.scale(k, k); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 9; ctx.lineCap = 'round';
+      const kind = i % 5; ctx.beginPath();
+      if (kind === 0) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.fill(); }
+      else if (kind === 1) { ctx.moveTo(0, -sz / 2); ctx.lineTo(sz / 2, sz / 2); ctx.lineTo(-sz / 2, sz / 2); ctx.closePath(); ctx.fill(); }
+      else if (kind === 2) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.stroke(); }
+      else if (kind === 3) { ctx.moveTo(-sz / 2, 0); ctx.lineTo(sz / 2, 0); ctx.moveTo(0, -sz / 2); ctx.lineTo(0, sz / 2); ctx.stroke(); }
+      else { for (let j = 0; j <= 12; j++) { const px = -sz + j * sz / 6, py = Math.sin(j * 1.2) * sz / 5; j ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
+      ctx.restore();
     }
   }
   function measureBadge(ctx, label, size) { ctx.save(); ctx.font = `800 ${size}px ${FONT}`; const w = ctx.measureText(label).width + size * 1.3; ctx.restore(); return w; }

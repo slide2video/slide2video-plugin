@@ -1,7 +1,8 @@
 // Sample chapter: The Water Cycle. Shows the idioms: cue-synced reveals, heading, tip, quiz, recap.
-const { W, H, C, E, P, pop, text, card, arrow, bg, heading, tip, bullets, emoji, titleCard, quizQ, quizA, recap, wander, circle } = Engine;
+const { W, H, C, E, P, pop, text, card, arrow, bg, heading, tip, bullets, emoji, intro, quizQ, quizA, recap, wander, circle } = Engine;
 
-scene('hook', (g, t, s) => titleCard(g, t, s, { kicker: 'Science review', title: 'The *Water Cycle*', sub: 'where every raindrop has been', emojis: ['☀️', '☁️', '🌧️', '🌊'] }), { bug: false, sfx: [[1.2, 'sparkle0', -12]] });
+// The opening is a motion piece of its own (intro), never a copy of the deck's title slide.
+scene('hook', (g, t, s) => intro(g, t, s, { mood: 'playful', kicker: 'Science review', title: 'The *Water Cycle*', sub: 'where every raindrop has been', emojis: ['☀️', '☁️', '🌧️', '🌊'], at: { title: s.cue('water'), sub: s.cue('travels') } }), { bug: false, sfx: [[1.2, 'sparkle0', -12]] });
 
 scene('evaporation', (g, t, s) => {
   bg(g, 'paper');
