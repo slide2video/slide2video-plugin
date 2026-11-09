@@ -8,7 +8,7 @@ import pytest
 
 from conftest import PLUGIN
 
-MOODS = ["polished", "cinematic", "calm", "energetic", "playful"]
+MOODS = ["polished", "cinematic", "calm", "energetic", "playful", "themed"]
 LONG = {"kicker": "Quarterly review for the whole northern region and all of its partners",
         "title": "Everything you need to know about the *new process* for reviews, goals, check-ins and promotions, "
                  "step by step, from the first of January",
@@ -39,6 +39,7 @@ Engine.assets({
 });
 const lumOf = (r, g, b) => [r, g, b].reduce((s, v, i) => { v /= 255; return s + [0.2126, 0.7152, 0.0722][i] * (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); }, 0);
 function parseColour(s) { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = s; const v = c.fillStyle;
+  if (typeof v !== 'string') return [0, 0, 0, 0];   // a gradient left over from the background (only emoji meet it)
   if (v[0] === '#') return [1, 3, 5].map(i => parseInt(v.slice(i, i + 2), 16)).concat(1);
   const m = v.match(/[\d.]+/g).map(Number); return [m[0], m[1], m[2], m[3] ?? 1]; }
 window.drawIntro = (opts, t) => {
@@ -69,21 +70,28 @@ def _engine():
     return (PLUGIN / "engine/engine.js").read_text(encoding="utf-8")
 
 
+def _page(b, theme=None):
+    pg = b.new_page()
+    log = {"errors": [], "console": []}
+    pg.on("pageerror", lambda e: log["errors"].append(str(e)))
+    pg.on("console", lambda m: log["console"].append(f"{m.type}: {m.text}"))
+    pg.set_content('<canvas id="c" width="1920" height="1080"></canvas>')
+    pg.add_script_tag(content=SETUP)
+    pg.add_script_tag(content=_engine())
+    if theme:
+        pg.add_script_tag(content=f"Engine.theme({json.dumps(theme[0])}, {json.dumps(theme[1])});")
+    pg.add_script_tag(content=HELPERS)
+    pg.wait_for_function("['dark', 'light', 'photo'].every(k => Engine.imgs[k].complete && Engine.imgs[k].naturalWidth > 0)")
+    pg.log = log
+    return pg
+
+
 @pytest.fixture(scope="module")
 def page(browser_ok):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         b = p.chromium.launch()
-        pg = b.new_page()
-        log = {"errors": [], "console": []}
-        pg.on("pageerror", lambda e: log["errors"].append(str(e)))
-        pg.on("console", lambda m: log["console"].append(f"{m.type}: {m.text}"))
-        pg.set_content('<canvas id="c" width="1920" height="1080"></canvas>')
-        pg.add_script_tag(content=SETUP)
-        pg.add_script_tag(content=_engine())
-        pg.add_script_tag(content=HELPERS)
-        pg.wait_for_function("['dark', 'light', 'photo'].every(k => Engine.imgs[k].complete && Engine.imgs[k].naturalWidth > 0)")
-        pg.log = log
+        pg = _page(b)
         yield pg
         b.close()
 
@@ -257,7 +265,7 @@ def test_guide_documents_intro_and_its_moods():
 
 def test_school_and_the_sample_open_with_intro():
     school = (PLUGIN / "styles/school/guide.md").read_text(encoding="utf-8")
-    assert "drawn with `intro` and `mood: 'playful'`" in school and "never with `titleCard`" in school
+    assert "drawn with `intro`: `mood: 'playful'`" in school and "`mood: 'themed'`" in school and "never with `titleCard`" in school
     sample = (PLUGIN / "skills/make/references/sample/scenes.js").read_text(encoding="utf-8")
     hook = next(l for l in sample.splitlines() if l.startswith("scene('hook'"))
     assert "intro(g, t, s, { mood: 'playful'" in hook and "titleCard" not in hook
@@ -265,3 +273,30 @@ def test_school_and_the_sample_open_with_intro():
     say = next(s["say"] for s in script["scenes"] if s["id"] == "hook").lower()
     for cue in re.findall(r"s\.cue\('(\w+)'\)", hook):
         assert cue in say, cue
+
+
+LOOKS = ["classroom", "math", "history", "literature", "life", "space", "ocean"]
+PIXEL = """([o, t, kind, x, y]) => { const a = document.createElement('canvas'); a.width = 1920; a.height = 1080; const g = a.getContext('2d');
+  Engine.intro(g, t, { dur: 12, start: 0 }, o); const b = document.createElement('canvas'); b.width = 1920; b.height = 1080; const h = b.getContext('2d');
+  Engine.bg(h, kind, t); return [[...g.getImageData(x, y, 1, 1).data], [...h.getImageData(x, y, 1, 1).data]]; }"""
+
+
+def test_with_a_theme_playful_and_themed_follow_the_look(page):
+    """Finding 6: with Engine.theme, playful paints the look's light background (and its colours) and themed its
+    title background; every text still reads on all seven looks, including with the deck's own colours."""
+    for look in LOOKS:
+        for over in ({}, {"main": "#7A1F5C", "accent": "#C2410C"}):
+            pg = _page(page.context.browser, (look, over))
+            for mood, kind in (("playful", "light"), ("themed", "title")):
+                got, want = pg.evaluate(PIXEL, [opts_for(mood, SHORT, logo="dark"), 20, kind, 960, 1010])
+                assert max(abs(x - y) for x, y in zip(got[:3], want[:3])) <= 2, (look, over, mood, got, want)
+                for d in draw(pg, opts_for(mood, SHORT, logo="dark"), 20)["texts"]:
+                    if d["alpha"] > 0.99 and d["s"].strip() and "contrast" in d and d["s"] not in ("☀️", "🌊"):
+                        assert d["contrast"] >= 4.3, (look, over, mood, d["s"], d["contrast"])
+            assert pg.log["errors"] == [], (look, pg.log["errors"])
+            pg.close()
+
+
+def test_without_a_theme_playful_keeps_its_paper(page):
+    got, want = page.evaluate(PIXEL, [opts_for("playful", SHORT), 20, "paper", 960, 1010])
+    assert got[:3] == want[:3], (got, want)

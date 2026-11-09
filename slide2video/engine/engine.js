@@ -191,6 +191,12 @@
   const UNTHEMED = { title: 'ocean', dark: 'deep', light: 'paper' }, ROLE_KEYS = ['head', 'main', 'accent', 'glow', 'soft', 'note'];
   const LEGACY_BG = ['paper', 'sand', 'lab', 'ocean', 'deep'], LIGHT_BG = ['paper', 'sand', 'lab', 'grid', 'parchment', 'lined'];
   const DARK_BG = ['night', 'blueprint', 'sepia', 'stage', 'canopy', 'cosmos', 'ocean', 'deep'];
+  const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);   // the one colour check: theme() and intro()
+  // Each background's main colours (top, bottom), for checking text drawn on it; TINT replaces the dark ones'.
+  const BG_ENDS = { night: ['#232A45', '#0D1020'], blueprint: ['#1E4A8A', '#0D244A'], sepia: ['#4E3521', '#1D130A'], stage: ['#40122A', '#12050C'],
+    canopy: ['#21583A', '#0B2516'], cosmos: ['#17144A', '#040313'], ocean: ['#1C7FA6', '#0A2540'], deep: ['#0E3A5C', '#061325'],
+    paper: ['#FBF8F1'], sand: ['#F6EFE2'], lab: ['#F3F7FA', '#DCE7EE'], grid: ['#FBFCFE'], parchment: ['#F6EDDA', '#E2CDA8'], lined: ['#FFFDF6'] };
+  const endsOf = kind => (TINT && DARK_BG.includes(kind)) ? TINT : BG_ENDS[kind];
   const LOOK = { ...UNTHEMED }, warnedBg = new Set();
   let TINT = null, THEMED = false;  // TINT: [top, bottom] replaces the dark backgrounds' own gradient
   function gradient(ctx, top, bottom) { const [a, b] = TINT || [top, bottom]; const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, a); gr.addColorStop(1, b); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
@@ -257,7 +263,7 @@
     if (typeof name !== 'string' || !Object.hasOwn(LOOKS, name)) fail(`unknown look "${name}"; use one of ${Object.keys(LOOKS).join(', ')}`);
     if (over === null || typeof over !== 'object' || Array.isArray(over)) fail('the second argument is { main, accent, tint }');
     for (const k of Object.keys(over)) if (!['look', 'title', 'dark', 'light', 'tint', ...ROLE_KEYS].includes(k)) fail(`unknown option "${k}"`);
-    const o = { ...LOOKS[name], ...over }, hex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+    const o = { ...LOOKS[name], ...over }, hex = isHex;
     for (const k of ['title', 'dark']) if (!DARK_BG.includes(o[k])) fail(`"${o[k]}" can't be the ${k} background (white text): use one of ${DARK_BG.join(', ')}`);
     if (!LIGHT_BG.includes(o.light)) fail(`"${o.light}" can't be the light background: use one of ${LIGHT_BG.join(', ')}`);
     for (const k of ROLE_KEYS) if (!hex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
@@ -386,10 +392,10 @@
     calm: { main: '#1F7A6D', accent: '#4FC3F7', stagger: 0.07, dur: 1.0 },
     energetic: { main: '#16212E', accent: '#FF6B57', stagger: 0.12, dur: 0.35 },
     playful: { main: '#0B2545', accent: '#FF6B57', stagger: 0.09, dur: 0.6 },
+    themed: { main: '#0B2545', accent: '#7FE0D6', stagger: 0.09, dur: 0.8 },
   };
   const INTRO_KEYS = ['mood', 'title', 'kicker', 'sub', 'by', 'logo', 'name', 'photo', 'main', 'accent', 'panel', 'emojis', 'at'];
   const AT_KEYS = ['logo', 'kicker', 'title', 'sub', 'by'], INK = '#16212E', WHITE = '#FFFFFF', BLACK = '#000000';
-  const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
   const hexRgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
   const toHex = v => '#' + v.map(x => Math.round(clamp(x, 0, 255)).toString(16).padStart(2, '0')).join('');
   const mixHex = (a, b, k) => { const x = hexRgb(a), y = hexRgb(b); return toHex(x.map((v, i) => lerp(v, y[i], clamp(k)))); };
@@ -423,7 +429,8 @@
       if (!AT_KEYS.includes(k)) fail(`unknown at.${k}; use ${AT_KEYS.join(', ')}`);
       if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) fail(`at.${k} must be a time in seconds, not ${JSON.stringify(v)}`);
     }
-    const d = MOODS[o.mood];
+    // with Engine.theme, playful and themed take the lesson's colours: headings and accent, or the glow on dark
+    const d = THEMED && o.mood === 'playful' ? { main: C.head, accent: C.accent } : o.mood === 'themed' ? { main: C.head, accent: C.glow } : MOODS[o.mood];
     return { kicker: o.kicker || '', sub: o.sub || '', by: o.by || '', name: o.name || '', logo: o.logo || null, photo: o.photo || null,
       emojis: o.emojis || [], panel: o.panel, title: o.title, mood: o.mood, main: o.main || d.main, accent: o.accent || d.accent, at };
   }
@@ -629,9 +636,15 @@
         title: WHITE, accent: acc, kick: acc, sub: readable(mixHex(WHITE, base, 0.12), base, 7), by: readable(mixHex(WHITE, base, 0.2), base, 4.5),
         rule: readable(A, base, 3), logo: [148, 110, 100] };
     }
-    const paper = C.paper, acc = readable(A, paper, 4.5);   // playful
-    return { x: 140, maxW: 1000, size: 108, y0: 260, y1: 880, mode: 'bounce', panel: false, behind: paper, badge: readable(A, WHITE, 4.5),
-      title: readable(M, paper, 4.5), accent: acc, kick: acc, sub: readable(C.sea, paper, 4.5), by: readable(C.sea, paper, 4.5),
+    if (o.mood === 'themed') {   // the lesson's own title background (Engine.theme), white text, its glow for accents
+      const ends = endsOf(LOOK.title), acc = readable(A, ends, 4.5);
+      return { x: 140, maxW: 1400, size: 112, y0: 260, y1: 880, mode: 'rise', panel: true, behind: ends[0], ends,
+        title: readable(WHITE, ends, 7), accent: acc, kick: acc, sub: readable(C.soft, ends, 4.5), by: readable(C.soft, ends, 4.5),
+        rule: readable(C.accent, ends, 3), shadow: true, logo: [148, 110, 100] };
+    }
+    const paper = endsOf(THEMED ? LOOK.light : 'paper'), acc = readable(A, paper, 4.5);   // playful: the look's light background
+    return { x: 140, maxW: 1000, size: 108, y0: 260, y1: 880, mode: 'bounce', panel: false, behind: paper[0], badge: readable(A, WHITE, 4.5),
+      title: readable(M, paper, 4.5), accent: acc, kick: acc, sub: readable(THEMED ? C.note : C.sea, paper, 4.5), by: readable(THEMED ? C.note : C.sea, paper, 4.5),
       extra: o.emojis.length ? 120 : 0, logo: [148, 110, 100] };
   }
   function intro(ctx, t, s, opts = {}) {
@@ -701,6 +714,10 @@
       introLogo(ctx, o, P(t, a.logo, 0.5), ...st.logo, st);
       introText(ctx, t, a, st, lay);
       ctx.restore();
+    } else if (o.mood === 'themed') {
+      paint(ctx, LOOK.title, t + (s.start || 0));
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
     } else {   // playful
       introPlayfulBackdrop(ctx, t, o, st);
       introLogo(ctx, o, P(t, a.logo, 0.6), ...st.logo, st);
@@ -710,8 +727,8 @@
   }
   // Paper with colourful shapes popping in and floating, kept clear of the text (right of x 1200, above y 100).
   function introPlayfulBackdrop(ctx, t, o, st) {
-    bg(ctx, 'paper');
-    const r = rng(8 * 977 + 13), cols = [C.coral, C.sun, C.teal, C.purple, C.leaf, C.pink, C.water];
+    paint(ctx, THEMED ? LOOK.light : 'paper', t);
+    const r = rng(8 * 977 + 13), cols = THEMED ? [C.accent, C.main, C.head, C.note, C.accent, C.main, C.glow] : [C.coral, C.sun, C.teal, C.purple, C.leaf, C.pink, C.water];
     for (let i = 0; i < 16; i++) {
       const right = i < 12, x = right ? 1220 + r() * 600 : 620 + r() * 1200, y = right ? 160 + r() * 700 : 40 + r() * 50;
       const k = pop(t, i * 0.06 - 0.3), sz = 26 + r() * 46, rot = t * (r() - 0.5) * 0.8, fy = y + 14 * Math.sin(t * 1.3 + i), col = cols[i % cols.length];
