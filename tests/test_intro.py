@@ -288,7 +288,8 @@ def test_with_a_theme_playful_and_themed_follow_the_look(page):
         for over in ({}, {"main": "#7A1F5C", "accent": "#C2410C"}):
             pg = _page(page.context.browser, (look, over))
             for mood, kind in (("playful", "light"), ("themed", "title")):
-                got, want = pg.evaluate(PIXEL, [opts_for(mood, SHORT, logo="dark"), 20, kind, 960, 1010])
+                x = 1915 if mood == "themed" else 960   # themed may shade the text side (the ocean's top), not the right edge
+                got, want = pg.evaluate(PIXEL, [opts_for(mood, SHORT, logo="dark"), 20, kind, x, 1010])
                 assert max(abs(x - y) for x, y in zip(got[:3], want[:3])) <= 2, (look, over, mood, got, want)
                 for d in draw(pg, opts_for(mood, SHORT, logo="dark"), 20)["texts"]:
                     if d["alpha"] > 0.99 and d["s"].strip() and "contrast" in d and d["s"] not in ("☀️", "🌊"):
@@ -300,3 +301,67 @@ def test_with_a_theme_playful_and_themed_follow_the_look(page):
 def test_without_a_theme_playful_keeps_its_paper(page):
     got, want = page.evaluate(PIXEL, [opts_for("playful", SHORT), 20, "paper", 960, 1010])
     assert got[:3] == want[:3], (got, want)
+
+
+EMOJI = """([kind]) => { const px = (g) => [...g.getImageData(960, 540, 1, 1).data].slice(0, 3);
+  const a = document.createElement('canvas'); a.width = 1920; a.height = 1080; const g = a.getContext('2d');
+  if (kind) Engine.bg(g, kind, 3); Engine.emoji(g, '☀️', 960, 540, 200);
+  const b = document.createElement('canvas'); b.width = 1920; b.height = 1080; const h = b.getContext('2d');
+  h.fillStyle = '#FFFFFF'; h.fillRect(0, 0, 1920, 1080); Engine.emoji(h, '☀️', 960, 540, 200);
+  return [px(g), px(h)]; }"""
+
+
+def test_emoji_keep_their_colour_on_every_look(page):
+    """Review 2 finding 1: the lined background left a 28%-opaque fill that faded every emoji drawn after it."""
+    for look in LOOKS:
+        pg = _page(page.context.browser, (look, {}))
+        for kind in ("light", "dark", "title"):
+            got, want = pg.evaluate(EMOJI, [kind])
+            assert max(abs(x - y) for x, y in zip(got, want)) <= 3, (look, kind, got, want)
+        # the playful opening's emoji row, drawn straight after the look's light background
+        r = pg.evaluate("""() => { const a = document.createElement('canvas'); a.width = 1920; a.height = 1080; const g = a.getContext('2d');
+            g.fillStyle = 'rgba(215,80,80,0.28)'; Engine.emoji(g, '☀️', 960, 540, 200); return [...g.getImageData(960, 540, 1, 1).data]; }""")
+        assert r[3] == 255, (look, r)   # emoji() sets its own opaque fill, whatever was set before
+        pg.close()
+
+
+@pytest.mark.parametrize("mood", MOODS)
+def test_a_long_name_wraps_or_shrinks_before_it_is_cut(page, mood):
+    """Review 2 finding 4: a school or company name is drawn whole (two lines, or smaller) before any "…"."""
+    name = "Lincoln Elementary School District 42 of the Northern Valley"
+    for logo in ({"logo": "dark"}, {}):
+        texts = draw(page, opts_for(mood, SHORT, name=name, **logo), 20)["texts"]
+        pieces = [d for d in texts if d["y1"] < 260]   # the name sits above the text block
+        joined = " ".join(d["s"] for d in pieces)
+        assert all(w in joined for w in name.split()) and "…" not in joined, (mood, logo, joined)
+        assert all(d["x1"] <= 1240 and d["y0"] >= 40 for d in pieces), (mood, logo, pieces)
+    huge = " ".join(["Northern Valley"] * 14)
+    pieces = [d for d in draw(page, opts_for(mood, SHORT, name=huge, logo="dark"), 20)["texts"] if d["y1"] < 260]
+    assert "…" in "".join(d["s"] for d in pieces) and all(d["x1"] <= 1240 for d in pieces), (mood, pieces)
+
+
+def test_themed_keeps_its_emphasis_on_the_ocean(page):
+    """Review 2 finding 5: on the ocean title (unthemed, or Engine.theme('ocean')) the accent words and kicker stay
+    coloured and the title reads at 7:1, thanks to a soft shade behind the text."""
+    themed = _page(page.context.browser, ("ocean", {}))
+    for pg in (page, themed):
+        texts = draw(pg, opts_for("themed", SHORT), 20)["texts"]
+        title = [d for d in texts if d["s"] == "The"][0]
+        accents = [d for d in texts if d["s"] in ("Water", "Cycle")]
+        kicker = [d for d in texts if d["s"].startswith("SCIENCE")][0]
+        assert accents and all(d["colour"][:3] != title["colour"][:3] for d in accents), (accents, title)
+        assert kicker["colour"][:3] != [255, 255, 255], kicker
+        assert title["contrast"] >= 6.5 and all(d["contrast"] >= 4.3 for d in accents + [kicker]), (title, accents, kicker)
+    themed.close()
+
+
+def test_guides_keep_scene_options_out_of_intro_and_look_none_out_of_theme():
+    """Review 2 findings 3 and 6."""
+    guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
+    assert "These go on the scene's own options, never inside `intro`'s" in guide
+    assert "`Look: none` means no `Engine.theme` line at all" in guide
+    assert "theme('none')" not in guide
+    sample = (PLUGIN / "skills/make/references/sample/scenes.js").read_text(encoding="utf-8")
+    hook = next(l for l in sample.splitlines() if l.startswith("scene('hook'"))
+    inside = hook.split("intro(g, t, s, ", 1)[1].rsplit("}),", 1)[0]
+    assert "bug:" not in inside and "dark:" not in inside, inside

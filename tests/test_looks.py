@@ -240,8 +240,8 @@ def test_underwater_backgrounds_are_only_for_water_lessons():
 
 def test_the_look_lives_in_the_plan_and_follows_changes():
     guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
-    assert "when `plan.md` has a `Look:` line, first `Engine.theme(...)`" in guide
-    assert "with no `Look:` line, don't call it" in guide
+    assert "when `plan.md`'s `Look:` line names a look, first `Engine.theme('<look>')`" in guide
+    assert "with no `Look:` line, or `Look: none`, don't call it" in guide
     school = (PLUGIN / "styles/school/guide.md").read_text(encoding="utf-8")
     look = school.split("## Look", 1)[1].split("\n## ", 1)[0]
     assert "change the `Look:` line in `plan.md` first" in look

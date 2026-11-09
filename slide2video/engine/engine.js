@@ -241,7 +241,7 @@
     // light, for content scenes and the recap (dark text)
     grid(ctx) { ctx.fillStyle = '#FBFCFE'; ctx.fillRect(0, 0, W, H); rules(ctx, 48, 'rgba(40,90,170,0.08)'); rules(ctx, 240, 'rgba(40,90,170,0.14)'); },
     parchment(ctx) { ctx.fillStyle = '#F6EDDA'; ctx.fillRect(0, 0, W, H); const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.7); rg.addColorStop(0, 'rgba(160,110,50,0)'); rg.addColorStop(1, 'rgba(160,110,50,0.22)'); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); },
-    lined(ctx) { ctx.fillStyle = '#FFFDF6'; ctx.fillRect(0, 0, W, H); rules(ctx, 54, 'rgba(70,110,190,0.13)', { rowsOnly: true, y0: 216 }); ctx.fillStyle = 'rgba(215,80,80,0.28)'; ctx.fillRect(84, 0, 3, H); },
+    lined(ctx) { ctx.fillStyle = '#FFFDF6'; ctx.fillRect(0, 0, W, H); rules(ctx, 54, 'rgba(70,110,190,0.13)', { rowsOnly: true, y0: 216 }); ctx.save(); ctx.fillStyle = 'rgba(215,80,80,0.28)'; ctx.fillRect(84, 0, 3, H); ctx.restore(); },   // restored: a translucent fill would fade later emoji
   };
   // Named looks: backgrounds plus colour roles. The style's guide says which fits which subject.
   const LOOKS = {
@@ -369,7 +369,7 @@
   function emoji(ctx, ch, x, y, size, o = {}) {
     o = { alpha: 1, scale: 1, rot: 0, ...o }; if (o.alpha <= 0 || o.scale <= 0) return;
     ctx.save(); ctx.globalAlpha *= o.alpha; ctx.translate(x, y); ctx.rotate(o.rot); ctx.scale(o.scale, o.scale);
-    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, size * 0.06); ctx.restore();
+    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`; ctx.fillStyle = '#000'; ctx.textAlign = 'center';   /* its own opaque fill: colour emoji take the fill's alpha */ ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, size * 0.06); ctx.restore();
   }
   const pop = (t, a, d = 0.5) => P(t, a, d, E.back);
   // Big title card: kicker (small caps line), title, optional subtitle + emoji row.
@@ -595,13 +595,19 @@
     if (logo && !panel && contrast(tone, st.behind) < 2) { panel = true; fill = lum(st.behind) > 0.179 ? dark : WHITE; }
     if (logo && panel && contrast(tone, fill) < 2) fill = fill === WHITE ? dark : WHITE;   // a light logo goes on a dark panel
     const ar = logo ? imgs[o.logo].naturalWidth / imgs[o.logo].naturalHeight : 0, lw = logo ? Math.min(560, h * ar) : 0;
-    const nameColor = readable(panel ? (fill === WHITE ? INK : WHITE) : st.title, panel ? fill : st.behind, 4.5), nf = { size: 40, weight: 800 };
-    const nl = o.name ? cutLines(ctx, introWrap(ctx, o.name, { ...nf, maxW: 640 }), 1, { ...nf, maxW: 640 }) : [];
-    const nw = nl.length ? nl[0].w : 0, gap = logo && nw ? 28 : 0;
+    const nameColor = readable(panel ? (fill === WHITE ? INK : WHITE) : st.title, panel ? fill : st.behind, 4.5);
+    // The name as the deck writes it: one line at 40 px, else two, shrinking to 30 px; only then cut short.
+    const gap0 = logo ? 28 : 0, room = Math.max(360, 1200 - (x + lw + gap0));
+    let ns = 40, nl = [];
+    if (o.name) {
+      for (ns = 40; ns >= 30; ns -= 2) { nl = introWrap(ctx, o.name, { size: ns, weight: 800, maxW: room }); if (nl.length === 1 || (nl.length === 2 && ns <= 36)) break; }
+      if (nl.length > 2) { ns = 30; nl = cutLines(ctx, introWrap(ctx, o.name, { size: ns, weight: 800, maxW: room }), 2, { size: ns, weight: 800, maxW: room }); }
+    }
+    const nw = nl.length ? Math.max(...nl.map(L => L.w)) : 0, gap = logo && nw ? gap0 : 0, bh = nl.length * ns * 1.22, ph = Math.max(h, bh);
     ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.translate((1 - k) * -50, 0);
-    if (panel) card(ctx, x - 28, y - 20, lw + gap + nw + 56, h + 40, { fill, r: 22 });
+    if (panel) card(ctx, x - 28, y - 20 - (ph - h) / 2, lw + gap + nw + 56, ph + 40, { fill, r: 22 });
     if (logo) img(ctx, o.logo, x, y, lw, h, { fit: 'contain' });
-    if (nl.length) drawBlock(ctx, nl, x + lw + gap, y + (h - 49) / 2, 40, 'kick', { color: nameColor, accent: nameColor }, 99, 0, null);
+    if (nl.length) drawBlock(ctx, nl, x + lw + gap, y + (h - bh) / 2, ns, 'kick', { color: nameColor, accent: nameColor }, 99, 0, null);
     ctx.restore();
   }
 
@@ -637,8 +643,11 @@
         rule: readable(A, base, 3), logo: [148, 110, 100] };
     }
     if (o.mood === 'themed') {   // the lesson's own title background (Engine.theme), white text, its glow for accents
-      const ends = endsOf(LOOK.title), acc = readable(A, ends, 4.5);
-      return { x: 140, maxW: 1400, size: 112, y0: 260, y1: 880, mode: 'rise', panel: true, behind: ends[0], ends,
+      // where the background is too light for white titles at 7:1 (the ocean's top), a soft shade behind the text
+      const raw = endsOf(LOOK.title); let scrim = 0;
+      while (scrim < 0.6 && contrast(WHITE, mixHex(raw[0], BLACK, scrim * 0.85)) < 7) scrim += 0.03;
+      const ends = raw.map(c => mixHex(c, BLACK, scrim * 0.85)), acc = readable(A, ends, 4.5);
+      return { x: 140, maxW: 1400, size: 112, y0: 260, y1: 880, mode: 'rise', panel: true, behind: ends[0], ends, scrim,
         title: readable(WHITE, ends, 7), accent: acc, kick: acc, sub: readable(C.soft, ends, 4.5), by: readable(C.soft, ends, 4.5),
         rule: readable(C.accent, ends, 3), shadow: true, logo: [148, 110, 100] };
     }
@@ -716,6 +725,7 @@
       ctx.restore();
     } else if (o.mood === 'themed') {
       paint(ctx, LOOK.title, t + (s.start || 0));
+      if (st.scrim > 0) { const lg = ctx.createLinearGradient(0, 0, W, 0); lg.addColorStop(0, `rgba(0,0,0,${st.scrim})`); lg.addColorStop(0.82, `rgba(0,0,0,${st.scrim * 0.85})`); lg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H); }
       introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
       introText(ctx, t, a, st, lay);
     } else {   // playful
