@@ -41,7 +41,7 @@ Read `${CLAUDE_SKILL_DIR}/references/guide.md` before writing any `script.json` 
 
 ## 0. Resume?
 
-If `WORK` already exists, run `LV status "WORK"` and read `WORK/plan.md`. Tell the teacher where things stand and continue from the first unfinished chapter (skip the steps already done).
+If `WORK` already exists, run `LV status "WORK"` and read `WORK/plan.md`. Tell the teacher where things stand and continue from the first unfinished chapter (skip the steps already done). If the style's guide has a **Look** section and `plan.md` has no `Look:` line, do what that section says for a resumed lesson before the next chapter.
 
 ## 1. Read the deck
 

@@ -149,15 +149,28 @@
   }
 
   // ---------- backgrounds ----------
-  function bg(ctx, kind, t = 0) {
-    if (Object.hasOwn(LOOK, kind)) kind = LOOK[kind];  // 'title', 'dark', 'light': the chapter's look (Engine.theme)
+  // bg(g, kind, t): a named background, or 'title' / 'dark' / 'light' for the chapter's look (Engine.theme).
+  // Without Engine.theme it works as it always did: the five original names, and the ocean for any other name.
+  function bg(ctx, kind, t = 0) { paint(ctx, resolveBg(kind), t); }
+  function resolveBg(kind) {
+    if (!THEMED) {
+      if (LEGACY_BG.includes(kind)) return kind;
+      if (!warnedBg.has(kind)) { warnedBg.add(kind); console.warn(`bg('${kind}') needs Engine.theme(...) at the top of scenes.js; drawn as 'ocean'`); }
+      return 'ocean';
+    }
+    if (Object.hasOwn(LOOK, kind)) return LOOK[kind];
+    if (LEGACY_BG.includes(kind) || Object.hasOwn(MOTIFS, kind)) return kind;
+    throw new Error(`bg: unknown background "${kind}"; use 'light', 'dark', or one of ${[...LIGHT_BG, ...DARK_BG].join(', ')}`);
+  }
+  function paint(ctx, kind, t = 0) {
     if (Object.hasOwn(MOTIFS, kind)) { MOTIFS[kind](ctx, t); return; }
     if (kind === 'paper') { ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H); dotsGrid(ctx, 'rgba(19,49,92,0.07)'); return; }
     if (kind === 'sand') { ctx.fillStyle = C.sand; ctx.fillRect(0, 0, W, H); return; }
     if (kind === 'lab') { const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#F3F7FA'); gr.addColorStop(1, '#DCE7EE'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); dotsGrid(ctx, 'rgba(19,49,92,0.06)'); return; }
     // ocean / deep: gradient + light rays + drifting particles
     const gr = ctx.createLinearGradient(0, 0, 0, H);
-    if (kind === 'deep') { gr.addColorStop(0, '#0E3A5C'); gr.addColorStop(1, '#061325'); }
+    if (TINT) { gr.addColorStop(0, TINT[0]); gr.addColorStop(1, TINT[1]); }
+    else if (kind === 'deep') { gr.addColorStop(0, '#0E3A5C'); gr.addColorStop(1, '#061325'); }
     else { gr.addColorStop(0, '#1C7FA6'); gr.addColorStop(0.55, '#0F4C75'); gr.addColorStop(1, '#0A2540'); }
     ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -175,9 +188,12 @@
   }
   // ---------- looks: backgrounds and colours chosen for the deck's subject (Engine.theme) ----------
   // Unthemed, the title card is 'ocean', quizzes 'deep' and the recap 'paper', as before.
-  const LOOK = { title: 'ocean', dark: 'deep', light: 'paper' };
-  let TINT = null;  // [top, bottom] replaces a dark motif's own gradient
-  function gradient(ctx, top, bottom) { const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, (TINT || [top])[0]); gr.addColorStop(1, (TINT || [, bottom])[1]); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
+  const UNTHEMED = { title: 'ocean', dark: 'deep', light: 'paper' }, ROLE_KEYS = ['head', 'main', 'accent', 'glow', 'soft', 'note'];
+  const LEGACY_BG = ['paper', 'sand', 'lab', 'ocean', 'deep'], LIGHT_BG = ['paper', 'sand', 'lab', 'grid', 'parchment', 'lined'];
+  const DARK_BG = ['night', 'blueprint', 'sepia', 'stage', 'canopy', 'cosmos', 'ocean', 'deep'];
+  const LOOK = { ...UNTHEMED }, warnedBg = new Set();
+  let TINT = null, THEMED = false;  // TINT: [top, bottom] replaces the dark backgrounds' own gradient
+  function gradient(ctx, top, bottom) { const [a, b] = TINT || [top, bottom]; const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, a); gr.addColorStop(1, b); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
   function vignette(ctx, a = 0.45) { const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.75); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, `rgba(0,0,0,${a})`); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); }
   function glowAt(ctx, x, y, r, rgb, a) { const rg = ctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(${rgb},${a})`); rg.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = rg; ctx.fillRect(x - r, y - r, 2 * r, 2 * r); }
   function rules(ctx, step, color, o = {}) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = o.w || 1; ctx.beginPath(); if (!o.rowsOnly) for (let x = (o.x0 ?? step); x < W; x += step) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); } for (let y = (o.y0 ?? step); y < H; y += step) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); } ctx.stroke(); ctx.restore(); }
@@ -224,28 +240,32 @@
   // Named looks: backgrounds plus colour roles. The style's guide says which fits which subject.
   const LOOKS = {
     ocean: { title: 'ocean', dark: 'deep', light: 'paper', head: '#0B2545', main: '#1FA7A0', accent: '#FF6B57', glow: '#7FE0D6', soft: '#E8F7F5', note: '#134E6F' },
-    classroom: { title: 'night', dark: 'night', light: 'paper', head: '#1F2A44', main: '#3D6AE0', accent: '#F0644B', glow: '#FFD166', soft: '#E6E9F5', note: '#3D6AE0' },
-    math: { title: 'blueprint', dark: 'blueprint', light: 'grid', head: '#1B3358', main: '#2B6DE0', accent: '#D9711C', glow: '#FFC94D', soft: '#DCE9FF', note: '#2B6DE0' },
+    classroom: { title: 'night', dark: 'night', light: 'paper', head: '#1F2A44', main: '#3D6AE0', accent: '#D84A30', glow: '#FFD166', soft: '#E6E9F5', note: '#3D6AE0' },
+    math: { title: 'blueprint', dark: 'blueprint', light: 'grid', head: '#1B3358', main: '#2B6DE0', accent: '#C2620F', glow: '#FFC94D', soft: '#DCE9FF', note: '#2B6DE0' },
     history: { title: 'sepia', dark: 'sepia', light: 'parchment', head: '#4A2C17', main: '#9A6630', accent: '#B23A48', glow: '#F2C879', soft: '#F5E6CC', note: '#7A4A21' },
     literature: { title: 'stage', dark: 'stage', light: 'lined', head: '#3B1832', main: '#8A3D7C', accent: '#C8553D', glow: '#F4C95D', soft: '#F6E3EC', note: '#8A3D7C' },
-    life: { title: 'canopy', dark: 'canopy', light: 'lab', head: '#1E3D2B', main: '#2E8B57', accent: '#E76F51', glow: '#C5EBA0', soft: '#E7F5E1', note: '#2E8B57' },
-    space: { title: 'cosmos', dark: 'cosmos', light: 'lab', head: '#1B1F4B', main: '#5552D6', accent: '#E8603F', glow: '#B9B4FF', soft: '#E7E6FF', note: '#5552D6' },
+    life: { title: 'canopy', dark: 'canopy', light: 'lab', head: '#1E3D2B', main: '#257A4B', accent: '#C24E2E', glow: '#C5EBA0', soft: '#E7F5E1', note: '#257A4B' },
+    space: { title: 'cosmos', dark: 'cosmos', light: 'lab', head: '#1B1F4B', main: '#5552D6', accent: '#C9472B', glow: '#B9B4FF', soft: '#E7E6FF', note: '#5552D6' },
   };
   // Engine.theme('history') or Engine.theme('math', { main: '#hex', accent: '#hex', tint: ['#top', '#bottom'] }):
   // call once at the top of scenes.js, before scene(). Sets the backgrounds bg('title'|'dark'|'light') and the
   // titleCard, quizQ, quizA and recap use, and the colour roles C.head, C.main, C.accent, C.glow, C.soft, C.note.
+  // Each call replaces the previous look entirely; nothing changes unless the whole call is valid.
   function theme(name, over = {}) {
-    if (typeof name === 'object') { over = name; name = over.look; }
-    const base = name == null ? {} : LOOKS[name];
-    if (!base) throw new Error(`Engine.theme: unknown look "${name}"; use one of ${Object.keys(LOOKS).join(', ')}`);
-    const o = { ...base, ...over };
-    for (const k of ['title', 'dark', 'light']) if (o[k] != null) {
-      if (!Object.hasOwn(MOTIFS, o[k]) && !['paper', 'sand', 'lab', 'ocean', 'deep'].includes(o[k])) throw new Error(`Engine.theme: unknown background "${o[k]}" for ${k}`);
-      LOOK[k] = o[k];
-    }
-    for (const k of ['head', 'main', 'accent', 'glow', 'soft', 'note']) if (o[k] != null) C[k] = o[k];
-    if (o.tint) TINT = o.tint;
-    return { ...LOOK, tint: TINT };
+    if (name !== null && typeof name === 'object' && !Array.isArray(name)) { over = name; name = over.look; }
+    const fail = msg => { throw new Error(`Engine.theme: ${msg}`); };
+    if (typeof name !== 'string' || !Object.hasOwn(LOOKS, name)) fail(`unknown look "${name}"; use one of ${Object.keys(LOOKS).join(', ')}`);
+    if (over === null || typeof over !== 'object' || Array.isArray(over)) fail('the second argument is { main, accent, tint }');
+    for (const k of Object.keys(over)) if (!['look', 'title', 'dark', 'light', 'tint', ...ROLE_KEYS].includes(k)) fail(`unknown option "${k}"`);
+    const o = { ...LOOKS[name], ...over }, hex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+    for (const k of ['title', 'dark']) if (!DARK_BG.includes(o[k])) fail(`"${o[k]}" can't be the ${k} background (white text): use one of ${DARK_BG.join(', ')}`);
+    if (!LIGHT_BG.includes(o.light)) fail(`"${o.light}" can't be the light background: use one of ${LIGHT_BG.join(', ')}`);
+    for (const k of ROLE_KEYS) if (!hex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
+    if (o.tint != null && !(Array.isArray(o.tint) && o.tint.length === 2 && o.tint.every(hex))) fail("tint must be ['#top', '#bottom']");
+    THEMED = true; TINT = o.tint || null;
+    for (const k of ['title', 'dark', 'light']) LOOK[k] = o[k];
+    for (const k of ROLE_KEYS) C[k] = o[k];
+    return { look: name, ...LOOK, tint: TINT };
   }
   function dotsGrid(ctx, color) { ctx.save(); ctx.fillStyle = color; for (let x = 40; x < W; x += 48) for (let y = 40; y < H; y += 48) { ctx.beginPath(); ctx.arc(x, y, 2, 0, 6.283); ctx.fill(); } ctx.restore(); }
 
@@ -348,8 +368,8 @@
   const pop = (t, a, d = 0.5) => P(t, a, d, E.back);
   // Big title card: kicker (small caps line), title, optional subtitle + emoji row.
   function titleCard(ctx, t, s, o = {}) {
-    o = { kicker: '', title: '', sub: '', emojis: [], bg: 'title', ...o };
-    bg(ctx, o.bg, t + (s.start || 0));
+    o = { kicker: '', title: '', sub: '', emojis: [], bg: null, ...o };
+    if (o.bg == null) paint(ctx, LOOK.title, t + (s.start || 0)); else bg(ctx, o.bg, t + (s.start || 0));
     const k1 = P(t, 0.1, 0.8), k2 = P(t, 0.4, 0.8), k3 = P(t, 0.9, 0.8);
     if (o.kicker) badge(ctx, o.kicker.toUpperCase(), W / 2 - measureBadge(ctx, o.kicker.toUpperCase(), 30) / 2, 330, { fill: C.accent, alpha: k1, size: 30 });
     text(ctx, o.title, W / 2, 400 + (1 - k2) * 40, { size: 104, weight: 800, color: '#fff', align: 'center', maxW: 1600, alpha: k2, shadow: true, accent: C.glow, lh: 1.08 });
@@ -360,7 +380,7 @@
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
     o = { n: 1, q: '', choices: null, emoji: '🤔', badge: '', numbered: false, ...o };
-    bg(ctx, 'dark', t + 100);
+    paint(ctx, LOOK.dark, t + 100);
     badge(ctx, o.badge || `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
     text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.glow });
     if (o.choices) o.choices.forEach((c, i) => {
@@ -377,7 +397,7 @@
   // Quiz answer: big check + answer + explanation.
   function quizA(ctx, t, s, o = {}) {
     o = { answer: '', why: '', ...o };
-    bg(ctx, 'dark', t + 100);
+    paint(ctx, LOOK.dark, t + 100);
     const k = pop(t, 0.05, 0.6);
     circle(ctx, 260, 470, 120 * k, C.leaf); check(ctx, 262, 470, 130, P(t, 0.3, 0.5), '#fff');
     text(ctx, o.answer, 460, 360, { size: 96, weight: 800, color: C.sun, alpha: P(t, 0.2, 0.5), maxW: 1340 });
@@ -385,7 +405,7 @@
   }
   // Recap checklist on paper.
   function recap(ctx, t, s, items, times, o = {}) {
-    bg(ctx, 'light', t);
+    paint(ctx, LOOK.light, t);
     heading(ctx, o.title || 'Recap', t, { kicker: o.kicker || 'In 30 seconds' });
     const gap = o.gap || 130, ch = gap - 24, size = o.size || 44;
     items.forEach((it, i) => { const k = P(t, times[i] ?? 0, 0.5); const y = 250 + i * gap; card(ctx, 120, y, 1680, ch, { fill: '#fff', alpha: k, r: 22 }); check(ctx, 190, y + ch / 2, 60, P(t, (times[i] ?? 0) + 0.2, 0.5)); const m = measure(ctx, it, { size, maxW: 1480, weight: 600 }).h; text(ctx, it, 260, y + (ch - m) / 2 - 2, { size, weight: 600, color: C.ink, maxW: 1480, alpha: k, accent: C.main }); });
@@ -448,7 +468,7 @@
     const ts = T.scenes[i], sc = scenes[ts.id], si = INFOS[i];
     const lt = gt - ts.start; si.t = lt;
     ctx.save();
-    if (!sc) { bg(ctx, 'deep', gt); text(ctx, `missing scene: ${ts.id}`, W / 2, H / 2, { align: 'center', color: '#fff' }); }
+    if (!sc) { paint(ctx, LOOK.dark, gt); text(ctx, `missing scene: ${ts.id}`, W / 2, H / 2, { align: 'center', color: '#fff' }); }
     else sc.draw(ctx, lt, si);
     ctx.restore();
   }

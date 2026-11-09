@@ -12,7 +12,7 @@ Study videos for students, made from a teacher's deck. Follow this with the shar
 
 ## Look
 Each lesson gets the look of its own subject; no look is the default for everything.
-- Choose it with the plan (step 4) and write it in `plan.md` as one line, `Look: <look>` and why, e.g. `Look: history (a unit on the American Revolution)`. Every chapter's `scenes.js` starts with `Engine.theme('<look>')`, the same in every chapter. Content scenes use `bg(g, 'light', t)`.
+- Choose it with the plan (step 4) and write it near the top of `plan.md` as one line, `Look: <look>` and why, e.g. `Look: history (a unit on the American Revolution)`. Every chapter's `scenes.js` starts with `Engine.theme('<look>')`, the same in every chapter. Content scenes use `bg(g, 'light', t)`.
 - Pick by what the whole deck teaches, not by one example in it (a math deck with a word problem about fish is `math`):
 
   | The deck teaches | Look |
@@ -26,8 +26,8 @@ Each lesson gets the look of its own subject; no look is the default for everyth
   | Anything else (chemistry, PE, several subjects), or when no row clearly fits | `classroom` |
 - The deck's own colours: when most slides share strong colours of their own (not plain white with black text or a stock template), keep the look and take two of them, `Engine.theme('<look>', { main: '#hex', accent: '#hex' })`. Both are drawn on white, so each must be dark enough to read there.
 - The grade: Grades 3–5 bright and playful, an emoji row on the title card and an emoji on every quiz question. Grades 9–12 calmer: at most two emoji on the title card, the deck's pictures and diagrams rather than emoji, and no cartoon emoji for serious topics (war, illness, death).
-- A lesson whose finished chapters have no `Engine.theme` line keeps their look: don't add one to its new chapters, unless the teacher asks for a new look (then change every chapter).
-- When the teacher asks for another look in feedback, change the line in every chapter.
+- A lesson resumed without a `Look:` line in `plan.md`: if no chapter is finished yet, choose the look now and add the line before writing chapter 1's `scenes.js`. If chapters are already finished (made before looks existed), keep their look: add `Look: none (earlier chapters kept as they are)` and no `Engine.theme` line in any chapter, unless the teacher asks for a new look.
+- When the teacher asks for another look, change the `Look:` line in `plan.md` first (later chapters and helpers read it), then the `Engine.theme` line in every finished chapter, and render them again.
 
 ## Images
 - Never use images of students.
