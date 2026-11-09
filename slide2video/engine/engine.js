@@ -367,18 +367,16 @@
     if (look === 'polished') {
       const gr = ctx.createLinearGradient(0, 0, W, H); gr.addColorStop(0, mix(M, '#FFFFFF', 0.06)); gr.addColorStop(1, mix(M, '#000000', 0.5));
       ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
-      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 2;
-      for (let y = 220; y <= 860; y += 80) { ctx.beginPath(); ctx.moveTo(1180, y); ctx.lineTo(1180 + 680 * P(t, 0.05 + (y - 220) / 2000, 1.2, E.inOut), y); ctx.stroke(); }
-      ctx.restore();
-      for (let i = 0; i < 7; i++) {   // rising columns: a chart, a skyline
-        const k = P(t, i * 0.08, 1.4, E.out), full = 200 + 420 * r(), h = full * (0.3 + 0.7 * k) * (1 + 0.025 * Math.sin(t * 1.1 + i));
-        ctx.save(); ctx.globalAlpha = i % 3 === 1 ? 0.95 : 0.5; rr(ctx, 1220 + i * 92, 860 - h, 60, h + 12, 10);
-        ctx.fillStyle = i % 3 === 1 ? A : mix(M, '#FFFFFF', 0.25 + 0.06 * i); ctx.fill(); ctx.restore();
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 9; j++) {   // a field of tiles breathing in a slow wave (decoration, never data)
+        const k = P(t, (i + j) * 0.045 - 0.25, 0.7, E.out), wv = 0.5 + 0.5 * Math.sin(t * 1.6 - (i + j) * 0.45), z = (14 + 30 * wv) * k;
+        if (z <= 0) continue;
+        const hot = (i * 3 + j * 5) % 11 === 0, cx = 1250 + i * 76, cy = 230 + j * 72;
+        ctx.save(); ctx.globalAlpha = hot ? 0.9 : 0.12 + 0.12 * wv; ctx.fillStyle = hot ? A : '#FFFFFF'; rr(ctx, cx - z / 2, cy - z / 2, z, z, z * 0.25); ctx.fill(); ctx.restore();
       }
       const sw = P(t, 0.2, 1.8, E.inOut);
       if (sw > 0 && sw < 1) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sx = lerp(-700, W + 300, sw); const lg = ctx.createLinearGradient(sx, 0, sx + 400, 0); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,0.10)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(sx + 200, 0); ctx.lineTo(sx + 600, 0); ctx.lineTo(sx + 200, H); ctx.lineTo(sx - 200, H); ctx.closePath(); ctx.fill(); ctx.restore(); }
-      introLogo(ctx, o, P(t, a.logo, 0.8), 148, 118, 84, true, '#fff');
-      introText(ctx, t, o, a, 140, null, { size: 104, maxW: 1000, mode: 'rise', color: '#fff', accent: mix(A, '#FFFFFF', 0.35), kickColor: mix(A, '#FFFFFF', 0.35), subColor: 'rgba(255,255,255,0.86)', rule: A, stagger, dur: 0.75 });
+      introLogo(ctx, o, P(t, a.logo, 0.8), 148, 110, 100, true, '#fff');
+      introText(ctx, t, o, a, 140, null, { size: 116, maxW: 1040, mode: 'rise', color: '#fff', accent: mix(A, '#FFFFFF', 0.35), kickColor: mix(A, '#FFFFFF', 0.35), subColor: 'rgba(255,255,255,0.86)', rule: A, stagger, dur: 0.75 });
     } else if (look === 'cinematic') {
       const kz = E.out(clamp(t / Math.max(6, s.dur || 10)));
       if (o.photo) img(ctx, o.photo, 0, 0, W, H, { fit: 'cover', zoom: 1.18 - 0.14 * kz, panX: -0.4 + 0.5 * kz });
@@ -391,7 +389,7 @@
       const bg2 = ctx.createLinearGradient(0, H * 0.45, 0, H); bg2.addColorStop(0, 'rgba(0,0,0,0)'); bg2.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = bg2; ctx.fillRect(0, 0, W, H);
       const hb = lerp(H / 2 - 170, 92, P(t, 0.05, 1.7, E.inOut));   // letterbox opening like a curtain
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, hb); ctx.fillRect(0, H - hb, W, hb);
-      introLogo(ctx, o, P(t, Math.max(a.logo, 1.2), 0.8), 148, 152, 72, true, '#fff');
+      introLogo(ctx, o, P(t, Math.max(a.logo, 1.2), 0.8), 148, 146, 84, true, '#fff');
       const st = { size: 132, maxW: 1250, mode: 'focus', color: '#fff', accent: mix(A, '#FFFFFF', 0.15), kickColor: mix(A, '#FFFFFF', 0.15), subColor: 'rgba(255,255,255,0.92)', shadow: true, stagger, dur: 0.9 };
       introText(ctx, t, o, { ...a, title: Math.max(a.title, 0.9) }, 140, Math.max(270, 860 - introHeight(ctx, o, st)), st);
     } else if (look === 'calm') {
@@ -405,7 +403,7 @@
       ctx.save(); ctx.strokeStyle = M; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
       for (let x = x0; x <= lerp(x0, x1, pk); x += 6) x === x0 ? ctx.moveTo(x, ys(x)) : ctx.lineTo(x, ys(x)); ctx.stroke(); ctx.restore();
       if (t > 2.5) { const px = lerp(x0, x1, ((t - 2.5) * 0.18) % 1); circle(ctx, px, ys(px), 22, mix(A, '#FFFFFF', 0.3), { alpha: 0.35 }); circle(ctx, px, ys(px), 9, A); }
-      introLogo(ctx, o, P(t, a.logo, 1.0), 148, 118, 84, false, mix(M, '#000000', 0.3));
+      introLogo(ctx, o, P(t, a.logo, 1.0), 148, 110, 100, false, mix(M, '#000000', 0.3));
       introText(ctx, t, o, a, 140, null, { size: 100, maxW: 900, mode: 'fade', color: mix(M, '#000000', 0.45), accent: M, kickColor: M, subColor: '#3D4B5C', rule: mix(A, M, 0.3), stagger, dur: 1.0 });
     } else if (look === 'energetic') {
       ctx.fillStyle = mix(M, '#08090C', 0.55); ctx.fillRect(0, 0, W, H);
@@ -419,7 +417,7 @@
       ctx.restore();
       let sh = 0; for (let i = 0; i < wordCount(o.title); i++) { const tk = a.title + i * stagger + 0.25; if (t > tk) sh += 9 * Math.exp(-(t - tk) * 16); }
       ctx.save(); ctx.translate(sh * noise(1, t * 40), sh * noise(2, t * 40));
-      introLogo(ctx, o, P(t, a.logo, 0.5), 148, 118, 84, true, '#fff');
+      introLogo(ctx, o, P(t, a.logo, 0.5), 148, 110, 100, true, '#fff');
       ctx.save(); ctx.transform(1, 0, -0.12, 1, 60, 0);
       introText(ctx, t, o, a, 140, null, { size: 124, maxW: 1000, mode: 'slam', color: '#fff', accent: A, kickColor: A, subColor: 'rgba(255,255,255,0.88)', rule: A, stagger, dur: 0.35 });
       ctx.restore(); ctx.restore();
