@@ -35,6 +35,8 @@
     sand: '#F6EFE2', paper: '#FBF8F1', ink: '#16212E', coral: '#FF6B57', sun: '#FFC145', leaf: '#3FB36B',
     purple: '#8E7DFF', pink: '#FF8FB1', grey: '#8A97A6', white: '#FFFFFF', salt: '#F2F2F2', water: '#4FC3F7',
   };
+  // Colour roles the ready-made widgets use; Engine.theme() sets them. Unthemed, they are the original palette.
+  Object.assign(C, { head: C.navy, main: C.teal, accent: C.coral, glow: C.aqua, soft: C.foam, note: C.sea });
   const FONT = '"Avenir Next", "Nunito", "Helvetica Neue", Arial, sans-serif';
   const HAND = '"Patrick Hand", "Avenir Next", sans-serif';
 
@@ -63,7 +65,7 @@
     return lines.map(L => { while (L.length && /^\s+$/.test(L[L.length - 1].s)) L.pop(); return { runs: L, w: L.reduce((a, r) => a + r.w, 0) }; });
   }
   function text(ctx, str, x, y, o = {}) {
-    o = { size: 48, color: C.ink, align: 'left', lh: 1.22, alpha: 1, accent: C.coral, ...o };
+    o = { size: 48, color: C.ink, align: 'left', lh: 1.22, alpha: 1, accent: C.accent, ...o };
     if (o.alpha <= 0) return 0;
     ctx.save(); ctx.globalAlpha *= o.alpha; ctx.textBaseline = 'alphabetic';
     if (o.shadow) { ctx.shadowColor = o.shadow === true ? 'rgba(0,0,0,0.35)' : o.shadow; ctx.shadowBlur = 18; ctx.shadowOffsetY = 4; }
@@ -147,13 +149,28 @@
   }
 
   // ---------- backgrounds ----------
-  function bg(ctx, kind, t = 0) {
+  // bg(g, kind, t): a named background, or 'title' / 'dark' / 'light' for the chapter's look (Engine.theme).
+  // Without Engine.theme it works as it always did: the five original names, and the ocean for any other name.
+  function bg(ctx, kind, t = 0) { paint(ctx, resolveBg(kind), t); }
+  function resolveBg(kind) {
+    if (!THEMED) {
+      if (LEGACY_BG.includes(kind)) return kind;
+      if (!warnedBg.has(kind)) { warnedBg.add(kind); console.warn(`bg('${kind}') needs Engine.theme(...) at the top of scenes.js; drawn as 'ocean'`); }
+      return 'ocean';
+    }
+    if (Object.hasOwn(LOOK, kind)) return LOOK[kind];
+    if (LEGACY_BG.includes(kind) || Object.hasOwn(MOTIFS, kind)) return kind;
+    throw new Error(`bg: unknown background "${kind}"; use 'light', 'dark', or one of ${[...LIGHT_BG, ...DARK_BG].join(', ')}`);
+  }
+  function paint(ctx, kind, t = 0) {
+    if (Object.hasOwn(MOTIFS, kind)) { MOTIFS[kind](ctx, t); return; }
     if (kind === 'paper') { ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H); dotsGrid(ctx, 'rgba(19,49,92,0.07)'); return; }
     if (kind === 'sand') { ctx.fillStyle = C.sand; ctx.fillRect(0, 0, W, H); return; }
     if (kind === 'lab') { const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#F3F7FA'); gr.addColorStop(1, '#DCE7EE'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); dotsGrid(ctx, 'rgba(19,49,92,0.06)'); return; }
     // ocean / deep: gradient + light rays + drifting particles
     const gr = ctx.createLinearGradient(0, 0, 0, H);
-    if (kind === 'deep') { gr.addColorStop(0, '#0E3A5C'); gr.addColorStop(1, '#061325'); }
+    if (TINT) { gr.addColorStop(0, TINT[0]); gr.addColorStop(1, TINT[1]); }
+    else if (kind === 'deep') { gr.addColorStop(0, '#0E3A5C'); gr.addColorStop(1, '#061325'); }
     else { gr.addColorStop(0, '#1C7FA6'); gr.addColorStop(0.55, '#0F4C75'); gr.addColorStop(1, '#0A2540'); }
     ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -169,18 +186,99 @@
       circle(ctx, bx + Math.sin(t + i) * 10, y, 1.5 + r() * 3, `rgba(220,250,255,${0.15 + r() * 0.25})`);
     }
   }
+  // ---------- looks: backgrounds and colours chosen for the deck's subject (Engine.theme) ----------
+  // Unthemed, the title card is 'ocean', quizzes 'deep' and the recap 'paper', as before.
+  const UNTHEMED = { title: 'ocean', dark: 'deep', light: 'paper' }, ROLE_KEYS = ['head', 'main', 'accent', 'glow', 'soft', 'note'];
+  const LEGACY_BG = ['paper', 'sand', 'lab', 'ocean', 'deep'], LIGHT_BG = ['paper', 'sand', 'lab', 'grid', 'parchment', 'lined'];
+  const DARK_BG = ['night', 'blueprint', 'sepia', 'stage', 'canopy', 'cosmos', 'ocean', 'deep'];
+  const LOOK = { ...UNTHEMED }, warnedBg = new Set();
+  let TINT = null, THEMED = false;  // TINT: [top, bottom] replaces the dark backgrounds' own gradient
+  function gradient(ctx, top, bottom) { const [a, b] = TINT || [top, bottom]; const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, a); gr.addColorStop(1, b); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
+  function vignette(ctx, a = 0.45) { const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.75); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, `rgba(0,0,0,${a})`); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); }
+  function glowAt(ctx, x, y, r, rgb, a) { const rg = ctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(${rgb},${a})`); rg.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = rg; ctx.fillRect(x - r, y - r, 2 * r, 2 * r); }
+  function rules(ctx, step, color, o = {}) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = o.w || 1; ctx.beginPath(); if (!o.rowsOnly) for (let x = (o.x0 ?? step); x < W; x += step) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); } for (let y = (o.y0 ?? step); y < H; y += step) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); } ctx.stroke(); ctx.restore(); }
+  const MOTIFS = {
+    // dark, for title cards, quizzes and dark scenes (white text)
+    night(ctx, t) {  // any subject: calm ink-blue with slow soft lights
+      gradient(ctx, '#232A45', '#0D1020'); const r = rng(11);
+      for (let i = 0; i < 9; i++) { const x = r() * W + Math.sin(t * 0.12 + i) * 80, y = r() * H + Math.cos(t * 0.1 + i * 2) * 50; glowAt(ctx, x, y, 140 + r() * 160, '160,170,255', 0.05 + 0.03 * r()); }
+      vignette(ctx, 0.4);
+    },
+    blueprint(ctx, t) {  // maths, engineering, technology: drafting grid with a slow light sweep
+      gradient(ctx, '#1E4A8A', '#0D244A'); rules(ctx, 48, 'rgba(255,255,255,0.06)'); rules(ctx, 240, 'rgba(255,255,255,0.12)', { w: 2 });
+      glowAt(ctx, (t * 60) % (W + 800) - 400, H * 0.4, 520, '150,200,255', 0.08); vignette(ctx, 0.35);
+    },
+    sepia(ctx, t) {  // history, geography, social studies: old-map brown with drifting dust
+      gradient(ctx, '#4E3521', '#1D130A'); ctx.save(); ctx.strokeStyle = 'rgba(255,225,170,0.07)'; ctx.lineWidth = 2;
+      for (let i = 1; i < 7; i++) { ctx.beginPath(); for (let x = 0; x <= W; x += 40) { const y = i * H / 7 + Math.sin(x / 260 + i * 1.7) * 26; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+      ctx.restore(); const r = rng(5);
+      for (let i = 0; i < 50; i++) { const x = (r() * W + t * (6 + r() * 10)) % W, y = r() * H + Math.sin(t * 0.3 + i) * 8; circle(ctx, x, y, 1 + r() * 2, `rgba(255,220,160,${0.08 + r() * 0.12})`); }
+      vignette(ctx, 0.5);
+    },
+    stage(ctx, t) {  // literature, drama, poetry, the arts: dark curtain with a swaying spotlight
+      gradient(ctx, '#40122A', '#12050C'); const x = W / 2 + Math.sin(t * 0.3) * 120;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; const rg = ctx.createLinearGradient(0, 0, 0, H); rg.addColorStop(0, 'rgba(255,230,190,0.13)'); rg.addColorStop(1, 'rgba(255,230,190,0.02)');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(x - 90, 0); ctx.lineTo(x + 90, 0); ctx.lineTo(x + 560, H); ctx.lineTo(x - 560, H); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 12; i++) { const fx = i * W / 12; ctx.fillRect(fx, 0, W / 24, H); } ctx.restore();
+      vignette(ctx, 0.55);
+    },
+    canopy(ctx, t) {  // life science on land, health, ecology: deep green with dappled light
+      gradient(ctx, '#21583A', '#0B2516'); const r = rng(3);
+      for (let i = 0; i < 12; i++) { const x = r() * W + Math.sin(t * 0.2 + i) * 40, y = r() * H * 0.8 + Math.cos(t * 0.15 + i) * 30; glowAt(ctx, x, y, 90 + r() * 140, '210,255,170', 0.05 + 0.04 * r()); }
+      for (let i = 0; i < 40; i++) { const x = (r() * W + t * (8 + r() * 14) + Math.sin(t + i) * 12) % W, y = (r() * H + t * (5 + r() * 8)) % H; circle(ctx, x, y, 1.5 + r() * 2, `rgba(230,255,200,${0.12 + r() * 0.15})`); }
+      vignette(ctx, 0.4);
+    },
+    cosmos(ctx, t) {  // astronomy, physics, earth and space: night sky with twinkling stars
+      gradient(ctx, '#17144A', '#040313'); glowAt(ctx, W * 0.72, H * 0.35, 620, '150,110,255', 0.10); glowAt(ctx, W * 0.2, H * 0.75, 480, '80,160,255', 0.07);
+      const r = rng(9); for (let i = 0; i < 220; i++) { const x = r() * W, y = r() * H, b = 0.25 + 0.5 * r() * (0.6 + 0.4 * Math.sin(t * (1 + r() * 2) + i)); circle(ctx, x, y, 0.8 + r() * 1.8, `rgba(255,255,255,${b})`); }
+    },
+    // light, for content scenes and the recap (dark text)
+    grid(ctx) { ctx.fillStyle = '#FBFCFE'; ctx.fillRect(0, 0, W, H); rules(ctx, 48, 'rgba(40,90,170,0.08)'); rules(ctx, 240, 'rgba(40,90,170,0.14)'); },
+    parchment(ctx) { ctx.fillStyle = '#F6EDDA'; ctx.fillRect(0, 0, W, H); const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.7); rg.addColorStop(0, 'rgba(160,110,50,0)'); rg.addColorStop(1, 'rgba(160,110,50,0.22)'); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); },
+    lined(ctx) { ctx.fillStyle = '#FFFDF6'; ctx.fillRect(0, 0, W, H); rules(ctx, 54, 'rgba(70,110,190,0.13)', { rowsOnly: true, y0: 216 }); ctx.fillStyle = 'rgba(215,80,80,0.28)'; ctx.fillRect(84, 0, 3, H); },
+  };
+  // Named looks: backgrounds plus colour roles. The style's guide says which fits which subject.
+  const LOOKS = {
+    ocean: { title: 'ocean', dark: 'deep', light: 'paper', head: '#0B2545', main: '#1FA7A0', accent: '#FF6B57', glow: '#7FE0D6', soft: '#E8F7F5', note: '#134E6F' },
+    classroom: { title: 'night', dark: 'night', light: 'paper', head: '#1F2A44', main: '#3D6AE0', accent: '#D84A30', glow: '#FFD166', soft: '#E6E9F5', note: '#3D6AE0' },
+    math: { title: 'blueprint', dark: 'blueprint', light: 'grid', head: '#1B3358', main: '#2B6DE0', accent: '#C2620F', glow: '#FFC94D', soft: '#DCE9FF', note: '#2B6DE0' },
+    history: { title: 'sepia', dark: 'sepia', light: 'parchment', head: '#4A2C17', main: '#9A6630', accent: '#B23A48', glow: '#F2C879', soft: '#F5E6CC', note: '#7A4A21' },
+    literature: { title: 'stage', dark: 'stage', light: 'lined', head: '#3B1832', main: '#8A3D7C', accent: '#C8553D', glow: '#F4C95D', soft: '#F6E3EC', note: '#8A3D7C' },
+    life: { title: 'canopy', dark: 'canopy', light: 'lab', head: '#1E3D2B', main: '#257A4B', accent: '#C24E2E', glow: '#C5EBA0', soft: '#E7F5E1', note: '#257A4B' },
+    space: { title: 'cosmos', dark: 'cosmos', light: 'lab', head: '#1B1F4B', main: '#5552D6', accent: '#C9472B', glow: '#B9B4FF', soft: '#E7E6FF', note: '#5552D6' },
+  };
+  // Engine.theme('history') or Engine.theme('math', { main: '#hex', accent: '#hex', tint: ['#top', '#bottom'] }):
+  // call once at the top of scenes.js, before scene(). Sets the backgrounds bg('title'|'dark'|'light') and the
+  // titleCard, quizQ, quizA and recap use, and the colour roles C.head, C.main, C.accent, C.glow, C.soft, C.note.
+  // Each call replaces the previous look entirely; nothing changes unless the whole call is valid.
+  function theme(name, over = {}) {
+    if (name !== null && typeof name === 'object' && !Array.isArray(name)) { over = name; name = over.look; }
+    const fail = msg => { throw new Error(`Engine.theme: ${msg}`); };
+    if (typeof name !== 'string' || !Object.hasOwn(LOOKS, name)) fail(`unknown look "${name}"; use one of ${Object.keys(LOOKS).join(', ')}`);
+    if (over === null || typeof over !== 'object' || Array.isArray(over)) fail('the second argument is { main, accent, tint }');
+    for (const k of Object.keys(over)) if (!['look', 'title', 'dark', 'light', 'tint', ...ROLE_KEYS].includes(k)) fail(`unknown option "${k}"`);
+    const o = { ...LOOKS[name], ...over }, hex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+    for (const k of ['title', 'dark']) if (!DARK_BG.includes(o[k])) fail(`"${o[k]}" can't be the ${k} background (white text): use one of ${DARK_BG.join(', ')}`);
+    if (!LIGHT_BG.includes(o.light)) fail(`"${o.light}" can't be the light background: use one of ${LIGHT_BG.join(', ')}`);
+    for (const k of ROLE_KEYS) if (!hex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
+    if (o.tint != null && !(Array.isArray(o.tint) && o.tint.length === 2 && o.tint.every(hex))) fail("tint must be ['#top', '#bottom']");
+    THEMED = true; TINT = o.tint || null;
+    for (const k of ['title', 'dark', 'light']) LOOK[k] = o[k];
+    for (const k of ROLE_KEYS) C[k] = o[k];
+    return { look: name, ...LOOK, tint: TINT };
+  }
   function dotsGrid(ctx, color) { ctx.save(); ctx.fillStyle = color; for (let x = 40; x < W; x += 48) for (let y = 40; y < H; y += 48) { ctx.beginPath(); ctx.arc(x, y, 2, 0, 6.283); ctx.fill(); } ctx.restore(); }
 
   // ---------- teaching widgets ----------
   // Title + optional kicker at the top of a content scene (consistent position).
   function heading(ctx, str, t, o = {}) {
-    o = { color: C.navy, kicker: null, kickColor: C.teal, at: 0, x: 120, y: 92, size: 72, ...o };
+    o = { color: C.head, kicker: null, kickColor: C.main, at: 0, x: 120, y: 92, size: 72, ...o };
     const k = P(t, o.at, 0.7);
     if (o.kicker) text(ctx, o.kicker.toUpperCase(), o.x, o.y - 50, { size: 30, weight: 700, color: o.kickColor, alpha: k });
-    text(ctx, str, o.x + (1 - k) * -40, o.y, { size: o.size, weight: 700, color: o.color, alpha: k, maxW: o.maxW || 1680, accent: o.accent || C.coral });
+    text(ctx, str, o.x + (1 - k) * -40, o.y, { size: o.size, weight: 700, color: o.color, alpha: k, maxW: o.maxW || 1680, accent: o.accent || C.accent });
   }
   function badge(ctx, label, x, y, o = {}) {
-    o = { fill: C.coral, color: '#fff', size: 30, alpha: 1, scale: 1, ...o }; if (o.alpha <= 0 || o.scale <= 0) return;
+    o = { fill: C.accent, color: '#fff', size: 30, alpha: 1, scale: 1, ...o }; if (o.alpha <= 0 || o.scale <= 0) return;
     ctx.save(); ctx.globalAlpha *= o.alpha; ctx.translate(x, y); ctx.scale(o.scale, o.scale);
     ctx.font = `800 ${o.size}px ${FONT}`; const w = ctx.measureText(label).width + o.size * 1.3, h = o.size * 1.7;
     rr(ctx, 0, -h / 2, w, h, h / 2); ctx.fillStyle = o.fill; ctx.fill();
@@ -190,7 +288,7 @@
   // "TEST TIP" banner card that pops in at time `at`.
   function tip(ctx, str, t, at, o = {}) {
     // Sits with its bottom edge at o.bottom (default 900, clear of the captions) unless o.y is given.
-    o = { x: 120, y: null, bottom: 900, w: 1680, label: 'TEST TIP', fill: '#FFF4E0', edge: C.coral, size: 40, ...o };
+    o = { x: 120, y: null, bottom: 900, w: 1680, label: 'TEST TIP', fill: '#FFF4E0', edge: C.accent, size: 40, ...o };
     const k = P(t, at, 0.55, E.back); if (k <= 0) return;
     const h = measure(ctx, str, { size: o.size, maxW: o.w - 300 }).h + 60;
     if (o.y == null) o.y = o.bottom - h;
@@ -203,17 +301,17 @@
   }
   // Bullet list; each item i appears at times[i].
   function bullets(ctx, items, x, y, t, times, o = {}) {
-    o = { size: 46, gap: 26, color: C.ink, dot: C.teal, maxW: 1500, ...o }; let cy = y;
+    o = { size: 46, gap: 26, color: C.ink, dot: C.main, maxW: 1500, ...o }; let cy = y;
     items.forEach((it, i) => {
       const k = P(t, times[i] ?? 0, 0.5); const h = measure(ctx, it, { size: o.size, maxW: o.maxW }).h;
-      if (k > 0) { circle(ctx, x + 14 + (1 - k) * -30, cy + o.size * 0.55, 11 * k, o.dot); text(ctx, it, x + 50 + (1 - k) * -30, cy, { size: o.size, color: o.color, maxW: o.maxW, alpha: k, weight: o.weight || 500, accent: o.accent || C.coral }); }
+      if (k > 0) { circle(ctx, x + 14 + (1 - k) * -30, cy + o.size * 0.55, 11 * k, o.dot); text(ctx, it, x + 50 + (1 - k) * -30, cy, { size: o.size, color: o.color, maxW: o.maxW, alpha: k, weight: o.weight || 500, accent: o.accent || C.accent }); }
       cy += h + o.gap;
     });
     return cy;
   }
   // Leader-line label: dot at (px,py), text at (tx,ty).
   function label(ctx, str, px, py, tx, ty, k, o = {}) {
-    o = { color: C.ink, line: C.coral, size: 36, align: tx < px ? 'right' : 'left', ...o }; if (k <= 0) return;
+    o = { color: C.ink, line: C.accent, size: 36, align: tx < px ? 'right' : 'left', ...o }; if (k <= 0) return;
     circle(ctx, px, py, 9 * k, o.line); line(ctx, px, py, tx, ty, { color: o.line, w: 4, prog: clamp(k * 1.4) });
     const kk = clamp(k * 1.6 - 0.6); if (kk > 0) text(ctx, str, tx + (o.align === 'right' ? -14 : 14), ty - o.size * 0.62, { size: o.size, weight: 700, color: o.color, align: o.align, alpha: kk, maxW: o.maxW });
   }
@@ -246,14 +344,14 @@
   }
   // Table: rows = [[...header], [...], ...]; colW = [..]; k reveals rows progressively.
   function table(ctx, rows, x, y, colW, o = {}) {
-    o = { rowH: 86, size: 36, head: C.navy, headColor: '#fff', fill: '#fff', alt: '#F1F6F9', k: 1, rowTimes: null, t: 0, ...o };
+    o = { rowH: 86, size: 36, head: C.head, headColor: '#fff', fill: '#fff', alt: '#F1F6F9', k: 1, rowTimes: null, t: 0, ...o };
     let cy = y; const totalW = colW.reduce((a, b) => a + b, 0);
     rows.forEach((row, ri) => {
       const k = o.rowTimes ? P(o.t, o.rowTimes[ri] ?? 0, 0.5) : clamp(o.k * rows.length - ri);
       if (k > 0) {
         ctx.save(); ctx.globalAlpha *= k;
         ctx.fillStyle = ri === 0 ? o.head : (ri % 2 ? o.fill : o.alt); ctx.fillRect(x, cy, totalW, o.rowH);
-        let cx = x; row.forEach((cell, ci) => { text(ctx, String(cell), cx + 22, cy + (o.rowH - o.size * 1.15) / 2, { size: o.size, weight: ri === 0 || ci === 0 ? 700 : 500, color: ri === 0 ? o.headColor : (o.colColors?.[ci] || C.ink), maxW: colW[ci] - 30, accent: C.coral }); cx += colW[ci]; });
+        let cx = x; row.forEach((cell, ci) => { text(ctx, String(cell), cx + 22, cy + (o.rowH - o.size * 1.15) / 2, { size: o.size, weight: ri === 0 || ci === 0 ? 700 : 500, color: ri === 0 ? o.headColor : (o.colColors?.[ci] || C.ink), maxW: colW[ci] - 30, accent: C.accent }); cx += colW[ci]; });
         ctx.restore();
       }
       cy += o.rowH;
@@ -270,12 +368,12 @@
   const pop = (t, a, d = 0.5) => P(t, a, d, E.back);
   // Big title card: kicker (small caps line), title, optional subtitle + emoji row.
   function titleCard(ctx, t, s, o = {}) {
-    o = { kicker: '', title: '', sub: '', emojis: [], bg: 'ocean', ...o };
-    bg(ctx, o.bg, t + (s.start || 0));
+    o = { kicker: '', title: '', sub: '', emojis: [], bg: null, ...o };
+    if (o.bg == null) paint(ctx, LOOK.title, t + (s.start || 0)); else bg(ctx, o.bg, t + (s.start || 0));
     const k1 = P(t, 0.1, 0.8), k2 = P(t, 0.4, 0.8), k3 = P(t, 0.9, 0.8);
-    if (o.kicker) badge(ctx, o.kicker.toUpperCase(), W / 2 - measureBadge(ctx, o.kicker.toUpperCase(), 30) / 2, 330, { fill: C.coral, alpha: k1, size: 30 });
-    text(ctx, o.title, W / 2, 400 + (1 - k2) * 40, { size: 104, weight: 800, color: '#fff', align: 'center', maxW: 1600, alpha: k2, shadow: true, accent: C.aqua, lh: 1.08 });
-    if (o.sub) text(ctx, o.sub, W / 2, 640 + (1 - k3) * 30, { size: 46, weight: 500, color: C.foam, align: 'center', maxW: 1400, alpha: k3 });
+    if (o.kicker) badge(ctx, o.kicker.toUpperCase(), W / 2 - measureBadge(ctx, o.kicker.toUpperCase(), 30) / 2, 330, { fill: C.accent, alpha: k1, size: 30 });
+    text(ctx, o.title, W / 2, 400 + (1 - k2) * 40, { size: 104, weight: 800, color: '#fff', align: 'center', maxW: 1600, alpha: k2, shadow: true, accent: C.glow, lh: 1.08 });
+    if (o.sub) text(ctx, o.sub, W / 2, 640 + (1 - k3) * 30, { size: 46, weight: 500, color: C.soft, align: 'center', maxW: 1400, alpha: k3 });
     o.emojis.forEach((e, i) => emoji(ctx, e, W / 2 + (i - (o.emojis.length - 1) / 2) * 150, 800 + Math.sin(t * 2 + i) * 10, 96, { scale: pop(t, 1.2 + i * 0.15) }));
   }
   // ---------- intro: the opening scene as a short motion piece, never a copy of the deck's title slide ----------
@@ -632,9 +730,9 @@
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
     o = { n: 1, q: '', choices: null, emoji: '🤔', badge: '', numbered: false, ...o };
-    bg(ctx, 'deep', t + 100);
+    paint(ctx, LOOK.dark, t + 100);
     badge(ctx, o.badge || `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
-    text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.aqua });
+    text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.glow });
     if (o.choices) o.choices.forEach((c, i) => {
       const k = P(t, 0.8 + i * 0.25, 0.5); card(ctx, 120, 560 + i * 120, 1000, 96, { fill: 'rgba(255,255,255,0.1)', shadow: false, alpha: k, r: 20 });
       // a teacher's questions are numbered (they are not options to pick); a long line shrinks to fit its card
@@ -649,19 +747,19 @@
   // Quiz answer: big check + answer + explanation.
   function quizA(ctx, t, s, o = {}) {
     o = { answer: '', why: '', ...o };
-    bg(ctx, 'deep', t + 100);
+    paint(ctx, LOOK.dark, t + 100);
     const k = pop(t, 0.05, 0.6);
     circle(ctx, 260, 470, 120 * k, C.leaf); check(ctx, 262, 470, 130, P(t, 0.3, 0.5), '#fff');
     text(ctx, o.answer, 460, 360, { size: 96, weight: 800, color: C.sun, alpha: P(t, 0.2, 0.5), maxW: 1340 });
-    text(ctx, o.why, 460, 500, { size: 50, weight: 500, color: '#fff', alpha: P(t, 0.8, 0.6), maxW: 1300, accent: C.aqua });
+    text(ctx, o.why, 460, 500, { size: 50, weight: 500, color: '#fff', alpha: P(t, 0.8, 0.6), maxW: 1300, accent: C.glow });
   }
   // Recap checklist on paper.
   function recap(ctx, t, s, items, times, o = {}) {
-    bg(ctx, 'paper');
+    paint(ctx, LOOK.light, t);
     heading(ctx, o.title || 'Recap', t, { kicker: o.kicker || 'In 30 seconds' });
     const gap = o.gap || 130, ch = gap - 24, size = o.size || 44;
-    items.forEach((it, i) => { const k = P(t, times[i] ?? 0, 0.5); const y = 250 + i * gap; card(ctx, 120, y, 1680, ch, { fill: '#fff', alpha: k, r: 22 }); check(ctx, 190, y + ch / 2, 60, P(t, (times[i] ?? 0) + 0.2, 0.5)); const m = measure(ctx, it, { size, maxW: 1480, weight: 600 }).h; text(ctx, it, 260, y + (ch - m) / 2 - 2, { size, weight: 600, color: C.ink, maxW: 1480, alpha: k, accent: C.teal }); });
-    if (o.next) text(ctx, o.next, W / 2, o.nextY || 840, { size: 40, weight: 700, color: C.sea, align: 'center', alpha: P(t, o.nextAt ?? s.end - 3, 0.6) });
+    items.forEach((it, i) => { const k = P(t, times[i] ?? 0, 0.5); const y = 250 + i * gap; card(ctx, 120, y, 1680, ch, { fill: '#fff', alpha: k, r: 22 }); check(ctx, 190, y + ch / 2, 60, P(t, (times[i] ?? 0) + 0.2, 0.5)); const m = measure(ctx, it, { size, maxW: 1480, weight: 600 }).h; text(ctx, it, 260, y + (ch - m) / 2 - 2, { size, weight: 600, color: C.ink, maxW: 1480, alpha: k, accent: C.main }); });
+    if (o.next) text(ctx, o.next, W / 2, o.nextY || 840, { size: 40, weight: 700, color: C.note, align: 'center', alpha: P(t, o.nextAt ?? s.end - 3, 0.6) });
   }
 
   // ---------- overlays: chapter bug, progress bar, captions ----------
@@ -697,7 +795,7 @@
   }
   function chrome(ctx, t, sc) {
     const k = clamp(t / T.duration);
-    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(0, 0, W, 8); ctx.fillStyle = C.teal; ctx.fillRect(0, 0, W * k, 8); ctx.restore();
+    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(0, 0, W, 8); ctx.fillStyle = C.main; ctx.fillRect(0, 0, W * k, 8); ctx.restore();
     if (sc && sc.opts.bug !== false && T.chapter) {
       const dark = sc.opts.dark; ctx.save(); ctx.font = `700 24px ${FONT}`; ctx.fillStyle = dark ? 'rgba(255,255,255,0.75)' : 'rgba(11,37,69,0.55)'; ctx.textAlign = 'right'; ctx.fillText(T.chapter, W - 60, 56); ctx.restore();
     }
@@ -720,7 +818,7 @@
     const ts = T.scenes[i], sc = scenes[ts.id], si = INFOS[i];
     const lt = gt - ts.start; si.t = lt;
     ctx.save();
-    if (!sc) { bg(ctx, 'deep', gt); text(ctx, `missing scene: ${ts.id}`, W / 2, H / 2, { align: 'center', color: '#fff' }); }
+    if (!sc) { paint(ctx, LOOK.dark, gt); text(ctx, `missing scene: ${ts.id}`, W / 2, H / 2, { align: 'center', color: '#fff' }); }
     else sc.draw(ctx, lt, si);
     ctx.restore();
   }
@@ -739,7 +837,7 @@
     if (!sc?.opts.noCaptions && window.CAPTIONS !== false) captions(g, gt, sc?.opts.dark ? 'dark' : 'light');
   }
 
-  window.Engine = { W, H, C, E, FONT, HAND, P, pop, clamp, lerp, rng, noise, text, measure, rr, card, circle, arrow, line, check, cross, assets, img, drawImg, clip, bg, heading, badge, tip, bullets, label, wander, molecule, membrane, ring, table, emoji, titleCard, intro, quizQ, quizA, recap, imgs, get pending() { return pending; }, waitLoads: () => pending ? new Promise(r => waiters.push(r)) : Promise.resolve() };
+  window.Engine = { W, H, C, E, FONT, HAND, theme, LOOKS, P, pop, clamp, lerp, rng, noise, text, measure, rr, card, circle, arrow, line, check, cross, assets, img, drawImg, clip, bg, heading, badge, tip, bullets, label, wander, molecule, membrane, ring, table, emoji, titleCard, intro, quizQ, quizA, recap, imgs, get pending() { return pending; }, waitLoads: () => pending ? new Promise(r => waiters.push(r)) : Promise.resolve() };
   window.scene = scene;
   window.FILM = { duration: T.duration };
   window.__render = render;
