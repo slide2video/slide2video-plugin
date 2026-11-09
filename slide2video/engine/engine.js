@@ -278,6 +278,174 @@
     if (o.sub) text(ctx, o.sub, W / 2, 640 + (1 - k3) * 30, { size: 46, weight: 500, color: C.foam, align: 'center', maxW: 1400, alpha: k3 });
     o.emojis.forEach((e, i) => emoji(ctx, e, W / 2 + (i - (o.emojis.length - 1) / 2) * 150, 800 + Math.sin(t * 2 + i) * 10, 96, { scale: pop(t, 1.2 + i * 0.15) }));
   }
+  // ---------- intro: the opening scene as a short motion piece, never a copy of the deck's title slide ----------
+  // intro(g, t, s, {look, title, kicker, sub, by, logo, name, photo, main, accent, emojis, at}); see guide.md.
+  const INTRO_LOOKS = {
+    polished: { main: '#0B2545', accent: '#2563EB' }, cinematic: { main: '#134E6F', accent: '#FFC145' },
+    calm: { main: '#1F7A6D', accent: '#4FC3F7' }, energetic: { main: '#16212E', accent: '#FF6B57' },
+    playful: { main: '#0B2545', accent: '#FF6B57' },
+  };
+  function hexRgb(c) { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || '')); if (!m) return [11, 37, 69]; const n = parseInt(m[1], 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function mix(a, b, k, alpha = 1) { const x = hexRgb(a), y = hexRgb(b); return `rgba(${x.map((v, i) => Math.round(lerp(v, y[i], clamp(k)))).join(',')},${alpha})`; }
+  // Largest size (down to min) at which str fits maxLines lines of maxW.
+  function fitSize(ctx, str, o, size, min, maxLines) { while (size > min && measure(ctx, str, { ...o, size }).lines > maxLines) size -= 4; return size; }
+  // Title drawn word by word: 'rise' (slides up out of a mask), 'slam' (lands from big), 'bounce' (pops in),
+  // 'focus' (blur to sharp), 'fade' (soft rise). Word i starts at at + i * stagger. Returns the block's height.
+  function kinetic(ctx, str, x, y, t, at, mode, o = {}) {
+    o = { size: 110, weight: 800, color: '#fff', accent: C.coral, lh: 1.06, maxW: 1200, stagger: 0.09, dur: 0.7, ...o };
+    const lines = wrapRich(ctx, str, o), lh = o.size * o.lh; let i = 0;
+    lines.forEach((L, li) => {
+      const top = y + li * lh, base = top + o.size * 0.82; let cx = x;
+      for (const r of L.runs) {
+        if (/^\s+$/.test(r.s)) { cx += r.w; continue; }
+        const k = P(t, at + i++ * o.stagger, o.dur, mode === 'bounce' ? E.back : E.out);
+        if (k > 0) {
+          ctx.save(); ctx.font = fontStr(o, r.bold); ctx.fillStyle = r.acc ? o.accent : o.color; ctx.textBaseline = 'alphabetic';
+          if (o.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4; }
+          const mx = cx + r.w / 2, my = base - o.size * 0.35;
+          if (mode === 'rise') { ctx.beginPath(); ctx.rect(cx - 30, top - o.size * 0.15, r.w + 60, o.size * 1.25); ctx.clip(); ctx.fillText(r.s, cx, base + (1 - k) * o.size * 1.3); }
+          else if (mode === 'slam') { const z = 1 + 0.7 * (1 - k); ctx.globalAlpha *= clamp(k * 2.5); ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, o.size * 0.35); }
+          else if (mode === 'bounce') { ctx.globalAlpha *= clamp(k * 3); ctx.translate(mx, my); ctx.scale(Math.max(0, k), Math.max(0, k)); ctx.rotate((1 - k) * 0.25); ctx.fillText(r.s, -r.w / 2, o.size * 0.35); }
+          else if (mode === 'focus') { const z = 1 + 0.12 * (1 - k); ctx.globalAlpha *= k; if (k < 1) ctx.filter = `blur(${((1 - k) * 14).toFixed(1)}px)`; ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, o.size * 0.35); }
+          else { ctx.globalAlpha *= k; ctx.fillText(r.s, cx, base + (1 - k) * 26); }
+          ctx.restore();
+        }
+        cx += r.w;
+      }
+    });
+    return lines.length * lh;
+  }
+  function wordCount(str) { return String(str || '').replace(/[*_]/g, '').split(/\s+/).filter(Boolean).length; }
+  // The logo (an Engine.assets key) at (x, y), h tall, on a white pill when panel; else the name as text; else nothing.
+  function introLogo(ctx, o, k, x, y, h, panel, color) {
+    if (k <= 0) return;
+    ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.translate((1 - k) * -50, 0);
+    if (o.logo) {
+      const im = imgs[o.logo]; const ar = im && im.naturalWidth ? im.naturalWidth / im.naturalHeight : 3;
+      const w = Math.min(560, h * ar);
+      if (panel) card(ctx, x - 28, y - 20, w + 56, h + 40, { fill: '#fff', r: 22 });
+      img(ctx, o.logo, x, y, w, h, { fit: 'contain' });
+    } else if (o.name) {
+      if (panel) { const m = measure(ctx, o.name, { size: 40, weight: 800 }); card(ctx, x - 28, y - 20, m.w + 56, h + 40, { fill: '#fff', r: 22 }); }
+      text(ctx, o.name, x, y + (h - 49) / 2, { size: 40, weight: 800, color: panel ? C.ink : color });
+    }
+    ctx.restore();
+  }
+  // Height of introText's block, so a look can place it (centred, or resting on the bottom).
+  function introHeight(ctx, o, st) {
+    const fit = fitSize(ctx, o.title, { weight: 800, maxW: st.maxW }, st.size, 64, 3);
+    let h = (o.kicker ? 70 : 0) + measure(ctx, o.title, { size: fit, weight: 800, maxW: st.maxW, lh: 1.06 }).h + (st.rule ? 40 : 0);
+    if (o.sub) h += 16 + measure(ctx, o.sub, { size: 46, weight: 600, maxW: st.maxW }).h;
+    if (o.by) h += 12 + measure(ctx, o.by, { size: 36, weight: 500, maxW: st.maxW }).h;
+    return h;
+  }
+  // Kicker, title, sub and by lines, left-aligned at x; y = null centres the block between y 300 and 880.
+  function introText(ctx, t, o, a, x, y, st) {
+    if (y == null) y = clamp(590 - introHeight(ctx, o, st) / 2, 300, 880 - introHeight(ctx, o, st));
+    const fit = fitSize(ctx, o.title, { weight: 800, maxW: st.maxW }, st.size, 64, 3);
+    if (o.kicker) {
+      const k = P(t, a.kicker, 0.6);
+      ctx.save(); ctx.globalAlpha *= k; ctx.fillStyle = st.kickColor; ctx.fillRect(x, y + 12, 56 * k, 6); ctx.restore();
+      text(ctx, o.kicker.toUpperCase(), x + 76 + (1 - k) * 30, y - 4, { size: 30, weight: 800, color: st.kickColor, alpha: k });
+      y += 70;
+    }
+    y += kinetic(ctx, o.title, x, y, t, a.title, st.mode, { size: fit, color: st.color, accent: st.accent, maxW: st.maxW, shadow: st.shadow, stagger: st.stagger, dur: st.dur });
+    if (st.rule) { const k = P(t, a.sub - 0.3, 0.9, E.inOut); ctx.save(); ctx.fillStyle = st.rule; ctx.fillRect(x, y + 18, 280 * k, 8); ctx.restore(); y += 40; }
+    if (o.sub) y += 16 + text(ctx, o.sub, x + (1 - P(t, a.sub, 0.7)) * 40, y + 16, { size: 46, weight: 600, color: st.subColor, alpha: P(t, a.sub, 0.7), maxW: st.maxW, accent: st.accent, shadow: st.shadow });
+    if (o.by) y += 12 + text(ctx, o.by, x + (1 - P(t, a.by, 0.7)) * 40, y + 12, { size: 36, weight: 500, color: st.subColor, alpha: 0.9 * P(t, a.by, 0.7), maxW: st.maxW, accent: st.accent, shadow: st.shadow });
+    return y;
+  }
+  function intro(ctx, t, s, o = {}) {
+    const look = INTRO_LOOKS[o.look] ? o.look : 'polished';
+    o = { title: '', kicker: '', sub: '', by: '', logo: null, name: '', photo: null, emojis: [], ...INTRO_LOOKS[look], ...o };
+    const M = o.main, A = o.accent, stagger = look === 'calm' ? 0.07 : look === 'energetic' ? 0.12 : 0.09;
+    const a = { logo: 0.15, kicker: 0.35, title: 0.55, ...(o.at || {}) };
+    const titleDone = a.title + Math.max(0, wordCount(o.title) - 1) * stagger + 0.7;
+    if (a.sub == null) a.sub = titleDone + 0.15;
+    if (a.by == null) a.by = a.sub + 0.6;
+    const r = rng(look.length * 977 + 13);
+    if (look === 'polished') {
+      const gr = ctx.createLinearGradient(0, 0, W, H); gr.addColorStop(0, mix(M, '#FFFFFF', 0.06)); gr.addColorStop(1, mix(M, '#000000', 0.5));
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 2;
+      for (let y = 220; y <= 860; y += 80) { ctx.beginPath(); ctx.moveTo(1180, y); ctx.lineTo(1180 + 680 * P(t, 0.05 + (y - 220) / 2000, 1.2, E.inOut), y); ctx.stroke(); }
+      ctx.restore();
+      for (let i = 0; i < 7; i++) {   // rising columns: a chart, a skyline
+        const k = P(t, i * 0.08, 1.4, E.out), full = 200 + 420 * r(), h = full * (0.3 + 0.7 * k) * (1 + 0.025 * Math.sin(t * 1.1 + i));
+        ctx.save(); ctx.globalAlpha = i % 3 === 1 ? 0.95 : 0.5; rr(ctx, 1220 + i * 92, 860 - h, 60, h + 12, 10);
+        ctx.fillStyle = i % 3 === 1 ? A : mix(M, '#FFFFFF', 0.25 + 0.06 * i); ctx.fill(); ctx.restore();
+      }
+      const sw = P(t, 0.2, 1.8, E.inOut);
+      if (sw > 0 && sw < 1) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sx = lerp(-700, W + 300, sw); const lg = ctx.createLinearGradient(sx, 0, sx + 400, 0); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,0.10)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(sx + 200, 0); ctx.lineTo(sx + 600, 0); ctx.lineTo(sx + 200, H); ctx.lineTo(sx - 200, H); ctx.closePath(); ctx.fill(); ctx.restore(); }
+      introLogo(ctx, o, P(t, a.logo, 0.8), 148, 118, 84, true, '#fff');
+      introText(ctx, t, o, a, 140, null, { size: 104, maxW: 1000, mode: 'rise', color: '#fff', accent: mix(A, '#FFFFFF', 0.35), kickColor: mix(A, '#FFFFFF', 0.35), subColor: 'rgba(255,255,255,0.86)', rule: A, stagger, dur: 0.75 });
+    } else if (look === 'cinematic') {
+      const kz = E.out(clamp(t / Math.max(6, s.dur || 10)));
+      if (o.photo) img(ctx, o.photo, 0, 0, W, H, { fit: 'cover', zoom: 1.18 - 0.14 * kz, panX: -0.4 + 0.5 * kz });
+      else {
+        const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, mix(A, '#FFFFFF', 0.4)); gr.addColorStop(0.55, mix(M, '#FFFFFF', 0.2)); gr.addColorStop(1, mix(M, '#000000', 0.4)); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+        circle(ctx, 1450, 330 + 60 * (1 - kz), 150, mix(A, '#FFFFFF', 0.2), { alpha: 0.9 });
+        for (let i = 0; i < 40; i++) { const x = (r() * W + t * (10 + r() * 30)) % W, y = r() * H; circle(ctx, x, y, 1.5 + r() * 3, 'rgba(255,255,255,0.35)'); }
+      }
+      const lg = ctx.createLinearGradient(0, 0, W * 0.75, 0); lg.addColorStop(0, 'rgba(0,0,0,0.62)'); lg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+      const bg2 = ctx.createLinearGradient(0, H * 0.45, 0, H); bg2.addColorStop(0, 'rgba(0,0,0,0)'); bg2.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = bg2; ctx.fillRect(0, 0, W, H);
+      const hb = lerp(H / 2 - 170, 92, P(t, 0.05, 1.7, E.inOut));   // letterbox opening like a curtain
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, hb); ctx.fillRect(0, H - hb, W, hb);
+      introLogo(ctx, o, P(t, Math.max(a.logo, 1.2), 0.8), 148, 152, 72, true, '#fff');
+      const st = { size: 132, maxW: 1250, mode: 'focus', color: '#fff', accent: mix(A, '#FFFFFF', 0.15), kickColor: mix(A, '#FFFFFF', 0.15), subColor: 'rgba(255,255,255,0.92)', shadow: true, stagger, dur: 0.9 };
+      introText(ctx, t, o, { ...a, title: Math.max(a.title, 0.9) }, 140, Math.max(270, 860 - introHeight(ctx, o, st)), st);
+    } else if (look === 'calm') {
+      const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(1, mix('#FFFFFF', M, 0.12)); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      const cx = 1530, cy = 500;
+      circle(ctx, cx, cy, 150 * (0.85 + 0.15 * P(t, 0, 1.2)) * (1 + 0.012 * Math.sin(t * 1.4)), mix(M, '#FFFFFF', 0.86));
+      for (let i = 0; i < 5; i++) circle(ctx, cx, cy, (170 + i * 64) * (1 + 0.015 * Math.sin(t * 0.9 - i * 0.7)), null, { stroke: mix(M, '#FFFFFF', 0.45 + i * 0.1), lw: 3, alpha: (0.7 - i * 0.12) * P(t, i * 0.18, 1.4) });
+      // a calm pulse line through the rings, then a soft light travelling along it
+      const ys = x => { const d = (x - cx) / 40; return cy + (Math.abs(d) < 3.2 ? -Math.sin(d * Math.PI / 1.6) * 70 * Math.exp(-d * d / 4) : 0); };
+      const pk = P(t, 0.3, 2.2, E.inOut), x0 = 1140, x1 = W + 20;
+      ctx.save(); ctx.strokeStyle = M; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+      for (let x = x0; x <= lerp(x0, x1, pk); x += 6) x === x0 ? ctx.moveTo(x, ys(x)) : ctx.lineTo(x, ys(x)); ctx.stroke(); ctx.restore();
+      if (t > 2.5) { const px = lerp(x0, x1, ((t - 2.5) * 0.18) % 1); circle(ctx, px, ys(px), 22, mix(A, '#FFFFFF', 0.3), { alpha: 0.35 }); circle(ctx, px, ys(px), 9, A); }
+      introLogo(ctx, o, P(t, a.logo, 1.0), 148, 118, 84, false, mix(M, '#000000', 0.3));
+      introText(ctx, t, o, a, 140, null, { size: 100, maxW: 900, mode: 'fade', color: mix(M, '#000000', 0.45), accent: M, kickColor: M, subColor: '#3D4B5C', rule: mix(A, M, 0.3), stagger, dur: 1.0 });
+    } else if (look === 'energetic') {
+      ctx.fillStyle = mix(M, '#08090C', 0.55); ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 4; i++) {   // stripes slashing in from the right
+        const k = P(t, i * 0.07, 0.5, E.out), x = 1080 + i * 190 + (1 - k) * 1300 - t * 6;
+        ctx.save(); ctx.globalAlpha = [0.95, 0.55, 0.3, 0.15][i]; ctx.fillStyle = i ? mix(A, '#FFFFFF', 0.1 * i) : A;
+        ctx.beginPath(); ctx.moveTo(x + 300, 0); ctx.lineTo(x + 420, 0); ctx.lineTo(x + 120, H); ctx.lineTo(x, H); ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineCap = 'round';
+      for (let i = 0; i < 28; i++) { const y = 60 + r() * 960, len = 120 + r() * 260, sp = 900 + r() * 1100, x = ((r() * (W + 600) - t * sp) % (W + 600) + W + 600) % (W + 600) - 300; ctx.lineWidth = 2 + r() * 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke(); }
+      ctx.restore();
+      let sh = 0; for (let i = 0; i < wordCount(o.title); i++) { const tk = a.title + i * stagger + 0.25; if (t > tk) sh += 9 * Math.exp(-(t - tk) * 16); }
+      ctx.save(); ctx.translate(sh * noise(1, t * 40), sh * noise(2, t * 40));
+      introLogo(ctx, o, P(t, a.logo, 0.5), 148, 118, 84, true, '#fff');
+      ctx.save(); ctx.transform(1, 0, -0.12, 1, 60, 0);
+      introText(ctx, t, o, a, 140, null, { size: 124, maxW: 1000, mode: 'slam', color: '#fff', accent: A, kickColor: A, subColor: 'rgba(255,255,255,0.88)', rule: A, stagger, dur: 0.35 });
+      ctx.restore(); ctx.restore();
+    } else {   // playful
+      bg(ctx, 'paper');
+      const cols = [C.coral, C.sun, C.teal, C.purple, C.leaf, C.pink, C.water];
+      for (let i = 0; i < 16; i++) {
+        const right = i < 10, x = right ? 1180 + r() * 620 : 140 + r() * 1700, y = right ? 160 + r() * 700 : (i % 2 ? 60 + r() * 60 : 860 + r() * 40);
+        const k = pop(t, i * 0.06 - 0.3), sz = 26 + r() * 46, rot = t * (r() - 0.5) * 0.8, fy = y + 14 * Math.sin(t * 1.3 + i), col = cols[i % cols.length];
+        if (k <= 0) continue;
+        ctx.save(); ctx.translate(x, fy); ctx.rotate(rot); ctx.scale(k, k); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 9; ctx.lineCap = 'round';
+        const kind = i % 5; ctx.beginPath();
+        if (kind === 0) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.fill(); }
+        else if (kind === 1) { ctx.moveTo(0, -sz / 2); ctx.lineTo(sz / 2, sz / 2); ctx.lineTo(-sz / 2, sz / 2); ctx.closePath(); ctx.fill(); }
+        else if (kind === 2) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.stroke(); }
+        else if (kind === 3) { ctx.moveTo(-sz / 2, 0); ctx.lineTo(sz / 2, 0); ctx.moveTo(0, -sz / 2); ctx.lineTo(0, sz / 2); ctx.stroke(); }
+        else { for (let j = 0; j <= 12; j++) { const px = -sz + j * sz / 6, py = Math.sin(j * 1.2) * sz / 5; j ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
+        ctx.restore();
+      }
+      introLogo(ctx, o, P(t, a.logo, 0.6), 148, 118, 84, false, C.navy);
+      if (o.kicker) badge(ctx, o.kicker.toUpperCase(), 140, 330, { fill: A, size: 30, scale: pop(t, a.kicker) });
+      const y = kinetic(ctx, o.title, 140, 390, t, a.title, 'bounce', { size: fitSize(ctx, o.title, { weight: 800, maxW: 1000 }, 108, 64, 3), color: M, accent: A, maxW: 1000, stagger, dur: 0.6 });
+      if (o.sub) text(ctx, o.sub, 140, 410 + y, { size: 46, weight: 600, color: C.sea, alpha: P(t, a.sub, 0.6), maxW: 1000 });
+      o.emojis.forEach((e, i) => emoji(ctx, e, 200 + i * 140, 800 + Math.sin(t * 2 + i) * 10, 90, { scale: pop(t, a.by + i * 0.12) }));
+    }
+  }
   function measureBadge(ctx, label, size) { ctx.save(); ctx.font = `800 ${size}px ${FONT}`; const w = ctx.measureText(label).width + size * 1.3; ctx.restore(); return w; }
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
@@ -389,7 +557,7 @@
     if (!sc?.opts.noCaptions && window.CAPTIONS !== false) captions(g, gt, sc?.opts.dark ? 'dark' : 'light');
   }
 
-  window.Engine = { W, H, C, E, FONT, HAND, P, pop, clamp, lerp, rng, noise, text, measure, rr, card, circle, arrow, line, check, cross, assets, img, drawImg, clip, bg, heading, badge, tip, bullets, label, wander, molecule, membrane, ring, table, emoji, titleCard, quizQ, quizA, recap, imgs, get pending() { return pending; }, waitLoads: () => pending ? new Promise(r => waiters.push(r)) : Promise.resolve() };
+  window.Engine = { W, H, C, E, FONT, HAND, P, pop, clamp, lerp, rng, noise, text, measure, rr, card, circle, arrow, line, check, cross, assets, img, drawImg, clip, bg, heading, badge, tip, bullets, label, wander, molecule, membrane, ring, table, emoji, titleCard, intro, quizQ, quizA, recap, imgs, get pending() { return pending; }, waitLoads: () => pending ? new Promise(r => waiters.push(r)) : Promise.resolve() };
   window.scene = scene;
   window.FILM = { duration: T.duration };
   window.__render = render;
