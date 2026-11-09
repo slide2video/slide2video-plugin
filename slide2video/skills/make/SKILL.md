@@ -69,7 +69,7 @@ Write `WORK/brief.md`. Per chapter: what the style's `brief` lists. Then a secti
 
 ## 4. Plan and approval gate
 
-Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (the style's `outline`), which deck questions it shows open (from the brief's "left open" section), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (the style's `clips` says which). Then run:
+Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (the style's `outline`), which deck questions it shows open (from the brief's "left open" section), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (the style's `clips` says which). When the style's guide has a **Look** section, add the lesson's `Look:` line as it says. Then run:
 
 ```
 LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music]
