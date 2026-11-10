@@ -35,6 +35,8 @@
     sand: '#F6EFE2', paper: '#FBF8F1', ink: '#16212E', coral: '#FF6B57', sun: '#FFC145', leaf: '#3FB36B',
     purple: '#8E7DFF', pink: '#FF8FB1', grey: '#8A97A6', white: '#FFFFFF', salt: '#F2F2F2', water: '#4FC3F7',
   };
+  // Colour roles the ready-made widgets use; Engine.theme() sets them. Unthemed, they are the original palette.
+  Object.assign(C, { head: C.navy, main: C.teal, accent: C.coral, glow: C.aqua, soft: C.foam, note: C.sea });
   const FONT = '"Avenir Next", "Nunito", "Helvetica Neue", Arial, sans-serif';
   const HAND = '"Patrick Hand", "Avenir Next", sans-serif';
 
@@ -63,7 +65,7 @@
     return lines.map(L => { while (L.length && /^\s+$/.test(L[L.length - 1].s)) L.pop(); return { runs: L, w: L.reduce((a, r) => a + r.w, 0) }; });
   }
   function text(ctx, str, x, y, o = {}) {
-    o = { size: 48, color: C.ink, align: 'left', lh: 1.22, alpha: 1, accent: C.coral, ...o };
+    o = { size: 48, color: C.ink, align: 'left', lh: 1.22, alpha: 1, accent: C.accent, ...o };
     if (o.alpha <= 0) return 0;
     ctx.save(); ctx.globalAlpha *= o.alpha; ctx.textBaseline = 'alphabetic';
     if (o.shadow) { ctx.shadowColor = o.shadow === true ? 'rgba(0,0,0,0.35)' : o.shadow; ctx.shadowBlur = 18; ctx.shadowOffsetY = 4; }
@@ -147,13 +149,28 @@
   }
 
   // ---------- backgrounds ----------
-  function bg(ctx, kind, t = 0) {
+  // bg(g, kind, t): a named background, or 'title' / 'dark' / 'light' for the chapter's look (Engine.theme).
+  // Without Engine.theme it works as it always did: the five original names, and the ocean for any other name.
+  function bg(ctx, kind, t = 0) { paint(ctx, resolveBg(kind), t); }
+  function resolveBg(kind) {
+    if (!THEMED) {
+      if (LEGACY_BG.includes(kind)) return kind;
+      if (!warnedBg.has(kind)) { warnedBg.add(kind); console.warn(`bg('${kind}') needs Engine.theme(...) at the top of scenes.js; drawn as 'ocean'`); }
+      return 'ocean';
+    }
+    if (Object.hasOwn(LOOK, kind)) return LOOK[kind];
+    if (LEGACY_BG.includes(kind) || Object.hasOwn(MOTIFS, kind)) return kind;
+    throw new Error(`bg: unknown background "${kind}"; use 'light', 'dark', or one of ${[...LIGHT_BG, ...DARK_BG].join(', ')}`);
+  }
+  function paint(ctx, kind, t = 0) {
+    if (Object.hasOwn(MOTIFS, kind)) { MOTIFS[kind](ctx, t); return; }
     if (kind === 'paper') { ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H); dotsGrid(ctx, 'rgba(19,49,92,0.07)'); return; }
     if (kind === 'sand') { ctx.fillStyle = C.sand; ctx.fillRect(0, 0, W, H); return; }
     if (kind === 'lab') { const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#F3F7FA'); gr.addColorStop(1, '#DCE7EE'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); dotsGrid(ctx, 'rgba(19,49,92,0.06)'); return; }
     // ocean / deep: gradient + light rays + drifting particles
     const gr = ctx.createLinearGradient(0, 0, 0, H);
-    if (kind === 'deep') { gr.addColorStop(0, '#0E3A5C'); gr.addColorStop(1, '#061325'); }
+    if (TINT) { gr.addColorStop(0, TINT[0]); gr.addColorStop(1, TINT[1]); }
+    else if (kind === 'deep') { gr.addColorStop(0, '#0E3A5C'); gr.addColorStop(1, '#061325'); }
     else { gr.addColorStop(0, '#1C7FA6'); gr.addColorStop(0.55, '#0F4C75'); gr.addColorStop(1, '#0A2540'); }
     ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -169,18 +186,105 @@
       circle(ctx, bx + Math.sin(t + i) * 10, y, 1.5 + r() * 3, `rgba(220,250,255,${0.15 + r() * 0.25})`);
     }
   }
+  // ---------- looks: backgrounds and colours chosen for the deck's subject (Engine.theme) ----------
+  // Unthemed, the title card is 'ocean', quizzes 'deep' and the recap 'paper', as before.
+  const UNTHEMED = { title: 'ocean', dark: 'deep', light: 'paper' }, ROLE_KEYS = ['head', 'main', 'accent', 'glow', 'soft', 'note'];
+  const LEGACY_BG = ['paper', 'sand', 'lab', 'ocean', 'deep'], LIGHT_BG = ['paper', 'sand', 'lab', 'grid', 'parchment', 'lined'];
+  const DARK_BG = ['night', 'blueprint', 'sepia', 'stage', 'canopy', 'cosmos', 'ocean', 'deep'];
+  const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);   // the one colour check: theme() and intro()
+  // Each background's main colours (top, bottom), for checking text drawn on it; TINT replaces the dark ones'.
+  const BG_ENDS = { night: ['#232A45', '#0D1020'], blueprint: ['#1E4A8A', '#0D244A'], sepia: ['#4E3521', '#1D130A'], stage: ['#40122A', '#12050C'],
+    canopy: ['#21583A', '#0B2516'], cosmos: ['#17144A', '#040313'], ocean: ['#1C7FA6', '#0A2540'], deep: ['#0E3A5C', '#061325'],
+    paper: ['#FBF8F1'], sand: ['#F6EFE2'], lab: ['#F3F7FA', '#DCE7EE'], grid: ['#FBFCFE'], parchment: ['#F6EDDA', '#E2CDA8'], lined: ['#FFFDF6'] };
+  const endsOf = kind => (TINT && DARK_BG.includes(kind)) ? TINT : BG_ENDS[kind];
+  const LOOK = { ...UNTHEMED }, warnedBg = new Set();
+  let TINT = null, THEMED = false;  // TINT: [top, bottom] replaces the dark backgrounds' own gradient
+  function gradient(ctx, top, bottom) { const [a, b] = TINT || [top, bottom]; const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, a); gr.addColorStop(1, b); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); }
+  function vignette(ctx, a = 0.45) { const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.75); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, `rgba(0,0,0,${a})`); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); }
+  function glowAt(ctx, x, y, r, rgb, a) { const rg = ctx.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(${rgb},${a})`); rg.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = rg; ctx.fillRect(x - r, y - r, 2 * r, 2 * r); }
+  function rules(ctx, step, color, o = {}) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = o.w || 1; ctx.beginPath(); if (!o.rowsOnly) for (let x = (o.x0 ?? step); x < W; x += step) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); } for (let y = (o.y0 ?? step); y < H; y += step) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); } ctx.stroke(); ctx.restore(); }
+  const MOTIFS = {
+    // dark, for title cards, quizzes and dark scenes (white text)
+    night(ctx, t) {  // any subject: calm ink-blue with slow soft lights
+      gradient(ctx, '#232A45', '#0D1020'); const r = rng(11);
+      for (let i = 0; i < 9; i++) { const x = r() * W + Math.sin(t * 0.12 + i) * 80, y = r() * H + Math.cos(t * 0.1 + i * 2) * 50; glowAt(ctx, x, y, 140 + r() * 160, '160,170,255', 0.05 + 0.03 * r()); }
+      vignette(ctx, 0.4);
+    },
+    blueprint(ctx, t) {  // maths, engineering, technology: drafting grid with a slow light sweep
+      gradient(ctx, '#1E4A8A', '#0D244A'); rules(ctx, 48, 'rgba(255,255,255,0.06)'); rules(ctx, 240, 'rgba(255,255,255,0.12)', { w: 2 });
+      glowAt(ctx, (t * 60) % (W + 800) - 400, H * 0.4, 520, '150,200,255', 0.08); vignette(ctx, 0.35);
+    },
+    sepia(ctx, t) {  // history, geography, social studies: old-map brown with drifting dust
+      gradient(ctx, '#4E3521', '#1D130A'); ctx.save(); ctx.strokeStyle = 'rgba(255,225,170,0.07)'; ctx.lineWidth = 2;
+      for (let i = 1; i < 7; i++) { ctx.beginPath(); for (let x = 0; x <= W; x += 40) { const y = i * H / 7 + Math.sin(x / 260 + i * 1.7) * 26; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+      ctx.restore(); const r = rng(5);
+      for (let i = 0; i < 50; i++) { const x = (r() * W + t * (6 + r() * 10)) % W, y = r() * H + Math.sin(t * 0.3 + i) * 8; circle(ctx, x, y, 1 + r() * 2, `rgba(255,220,160,${0.08 + r() * 0.12})`); }
+      vignette(ctx, 0.5);
+    },
+    stage(ctx, t) {  // literature, drama, poetry, the arts: dark curtain with a swaying spotlight
+      gradient(ctx, '#40122A', '#12050C'); const x = W / 2 + Math.sin(t * 0.3) * 120;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; const rg = ctx.createLinearGradient(0, 0, 0, H); rg.addColorStop(0, 'rgba(255,230,190,0.13)'); rg.addColorStop(1, 'rgba(255,230,190,0.02)');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(x - 90, 0); ctx.lineTo(x + 90, 0); ctx.lineTo(x + 560, H); ctx.lineTo(x - 560, H); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 12; i++) { const fx = i * W / 12; ctx.fillRect(fx, 0, W / 24, H); } ctx.restore();
+      vignette(ctx, 0.55);
+    },
+    canopy(ctx, t) {  // life science on land, health, ecology: deep green with dappled light
+      gradient(ctx, '#21583A', '#0B2516'); const r = rng(3);
+      for (let i = 0; i < 12; i++) { const x = r() * W + Math.sin(t * 0.2 + i) * 40, y = r() * H * 0.8 + Math.cos(t * 0.15 + i) * 30; glowAt(ctx, x, y, 90 + r() * 140, '210,255,170', 0.05 + 0.04 * r()); }
+      for (let i = 0; i < 40; i++) { const x = (r() * W + t * (8 + r() * 14) + Math.sin(t + i) * 12) % W, y = (r() * H + t * (5 + r() * 8)) % H; circle(ctx, x, y, 1.5 + r() * 2, `rgba(230,255,200,${0.12 + r() * 0.15})`); }
+      vignette(ctx, 0.4);
+    },
+    cosmos(ctx, t) {  // astronomy, physics, earth and space: night sky with twinkling stars
+      gradient(ctx, '#17144A', '#040313'); glowAt(ctx, W * 0.72, H * 0.35, 620, '150,110,255', 0.10); glowAt(ctx, W * 0.2, H * 0.75, 480, '80,160,255', 0.07);
+      const r = rng(9); for (let i = 0; i < 220; i++) { const x = r() * W, y = r() * H, b = 0.25 + 0.5 * r() * (0.6 + 0.4 * Math.sin(t * (1 + r() * 2) + i)); circle(ctx, x, y, 0.8 + r() * 1.8, `rgba(255,255,255,${b})`); }
+    },
+    // light, for content scenes and the recap (dark text)
+    grid(ctx) { ctx.fillStyle = '#FBFCFE'; ctx.fillRect(0, 0, W, H); rules(ctx, 48, 'rgba(40,90,170,0.08)'); rules(ctx, 240, 'rgba(40,90,170,0.14)'); },
+    parchment(ctx) { ctx.fillStyle = '#F6EDDA'; ctx.fillRect(0, 0, W, H); const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.7); rg.addColorStop(0, 'rgba(160,110,50,0)'); rg.addColorStop(1, 'rgba(160,110,50,0.22)'); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); },
+    lined(ctx) { ctx.fillStyle = '#FFFDF6'; ctx.fillRect(0, 0, W, H); rules(ctx, 54, 'rgba(70,110,190,0.13)', { rowsOnly: true, y0: 216 }); ctx.save(); ctx.fillStyle = 'rgba(215,80,80,0.28)'; ctx.fillRect(84, 0, 3, H); ctx.restore(); },   // restored: a translucent fill would fade later emoji
+  };
+  // Named looks: backgrounds plus colour roles. The style's guide says which fits which subject.
+  const LOOKS = {
+    ocean: { title: 'ocean', dark: 'deep', light: 'paper', head: '#0B2545', main: '#1FA7A0', accent: '#FF6B57', glow: '#7FE0D6', soft: '#E8F7F5', note: '#134E6F' },
+    classroom: { title: 'night', dark: 'night', light: 'paper', head: '#1F2A44', main: '#3D6AE0', accent: '#D84A30', glow: '#FFD166', soft: '#E6E9F5', note: '#3D6AE0' },
+    math: { title: 'blueprint', dark: 'blueprint', light: 'grid', head: '#1B3358', main: '#2B6DE0', accent: '#C2620F', glow: '#FFC94D', soft: '#DCE9FF', note: '#2B6DE0' },
+    history: { title: 'sepia', dark: 'sepia', light: 'parchment', head: '#4A2C17', main: '#9A6630', accent: '#B23A48', glow: '#F2C879', soft: '#F5E6CC', note: '#7A4A21' },
+    literature: { title: 'stage', dark: 'stage', light: 'lined', head: '#3B1832', main: '#8A3D7C', accent: '#C8553D', glow: '#F4C95D', soft: '#F6E3EC', note: '#8A3D7C' },
+    life: { title: 'canopy', dark: 'canopy', light: 'lab', head: '#1E3D2B', main: '#257A4B', accent: '#C24E2E', glow: '#C5EBA0', soft: '#E7F5E1', note: '#257A4B' },
+    space: { title: 'cosmos', dark: 'cosmos', light: 'lab', head: '#1B1F4B', main: '#5552D6', accent: '#C9472B', glow: '#B9B4FF', soft: '#E7E6FF', note: '#5552D6' },
+  };
+  // Engine.theme('history') or Engine.theme('math', { main: '#hex', accent: '#hex', tint: ['#top', '#bottom'] }):
+  // call once at the top of scenes.js, before scene(). Sets the backgrounds bg('title'|'dark'|'light') and the
+  // titleCard, quizQ, quizA and recap use, and the colour roles C.head, C.main, C.accent, C.glow, C.soft, C.note.
+  // Each call replaces the previous look entirely; nothing changes unless the whole call is valid.
+  function theme(name, over = {}) {
+    if (name !== null && typeof name === 'object' && !Array.isArray(name)) { over = name; name = over.look; }
+    const fail = msg => { throw new Error(`Engine.theme: ${msg}`); };
+    if (typeof name !== 'string' || !Object.hasOwn(LOOKS, name)) fail(`unknown look "${name}"; use one of ${Object.keys(LOOKS).join(', ')}`);
+    if (over === null || typeof over !== 'object' || Array.isArray(over)) fail('the second argument is { main, accent, tint }');
+    for (const k of Object.keys(over)) if (!['look', 'title', 'dark', 'light', 'tint', ...ROLE_KEYS].includes(k)) fail(`unknown option "${k}"`);
+    const o = { ...LOOKS[name], ...over }, hex = isHex;
+    for (const k of ['title', 'dark']) if (!DARK_BG.includes(o[k])) fail(`"${o[k]}" can't be the ${k} background (white text): use one of ${DARK_BG.join(', ')}`);
+    if (!LIGHT_BG.includes(o.light)) fail(`"${o.light}" can't be the light background: use one of ${LIGHT_BG.join(', ')}`);
+    for (const k of ROLE_KEYS) if (!hex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
+    if (o.tint != null && !(Array.isArray(o.tint) && o.tint.length === 2 && o.tint.every(hex))) fail("tint must be ['#top', '#bottom']");
+    THEMED = true; TINT = o.tint || null;
+    for (const k of ['title', 'dark', 'light']) LOOK[k] = o[k];
+    for (const k of ROLE_KEYS) C[k] = o[k];
+    return { look: name, ...LOOK, tint: TINT };
+  }
   function dotsGrid(ctx, color) { ctx.save(); ctx.fillStyle = color; for (let x = 40; x < W; x += 48) for (let y = 40; y < H; y += 48) { ctx.beginPath(); ctx.arc(x, y, 2, 0, 6.283); ctx.fill(); } ctx.restore(); }
 
   // ---------- teaching widgets ----------
   // Title + optional kicker at the top of a content scene (consistent position).
   function heading(ctx, str, t, o = {}) {
-    o = { color: C.navy, kicker: null, kickColor: C.teal, at: 0, x: 120, y: 92, size: 72, ...o };
+    o = { color: C.head, kicker: null, kickColor: C.main, at: 0, x: 120, y: 92, size: 72, ...o };
     const k = P(t, o.at, 0.7);
     if (o.kicker) text(ctx, o.kicker.toUpperCase(), o.x, o.y - 50, { size: 30, weight: 700, color: o.kickColor, alpha: k });
-    text(ctx, str, o.x + (1 - k) * -40, o.y, { size: o.size, weight: 700, color: o.color, alpha: k, maxW: o.maxW || 1680, accent: o.accent || C.coral });
+    text(ctx, str, o.x + (1 - k) * -40, o.y, { size: o.size, weight: 700, color: o.color, alpha: k, maxW: o.maxW || 1680, accent: o.accent || C.accent });
   }
   function badge(ctx, label, x, y, o = {}) {
-    o = { fill: C.coral, color: '#fff', size: 30, alpha: 1, scale: 1, ...o }; if (o.alpha <= 0 || o.scale <= 0) return;
+    o = { fill: C.accent, color: '#fff', size: 30, alpha: 1, scale: 1, ...o }; if (o.alpha <= 0 || o.scale <= 0) return;
     ctx.save(); ctx.globalAlpha *= o.alpha; ctx.translate(x, y); ctx.scale(o.scale, o.scale);
     ctx.font = `800 ${o.size}px ${FONT}`; const w = ctx.measureText(label).width + o.size * 1.3, h = o.size * 1.7;
     rr(ctx, 0, -h / 2, w, h, h / 2); ctx.fillStyle = o.fill; ctx.fill();
@@ -190,7 +294,7 @@
   // "TEST TIP" banner card that pops in at time `at`.
   function tip(ctx, str, t, at, o = {}) {
     // Sits with its bottom edge at o.bottom (default 900, clear of the captions) unless o.y is given.
-    o = { x: 120, y: null, bottom: 900, w: 1680, label: 'TEST TIP', fill: '#FFF4E0', edge: C.coral, size: 40, ...o };
+    o = { x: 120, y: null, bottom: 900, w: 1680, label: 'TEST TIP', fill: '#FFF4E0', edge: C.accent, size: 40, ...o };
     const k = P(t, at, 0.55, E.back); if (k <= 0) return;
     const h = measure(ctx, str, { size: o.size, maxW: o.w - 300 }).h + 60;
     if (o.y == null) o.y = o.bottom - h;
@@ -203,17 +307,17 @@
   }
   // Bullet list; each item i appears at times[i].
   function bullets(ctx, items, x, y, t, times, o = {}) {
-    o = { size: 46, gap: 26, color: C.ink, dot: C.teal, maxW: 1500, ...o }; let cy = y;
+    o = { size: 46, gap: 26, color: C.ink, dot: C.main, maxW: 1500, ...o }; let cy = y;
     items.forEach((it, i) => {
       const k = P(t, times[i] ?? 0, 0.5); const h = measure(ctx, it, { size: o.size, maxW: o.maxW }).h;
-      if (k > 0) { circle(ctx, x + 14 + (1 - k) * -30, cy + o.size * 0.55, 11 * k, o.dot); text(ctx, it, x + 50 + (1 - k) * -30, cy, { size: o.size, color: o.color, maxW: o.maxW, alpha: k, weight: o.weight || 500, accent: o.accent || C.coral }); }
+      if (k > 0) { circle(ctx, x + 14 + (1 - k) * -30, cy + o.size * 0.55, 11 * k, o.dot); text(ctx, it, x + 50 + (1 - k) * -30, cy, { size: o.size, color: o.color, maxW: o.maxW, alpha: k, weight: o.weight || 500, accent: o.accent || C.accent }); }
       cy += h + o.gap;
     });
     return cy;
   }
   // Leader-line label: dot at (px,py), text at (tx,ty).
   function label(ctx, str, px, py, tx, ty, k, o = {}) {
-    o = { color: C.ink, line: C.coral, size: 36, align: tx < px ? 'right' : 'left', ...o }; if (k <= 0) return;
+    o = { color: C.ink, line: C.accent, size: 36, align: tx < px ? 'right' : 'left', ...o }; if (k <= 0) return;
     circle(ctx, px, py, 9 * k, o.line); line(ctx, px, py, tx, ty, { color: o.line, w: 4, prog: clamp(k * 1.4) });
     const kk = clamp(k * 1.6 - 0.6); if (kk > 0) text(ctx, str, tx + (o.align === 'right' ? -14 : 14), ty - o.size * 0.62, { size: o.size, weight: 700, color: o.color, align: o.align, alpha: kk, maxW: o.maxW });
   }
@@ -246,14 +350,14 @@
   }
   // Table: rows = [[...header], [...], ...]; colW = [..]; k reveals rows progressively.
   function table(ctx, rows, x, y, colW, o = {}) {
-    o = { rowH: 86, size: 36, head: C.navy, headColor: '#fff', fill: '#fff', alt: '#F1F6F9', k: 1, rowTimes: null, t: 0, ...o };
+    o = { rowH: 86, size: 36, head: C.head, headColor: '#fff', fill: '#fff', alt: '#F1F6F9', k: 1, rowTimes: null, t: 0, ...o };
     let cy = y; const totalW = colW.reduce((a, b) => a + b, 0);
     rows.forEach((row, ri) => {
       const k = o.rowTimes ? P(o.t, o.rowTimes[ri] ?? 0, 0.5) : clamp(o.k * rows.length - ri);
       if (k > 0) {
         ctx.save(); ctx.globalAlpha *= k;
         ctx.fillStyle = ri === 0 ? o.head : (ri % 2 ? o.fill : o.alt); ctx.fillRect(x, cy, totalW, o.rowH);
-        let cx = x; row.forEach((cell, ci) => { text(ctx, String(cell), cx + 22, cy + (o.rowH - o.size * 1.15) / 2, { size: o.size, weight: ri === 0 || ci === 0 ? 700 : 500, color: ri === 0 ? o.headColor : (o.colColors?.[ci] || C.ink), maxW: colW[ci] - 30, accent: C.coral }); cx += colW[ci]; });
+        let cx = x; row.forEach((cell, ci) => { text(ctx, String(cell), cx + 22, cy + (o.rowH - o.size * 1.15) / 2, { size: o.size, weight: ri === 0 || ci === 0 ? 700 : 500, color: ri === 0 ? o.headColor : (o.colColors?.[ci] || C.ink), maxW: colW[ci] - 30, accent: C.accent }); cx += colW[ci]; });
         ctx.restore();
       }
       cy += o.rowH;
@@ -265,26 +369,397 @@
   function emoji(ctx, ch, x, y, size, o = {}) {
     o = { alpha: 1, scale: 1, rot: 0, ...o }; if (o.alpha <= 0 || o.scale <= 0) return;
     ctx.save(); ctx.globalAlpha *= o.alpha; ctx.translate(x, y); ctx.rotate(o.rot); ctx.scale(o.scale, o.scale);
-    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, size * 0.06); ctx.restore();
+    ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`; ctx.fillStyle = '#000'; ctx.textAlign = 'center';   /* its own opaque fill: colour emoji take the fill's alpha */ ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, size * 0.06); ctx.restore();
   }
   const pop = (t, a, d = 0.5) => P(t, a, d, E.back);
   // Big title card: kicker (small caps line), title, optional subtitle + emoji row.
   function titleCard(ctx, t, s, o = {}) {
-    o = { kicker: '', title: '', sub: '', emojis: [], bg: 'ocean', ...o };
-    bg(ctx, o.bg, t + (s.start || 0));
+    o = { kicker: '', title: '', sub: '', emojis: [], bg: null, ...o };
+    if (o.bg == null) paint(ctx, LOOK.title, t + (s.start || 0)); else bg(ctx, o.bg, t + (s.start || 0));
     const k1 = P(t, 0.1, 0.8), k2 = P(t, 0.4, 0.8), k3 = P(t, 0.9, 0.8);
-    if (o.kicker) badge(ctx, o.kicker.toUpperCase(), W / 2 - measureBadge(ctx, o.kicker.toUpperCase(), 30) / 2, 330, { fill: C.coral, alpha: k1, size: 30 });
-    text(ctx, o.title, W / 2, 400 + (1 - k2) * 40, { size: 104, weight: 800, color: '#fff', align: 'center', maxW: 1600, alpha: k2, shadow: true, accent: C.aqua, lh: 1.08 });
-    if (o.sub) text(ctx, o.sub, W / 2, 640 + (1 - k3) * 30, { size: 46, weight: 500, color: C.foam, align: 'center', maxW: 1400, alpha: k3 });
+    if (o.kicker) badge(ctx, o.kicker.toUpperCase(), W / 2 - measureBadge(ctx, o.kicker.toUpperCase(), 30) / 2, 330, { fill: C.accent, alpha: k1, size: 30 });
+    text(ctx, o.title, W / 2, 400 + (1 - k2) * 40, { size: 104, weight: 800, color: '#fff', align: 'center', maxW: 1600, alpha: k2, shadow: true, accent: C.glow, lh: 1.08 });
+    if (o.sub) text(ctx, o.sub, W / 2, 640 + (1 - k3) * 30, { size: 46, weight: 500, color: C.soft, align: 'center', maxW: 1400, alpha: k3 });
     o.emojis.forEach((e, i) => emoji(ctx, e, W / 2 + (i - (o.emojis.length - 1) / 2) * 150, 800 + Math.sin(t * 2 + i) * 10, 96, { scale: pop(t, 1.2 + i * 0.15) }));
+  }
+  // ---------- intro: the opening scene as a short motion piece, never a copy of the deck's title slide ----------
+  // intro(g, t, s, {mood, title, kicker, sub, by, logo, name, photo, main, accent, panel, emojis, at}); see guide.md.
+  // Every text colour is checked against what is behind it (4.5:1 at least) and moved toward black or white until
+  // it reads; the text block shrinks, and at worst is cut short, so it stays between the logo and the captions.
+  const MOODS = {
+    polished: { main: '#0B2545', accent: '#2563EB', stagger: 0.09, dur: 0.75 },
+    cinematic: { main: '#134E6F', accent: '#FFC145', stagger: 0.09, dur: 0.9 },
+    calm: { main: '#1F7A6D', accent: '#4FC3F7', stagger: 0.07, dur: 1.0 },
+    energetic: { main: '#16212E', accent: '#FF6B57', stagger: 0.12, dur: 0.35 },
+    playful: { main: '#0B2545', accent: '#FF6B57', stagger: 0.09, dur: 0.6 },
+    themed: { main: '#0B2545', accent: '#7FE0D6', stagger: 0.09, dur: 0.8 },
+  };
+  const INTRO_KEYS = ['mood', 'title', 'kicker', 'sub', 'by', 'logo', 'name', 'photo', 'main', 'accent', 'panel', 'emojis', 'at'];
+  const AT_KEYS = ['logo', 'kicker', 'title', 'sub', 'by'], INK = '#16212E', WHITE = '#FFFFFF', BLACK = '#000000';
+  const hexRgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const toHex = v => '#' + v.map(x => Math.round(clamp(x, 0, 255)).toString(16).padStart(2, '0')).join('');
+  const mixHex = (a, b, k) => { const x = hexRgb(a), y = hexRgb(b); return toHex(x.map((v, i) => lerp(v, y[i], clamp(k)))); };
+  const rgba = (c, a) => `rgba(${hexRgb(c).join(',')},${a})`;
+  function lum(c) { return hexRgb(c).reduce((s, v, i) => { v /= 255; return s + [0.2126, 0.7152, 0.0722][i] * (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); }, 0); }
+  function contrast(a, b) { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  // c, moved toward black (on light colours) or white (on dark ones) until it reads at min:1 on every colour of `on`.
+  function readable(c, on, min) {
+    on = [].concat(on); const ok = x => on.every(b => contrast(x, b) >= min);
+    if (ok(c)) return c;
+    const to = on.reduce((s, b) => s + lum(b), 0) / on.length > 0.179 ? BLACK : WHITE;
+    for (let k = 0.05; k < 1; k += 0.05) { const x = mixHex(c, to, k); if (ok(x)) return x; }
+    return to;
+  }
+  function introOptions(o) {
+    const fail = m => { throw new Error(`Engine.intro: ${m}`); };
+    if (o === null || typeof o !== 'object' || Array.isArray(o)) fail('the fourth argument is { mood, title, ... }');
+    if (Object.hasOwn(o, 'look')) fail('`look` is now `mood`: one of ' + Object.keys(MOODS).join(', '));
+    for (const k of Object.keys(o)) if (!INTRO_KEYS.includes(k)) fail(`unknown option "${k}"; use ${INTRO_KEYS.join(', ')}`);
+    if (typeof o.mood !== 'string' || !Object.hasOwn(MOODS, o.mood)) fail(`unknown mood ${JSON.stringify(o.mood)}; use one of ${Object.keys(MOODS).join(', ')}`);
+    if (typeof o.title !== 'string' || !o.title.trim()) fail("title must be the title slide's title, a non-empty string");
+    for (const k of ['kicker', 'sub', 'by', 'name', 'logo', 'photo']) if (o[k] != null && typeof o[k] !== 'string') fail(`${k} must be a string, not ${JSON.stringify(o[k])}`);
+    for (const k of ['main', 'accent']) if (o[k] != null && !isHex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
+    if (o.panel != null && typeof o.panel !== 'boolean') fail('panel must be true or false');
+    if (o.photo != null && o.mood !== 'cinematic') fail('photo is drawn only by the cinematic mood');
+    if (o.emojis != null && !(Array.isArray(o.emojis) && o.emojis.every(e => typeof e === 'string'))) fail("emojis must be a list like ['🌍', '📜']");
+    if (o.emojis?.length && o.mood !== 'playful') fail('emojis are drawn only by the playful mood');
+    const at = o.at ?? {};
+    if (at === null || typeof at !== 'object' || Array.isArray(at)) fail('at must be { logo, kicker, title, sub, by } times in seconds');
+    for (const [k, v] of Object.entries(at)) {
+      if (!AT_KEYS.includes(k)) fail(`unknown at.${k}; use ${AT_KEYS.join(', ')}`);
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) fail(`at.${k} must be a time in seconds, not ${JSON.stringify(v)}`);
+    }
+    // with Engine.theme, playful and themed take the lesson's colours: headings and accent, or the glow on dark
+    const d = THEMED && o.mood === 'playful' ? { main: C.head, accent: C.accent } : o.mood === 'themed' ? { main: C.head, accent: C.glow } : MOODS[o.mood];
+    return { kicker: o.kicker || '', sub: o.sub || '', by: o.by || '', name: o.name || '', logo: o.logo || null, photo: o.photo || null,
+      emojis: o.emojis || [], panel: o.panel, title: o.title, mood: o.mood, main: o.main || d.main, accent: o.accent || d.accent, at };
+  }
+
+  // ---- text: wrapping that also breaks scripts written without spaces, shrinking, cutting short ----
+  const NOSPACE = /[฀-໿က-႟ក-៿⺀-鿿ꥠ-퟿豈-﫿︰-﹏＀-￯]/;
+  const segmenters = {};
+  function pieces(s, granularity) {
+    try { segmenters[granularity] ||= new Intl.Segmenter(undefined, { granularity }); return [...segmenters[granularity].segment(s)].map(x => x.segment); }
+    catch (e) { return Array.from(s); }
+  }
+  // Lines of runs, like wrapRich, but Chinese, Japanese, Thai... and any word wider than maxW also break inside.
+  function introWrap(ctx, str, o) {
+    const toks = [];
+    for (const r of parseRich(str)) for (const w of r.s.split(/(\s+)/)) {
+      if (!w) continue;
+      ctx.font = fontStr(o, r.bold);
+      if (/^\s+$/.test(w)) { toks.push({ acc: r.acc, bold: r.bold, s: ' ', w: ctx.measureText(' ').width, sp: true }); continue; }
+      const parts = (NOSPACE.test(w) ? pieces(w, 'word') : [w]).flatMap(p => ctx.measureText(p).width > o.maxW ? pieces(p, 'grapheme') : [p]);
+      for (const p of parts) toks.push({ acc: r.acc, bold: r.bold, s: p, w: ctx.measureText(p).width });
+    }
+    const lines = [[]]; let lw = 0;
+    for (const tk of toks) {
+      const L = lines[lines.length - 1];
+      if (tk.sp) { if (L.length) { L.push(tk); lw += tk.w; } continue; }
+      if (lw + tk.w > o.maxW && L.length) { while (L.length && L[L.length - 1].sp) L.pop(); lines.push([]); lw = 0; }
+      lines[lines.length - 1].push(tk); lw += tk.w;
+    }
+    return lines.map(L => { while (L.length && L[L.length - 1].sp) L.pop(); return { runs: L, w: L.reduce((a, r) => a + r.w, 0) }; }).filter(L => L.runs.length);
+  }
+  // At most n lines; when lines are dropped, the last one kept ends with an ellipsis.
+  function cutLines(ctx, lines, n, o) {
+    if (lines.length <= n) return lines;
+    if (n <= 0) return [];
+    const out = lines.slice(0, n), runs = [...out[n - 1].runs];
+    ctx.font = fontStr(o, false); const ew = ctx.measureText('…').width;
+    let w = out[n - 1].w;
+    while (runs.length > 1 && (w + ew > o.maxW || runs[runs.length - 1].sp)) w -= runs.pop().w;
+    const last = runs[runs.length - 1];
+    runs.push({ acc: last.acc, bold: last.bold, s: '…', w: ew });
+    out[n - 1] = { runs, w: w + ew };
+    return out;
+  }
+  const SLOTS = { title: { weight: 800, lh: 1.06 }, sub: { weight: 600, lh: 1.22 }, by: { weight: 500, lh: 1.22 }, kick: { weight: 800, lh: 1.22 } };
+  // Sizes and lines for the kicker, title, sub and by lines that fit maxH: the title shrinks first (to 64 px, then to
+  // 44 px over four lines), then sub and by (to 34 and 30 px), then lines are cut short, last of all the title's.
+  function introLayout(ctx, o, st, maxH) {
+    const size = { title: st.size, sub: 46, by: 36, kick: 30 }, n = { title: 3, sub: 3, by: 2, kick: 1 };
+    const text = { title: o.title, sub: o.sub, by: o.by, kick: o.kicker.toUpperCase() };
+    const maxW = k => k === 'kick' ? st.maxW - (st.badge ? 60 : 80) : st.maxW;
+    const wrap = k => text[k] ? introWrap(ctx, text[k], { size: size[k], weight: SLOTS[k].weight, maxW: maxW(k) }) : [];
+    const build = () => {
+      const L = {};
+      for (const k of ['kick', 'title', 'sub', 'by']) L[k] = cutLines(ctx, wrap(k), n[k], { size: size[k], weight: SLOTS[k].weight, maxW: maxW(k) });
+      const h = (L.kick.length ? 70 : 0) + L.title.length * size.title * SLOTS.title.lh + (st.rule ? 40 : 0)
+        + (L.sub.length ? 16 + L.sub.length * size.sub * SLOTS.sub.lh : 0) + (L.by.length ? 12 + L.by.length * size.by * SLOTS.by.lh : 0)
+        + (st.extra || 0);
+      return { L, h, size: { ...size } };
+    };
+    while (size.title > 64 && wrap('title').length > 3) size.title -= 4;
+    if (wrap('title').length > 3) { n.title = 4; while (size.title > 44 && wrap('title').length > 4) size.title -= 4; }
+    let r = build();
+    while (r.h > maxH && size.title > 64) { size.title -= 4; r = build(); }
+    while (r.h > maxH && (size.sub > 34 || size.by > 30)) { size.sub = Math.max(34, size.sub - 2); size.by = Math.max(30, size.by - 2); r = build(); }
+    while (r.h > maxH && size.title > 44) { size.title -= 4; r = build(); }
+    while (r.h > maxH && (n.by > 0 || n.sub > 0 || n.title > 1)) {
+      if (n.by > 1) n.by--; else if (n.sub > 1) n.sub--; else if (n.title > 2) n.title--; else if (n.by) n.by = 0; else if (n.sub) n.sub = 0; else n.title--;
+      r = build();
+    }
+    return r;
+  }
+  const pieceCount = lines => lines.reduce((s, L) => s + L.runs.filter(r => !r.sp).length, 0);
+  // One laid-out block at (x, y). With a mode, its pieces come in one by one ('rise', 'slam', 'bounce', 'focus',
+  // 'fade'); without, the block slides in as one at `at`. Returns its height.
+  function drawBlock(ctx, lines, x, y, size, slot, o, t, at, mode, stagger = 0, dur = 0.7) {
+    const f = { size, weight: SLOTS[slot].weight }, lh = size * SLOTS[slot].lh; let i = 0;
+    lines.forEach((L, li) => {
+      const top = y + li * lh, base = top + size * 0.82; let cx = x;
+      for (const r of L.runs) {
+        if (r.sp) { cx += r.w; continue; }
+        const k = mode ? P(t, at + i++ * stagger, dur, mode === 'bounce' ? E.back : E.out) : P(t, at, 0.7);
+        if (k > 0) {
+          ctx.save(); ctx.font = fontStr(f, r.bold); ctx.fillStyle = r.acc ? o.accent : o.color; ctx.textBaseline = 'alphabetic';
+          if (o.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4; }
+          const mx = cx + r.w / 2, my = base - size * 0.35;
+          if (!mode) { ctx.globalAlpha *= k; ctx.fillText(r.s, cx + (1 - k) * 40, base); }
+          else if (mode === 'rise') { ctx.beginPath(); ctx.rect(cx - 30, top - size * 0.15, r.w + 60, size * 1.25); ctx.clip(); ctx.fillText(r.s, cx, base + (1 - k) * size * 1.3); }
+          else if (mode === 'slam') { const z = 1 + 0.7 * (1 - k); ctx.globalAlpha *= clamp(k * 2.5); ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else if (mode === 'bounce') { ctx.globalAlpha *= clamp(k * 3); ctx.translate(mx, my); ctx.scale(Math.max(0, k), Math.max(0, k)); ctx.rotate((1 - k) * 0.25); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else if (mode === 'focus') { const z = 1 + 0.12 * (1 - k); ctx.globalAlpha *= k; if (k < 1) ctx.filter = `blur(${((1 - k) * 14).toFixed(1)}px)`; ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else { ctx.globalAlpha *= k; ctx.fillText(r.s, cx, base + (1 - k) * 26); }
+          ctx.restore();
+        }
+        cx += r.w;
+      }
+    });
+    return lines.length * lh;
+  }
+  // Kicker, title, rule, sub and by, left-aligned at st.x: centred between st.y0 and st.y1, or resting on st.y1.
+  function introText(ctx, t, a, st, lay) {
+    const { L, size } = lay;
+    let y = st.anchor === 'bottom' ? st.y1 - lay.h : clamp(590 - lay.h / 2, st.y0, st.y1 - lay.h);
+    const top = y, x = st.x;
+    ctx.save();
+    if (st.skew) ctx.transform(1, 0, -st.skew, 1, st.skew * (top + lay.h / 2), 0);
+    if (L.kick.length) {
+      const k = P(t, a.kicker, 0.6);
+      if (st.badge) badge(ctx, L.kick[0].runs.map(r => r.s).join(''), x, y + 22, { fill: st.badge, size: 30, scale: pop(t, a.kicker) });
+      else {
+        ctx.save(); ctx.globalAlpha *= k; ctx.fillStyle = st.kick; ctx.fillRect(x, y + 12, 56 * k, 6); ctx.restore();
+        drawBlock(ctx, L.kick, x + 76, y - 4, size.kick, 'kick', { color: st.kick, accent: st.kick }, t, a.kicker, null);
+      }
+      y += 70;
+    }
+    y += drawBlock(ctx, L.title, x, y, size.title, 'title', { color: st.title, accent: st.accent, shadow: st.shadow }, t, a.title, st.mode, a.stagger, st.dur);
+    if (st.rule) { const k = P(t, a.sub - 0.3, 0.9, E.inOut); ctx.save(); ctx.fillStyle = st.rule; ctx.fillRect(x, y + 18, 280 * k, 8); ctx.restore(); y += 40; }
+    if (L.sub.length) y += 16 + drawBlock(ctx, L.sub, x, y + 16, size.sub, 'sub', { color: st.sub, accent: st.accent, shadow: st.shadow }, t, a.sub, null);
+    if (L.by.length) y += 12 + drawBlock(ctx, L.by, x, y + 12, size.by, 'by', { color: st.by, accent: st.accent, shadow: st.shadow }, t, a.by, null);
+    ctx.restore();
+    return y;
+  }
+
+  // ---- logo and photo ----
+  const tones = {}, scrims = {}, warnedIntro = new Set();
+  function warnOnce(m) { if (!warnedIntro.has(m)) { warnedIntro.add(m); console.warn(m); } }
+  function loaded(key) { return !!key && Object.hasOwn(imgs, key) && imgs[key].naturalWidth > 0; }
+  // The logo's average colour (by opacity), to keep it visible on its background.
+  function logoTone(key) {
+    if (Object.hasOwn(tones, key)) return tones[key];
+    let c = INK;
+    try {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 48; const x = cv.getContext('2d'); x.drawImage(imgs[key], 0, 0, 48, 48);
+      const d = x.getImageData(0, 0, 48, 48).data; let r = 0, g = 0, b = 0, w = 0;
+      for (let i = 0; i < d.length; i += 4) { const q = d[i + 3] / 255; r += d[i] * q; g += d[i + 1] * q; b += d[i + 2] * q; w += q; }
+      if (w > 0) c = toHex([r / w, g / w, b / w]);
+    } catch (e) { /* pixels unreadable: treat it as a dark logo */ }
+    return (tones[key] = c);
+  }
+  // How dark the photo is made behind the text: enough for white text at 7:1 on its brightest tenth there.
+  function photoScrim(key) {
+    if (Object.hasOwn(scrims, key)) return scrims[key];
+    let a = 0.62;
+    try {
+      const cv = document.createElement('canvas'); cv.width = 96; cv.height = 54; const x = cv.getContext('2d');
+      drawImg(x, imgs[key], 0, 0, 96, 54, { fit: 'cover', zoom: 1.1 });
+      const d = x.getImageData(0, 13, 70, 35).data, px = [];
+      for (let i = 0; i < d.length; i += 4) px.push(toHex([d[i], d[i + 1], d[i + 2]]));
+      px.sort((p, q) => lum(p) - lum(q)); const p90 = px[Math.floor(px.length * 0.9)];
+      a = 0.3; while (a < 0.95 && contrast(WHITE, mixHex(p90, BLACK, a * 0.85)) < 7) a += 0.03;
+    } catch (e) { /* pixels unreadable: keep the strong default */ }
+    return (scrims[key] = a);
+  }
+  // The logo (with the name beside it when both are given), or the name alone, at (x, y), h tall. A panel goes under
+  // it when the mood uses one (or `panel: true`), or when the logo would be hard to see on the background behind it.
+  function introLogo(ctx, o, k, x, y, h, st) {
+    if (k <= 0) return;
+    const logo = loaded(o.logo);
+    if (o.logo && !logo) warnOnce(`Engine.intro: no loaded Engine.assets() entry "${o.logo}" for the logo; drawing ${o.name ? 'the name' : 'no logo'} instead`);
+    if (!logo && !o.name) return;
+    const tone = logo ? logoTone(o.logo) : null, dark = readable(o.main, WHITE, 7);
+    let panel = o.panel ?? st.panel, fill = WHITE;
+    if (logo && !panel && contrast(tone, st.behind) < 2) { panel = true; fill = lum(st.behind) > 0.179 ? dark : WHITE; }
+    if (logo && panel && contrast(tone, fill) < 2) fill = fill === WHITE ? dark : WHITE;   // a light logo goes on a dark panel
+    const ar = logo ? imgs[o.logo].naturalWidth / imgs[o.logo].naturalHeight : 0, lw = logo ? Math.min(560, h * ar) : 0;
+    const nameColor = readable(panel ? (fill === WHITE ? INK : WHITE) : st.title, panel ? fill : st.behind, 4.5);
+    // The name as the deck writes it: one line at 40 px, else two, shrinking to 30 px; only then cut short.
+    const gap0 = logo ? 28 : 0, room = Math.max(360, 1200 - (x + lw + gap0));
+    let ns = 40, nl = [];
+    if (o.name) {
+      for (ns = 40; ns >= 30; ns -= 2) { nl = introWrap(ctx, o.name, { size: ns, weight: 800, maxW: room }); if (nl.length === 1 || (nl.length === 2 && ns <= 36)) break; }
+      if (nl.length > 2) { ns = 30; nl = cutLines(ctx, introWrap(ctx, o.name, { size: ns, weight: 800, maxW: room }), 2, { size: ns, weight: 800, maxW: room }); }
+    }
+    const nw = nl.length ? Math.max(...nl.map(L => L.w)) : 0, gap = logo && nw ? gap0 : 0, bh = nl.length * ns * 1.22, ph = Math.max(h, bh);
+    ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.translate((1 - k) * -50, 0);
+    if (panel) card(ctx, x - 28, y - 20 - (ph - h) / 2, lw + gap + nw + 56, ph + 40, { fill, r: 22 });
+    if (logo) img(ctx, o.logo, x, y, lw, h, { fit: 'contain' });
+    if (nl.length) drawBlock(ctx, nl, x + lw + gap, y + (h - bh) / 2, ns, 'kick', { color: nameColor, accent: nameColor }, 99, 0, null);
+    ctx.restore();
+  }
+
+  // ---- the moods ----
+  function introStyle(ctx, o, t, s) {
+    const M = o.main, A = o.accent;
+    if (o.mood === 'polished') {
+      const light = contrast(M, INK) > contrast(M, WHITE);
+      const base = light ? readable(M, INK, 7) : readable(M, WHITE, 7), ends = light ? [mixHex(base, WHITE, 0.35), base] : [base, mixHex(base, BLACK, 0.5)];
+      const text = light ? INK : WHITE, acc = readable(light ? A : mixHex(A, WHITE, 0.35), ends, 4.5);
+      return { x: 140, maxW: 1040, size: 116, y0: 260, y1: 880, mode: 'rise', panel: true, behind: ends[0], ends,
+        title: readable(text, ends, 7), accent: acc, kick: acc, sub: readable(mixHex(text, base, 0.14), ends, 4.5), by: readable(mixHex(text, base, 0.2), ends, 4.5),
+        rule: readable(A, ends, 3), tile: readable(A, ends, 3), ink: text, logo: [148, 110, 100] };
+    }
+    if (o.mood === 'cinematic') {
+      const photo = !!o.photo && loaded(o.photo);
+      if (o.photo && !photo) warnOnce(`Engine.intro: no loaded Engine.assets() entry "${o.photo}" for the photo; drawing a sky instead`);
+      const base = readable(M, WHITE, 7), behind = photo ? '#595959' : base;   // #595959: the scrimmed photo is at most this bright
+      const acc = readable(mixHex(A, WHITE, 0.15), behind, 4.5);
+      return { x: 140, maxW: 1250, size: 132, y0: 270, y1: 860, anchor: 'bottom', mode: 'focus', panel: true, behind: '#000000', photo, base,
+        title: WHITE, accent: acc, kick: acc, sub: readable('#EBEBEB', behind, 4.5), by: readable('#EBEBEB', behind, 4.5), shadow: true, logo: [148, 146, 84] };
+    }
+    if (o.mood === 'calm') {
+      const ends = [WHITE, mixHex(WHITE, M, 0.12)], acc = readable(M, ends, 4.5);
+      return { x: 140, maxW: 900, size: 100, y0: 260, y1: 880, mode: 'fade', panel: false, behind: WHITE, ends,
+        title: readable(mixHex(M, BLACK, 0.45), ends, 7), accent: acc, kick: acc, sub: readable('#3D4B5C', ends, 7), by: readable('#3D4B5C', ends, 7),
+        rule: readable(mixHex(A, M, 0.3), ends, 3), line: readable(M, ends, 3), logo: [148, 110, 100] };
+    }
+    if (o.mood === 'energetic') {
+      const base = readable(mixHex(M, '#08090C', 0.55), WHITE, 12), acc = readable(A, base, 4.5);
+      return { x: 160, maxW: 1000, size: 124, y0: 260, y1: 880, mode: 'slam', panel: true, behind: base, base, skew: 0.12,
+        title: WHITE, accent: acc, kick: acc, sub: readable(mixHex(WHITE, base, 0.12), base, 7), by: readable(mixHex(WHITE, base, 0.2), base, 4.5),
+        rule: readable(A, base, 3), logo: [148, 110, 100] };
+    }
+    if (o.mood === 'themed') {   // the lesson's own title background (Engine.theme), white text, its glow for accents
+      // where the background is too light for white titles at 7:1 (the ocean's top), a soft shade behind the text
+      const raw = endsOf(LOOK.title); let scrim = 0;
+      while (scrim < 0.6 && contrast(WHITE, mixHex(raw[0], BLACK, scrim * 0.85)) < 7) scrim += 0.03;
+      const ends = raw.map(c => mixHex(c, BLACK, scrim * 0.85)), acc = readable(A, ends, 4.5);
+      return { x: 140, maxW: 1400, size: 112, y0: 260, y1: 880, mode: 'rise', panel: true, behind: ends[0], ends, scrim,
+        title: readable(WHITE, ends, 7), accent: acc, kick: acc, sub: readable(C.soft, ends, 4.5), by: readable(C.soft, ends, 4.5),
+        rule: readable(C.accent, ends, 3), shadow: true, logo: [148, 110, 100] };
+    }
+    const paper = endsOf(THEMED ? LOOK.light : 'paper'), acc = readable(A, paper, 4.5);   // playful: the look's light background
+    return { x: 140, maxW: 1000, size: 108, y0: 260, y1: 880, mode: 'bounce', panel: false, behind: paper[0], badge: readable(A, WHITE, 4.5),
+      title: readable(M, paper, 4.5), accent: acc, kick: acc, sub: readable(THEMED ? C.note : C.sea, paper, 4.5), by: readable(THEMED ? C.note : C.sea, paper, 4.5),
+      extra: o.emojis.length ? 120 : 0, logo: [148, 110, 100] };
+  }
+  function intro(ctx, t, s, opts = {}) {
+    const o = introOptions(opts), mood = MOODS[o.mood], st = introStyle(ctx, o, t, s);
+    st.dur = mood.dur;
+    const lay = introLayout(ctx, o, st, st.y1 - st.y0), n = pieceCount(lay.L.title);
+    const stagger = Math.min(mood.stagger, 1.6 / Math.max(1, n - 1));
+    const a = { ...(o.mood === 'cinematic' ? { logo: 1.2, kicker: 0.9, title: 1.1 } : { logo: 0.15, kicker: 0.35, title: 0.55 }), ...o.at, stagger };
+    const titleDone = a.title + Math.max(0, n - 1) * stagger + mood.dur;
+    if (a.sub == null) a.sub = titleDone + 0.15;
+    if (a.by == null) a.by = a.sub + 0.6;
+    const M = o.main, A = o.accent, r = rng(o.mood.length * 977 + 13);
+    if (o.mood === 'polished') {
+      const gr = ctx.createLinearGradient(0, 0, W, H); gr.addColorStop(0, st.ends[0]); gr.addColorStop(1, st.ends[1]);
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 9; j++) {   // a field of tiles breathing in a slow wave (decoration, never data)
+        const k = P(t, (i + j) * 0.045 - 0.25, 0.7, E.out), wv = 0.5 + 0.5 * Math.sin(t * 1.6 - (i + j) * 0.45), z = (14 + 30 * wv) * k;
+        if (z <= 0) continue;
+        const hot = (i * 3 + j * 5) % 11 === 0, cx = 1250 + i * 76, cy = 230 + j * 72;
+        ctx.save(); ctx.globalAlpha = hot ? 0.9 : 0.12 + 0.12 * wv; ctx.fillStyle = hot ? st.tile : st.ink; rr(ctx, cx - z / 2, cy - z / 2, z, z, z * 0.25); ctx.fill(); ctx.restore();
+      }
+      const sw = P(t, 0.2, 1.8, E.inOut);
+      if (sw > 0 && sw < 1) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sx = lerp(-700, W + 300, sw); const lg = ctx.createLinearGradient(sx, 0, sx + 400, 0); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,0.10)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(sx + 200, 0); ctx.lineTo(sx + 600, 0); ctx.lineTo(sx + 200, H); ctx.lineTo(sx - 200, H); ctx.closePath(); ctx.fill(); ctx.restore(); }
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else if (o.mood === 'cinematic') {
+      const kz = E.out(clamp(t / Math.max(6, s.dur || 10)));
+      if (st.photo) {
+        img(ctx, o.photo, 0, 0, W, H, { fit: 'cover', zoom: 1.18 - 0.14 * kz, panX: -0.4 + 0.5 * kz });
+        const sa = photoScrim(o.photo), lg = ctx.createLinearGradient(0, 0, W, 0);
+        lg.addColorStop(0, `rgba(0,0,0,${sa})`); lg.addColorStop(0.72, `rgba(0,0,0,${sa * 0.85})`); lg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+      } else {
+        const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, st.base); gr.addColorStop(1, mixHex(st.base, BLACK, 0.6)); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+        circle(ctx, 1650, 330 + 60 * (1 - kz), 150, mixHex(A, WHITE, 0.2), { alpha: 0.9 });   // right of the text (x <= 1390)
+        for (let i = 0; i < 40; i++) { const x = (r() * W + t * (10 + r() * 30)) % W, y = r() * H; circle(ctx, x, y, 1.5 + r() * 3, 'rgba(255,255,255,0.35)'); }
+      }
+      const bg2 = ctx.createLinearGradient(0, H * 0.45, 0, H); bg2.addColorStop(0, 'rgba(0,0,0,0)'); bg2.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = bg2; ctx.fillRect(0, 0, W, H);
+      const hb = lerp(H / 2 - 170, 92, P(t, 0.05, 1.7, E.inOut));   // letterbox opening like a curtain
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, hb); ctx.fillRect(0, H - hb, W, hb);
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else if (o.mood === 'calm') {
+      const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, st.ends[0]); gr.addColorStop(1, st.ends[1]); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      const cx = 1530, cy = 500;
+      circle(ctx, cx, cy, 150 * (0.85 + 0.15 * P(t, 0, 1.2)) * (1 + 0.012 * Math.sin(t * 1.4)), mixHex(M, WHITE, 0.86));
+      for (let i = 0; i < 5; i++) circle(ctx, cx, cy, (170 + i * 64) * (1 + 0.015 * Math.sin(t * 0.9 - i * 0.7)), null, { stroke: mixHex(M, WHITE, 0.45 + i * 0.1), lw: 3, alpha: (0.7 - i * 0.12) * P(t, i * 0.18, 1.4) });
+      // a calm pulse line through the rings, then a soft light travelling along it
+      const ys = x => { const d = (x - cx) / 40; return cy + (Math.abs(d) < 3.2 ? -Math.sin(d * Math.PI / 1.6) * 70 * Math.exp(-d * d / 4) : 0); };
+      const pk = P(t, 0.3, 2.2, E.inOut), x0 = 1140, x1 = W + 20;
+      ctx.save(); ctx.strokeStyle = st.line; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+      for (let x = x0; x <= lerp(x0, x1, pk); x += 6) x === x0 ? ctx.moveTo(x, ys(x)) : ctx.lineTo(x, ys(x)); ctx.stroke(); ctx.restore();
+      if (t > 2.5) { const px = lerp(x0, x1, ((t - 2.5) * 0.18) % 1); circle(ctx, px, ys(px), 22, mixHex(A, WHITE, 0.3), { alpha: 0.35 }); circle(ctx, px, ys(px), 9, A); }
+      introLogo(ctx, o, P(t, a.logo, 1.0), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else if (o.mood === 'energetic') {
+      ctx.fillStyle = st.base; ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 4; i++) {   // stripes slashing in from the right
+        const k = P(t, i * 0.07, 0.5, E.out), x = 1180 + i * 190 + (1 - k) * 1300 - t * 6;
+        ctx.save(); ctx.globalAlpha = [0.95, 0.55, 0.3, 0.15][i]; ctx.fillStyle = i ? mixHex(A, WHITE, 0.1 * i) : A;
+        ctx.beginPath(); ctx.moveTo(x + 300, 0); ctx.lineTo(x + 420, 0); ctx.lineTo(x + 120, H); ctx.lineTo(x, H); ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineCap = 'round';
+      for (let i = 0; i < 28; i++) { const y = 60 + r() * 960, len = 120 + r() * 260, sp = 900 + r() * 1100, x = ((r() * (W + 600) - t * sp) % (W + 600) + W + 600) % (W + 600) - 300; ctx.lineWidth = 2 + r() * 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke(); }
+      ctx.restore();
+      let sh = 0; for (let i = 0; i < n; i++) { const tk = a.title + i * stagger + 0.25; if (t > tk) sh += 9 * Math.exp(-(t - tk) * 16); }
+      ctx.save(); ctx.translate(sh * noise(1, t * 40), sh * noise(2, t * 40));
+      introLogo(ctx, o, P(t, a.logo, 0.5), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+      ctx.restore();
+    } else if (o.mood === 'themed') {
+      paint(ctx, LOOK.title, t + (s.start || 0));
+      if (st.scrim > 0) { const lg = ctx.createLinearGradient(0, 0, W, 0); lg.addColorStop(0, `rgba(0,0,0,${st.scrim})`); lg.addColorStop(0.82, `rgba(0,0,0,${st.scrim * 0.85})`); lg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H); }
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+    } else {   // playful
+      introPlayfulBackdrop(ctx, t, o, st);
+      introLogo(ctx, o, P(t, a.logo, 0.6), ...st.logo, st);
+      const end = introText(ctx, t, a, st, lay);
+      o.emojis.forEach((e, i) => emoji(ctx, e, st.x + 60 + i * 140, end + 60 + Math.sin(t * 2 + i) * 8, 90, { scale: pop(t, a.by + i * 0.12) }));
+    }
+  }
+  // Paper with colourful shapes popping in and floating, kept clear of the text (right of x 1200, above y 100).
+  function introPlayfulBackdrop(ctx, t, o, st) {
+    paint(ctx, THEMED ? LOOK.light : 'paper', t);
+    const r = rng(8 * 977 + 13), cols = THEMED ? [C.accent, C.main, C.head, C.note, C.accent, C.main, C.glow] : [C.coral, C.sun, C.teal, C.purple, C.leaf, C.pink, C.water];
+    for (let i = 0; i < 16; i++) {
+      const right = i < 12, x = right ? 1220 + r() * 600 : 620 + r() * 1200, y = right ? 160 + r() * 700 : 40 + r() * 50;
+      const k = pop(t, i * 0.06 - 0.3), sz = 26 + r() * 46, rot = t * (r() - 0.5) * 0.8, fy = y + 14 * Math.sin(t * 1.3 + i), col = cols[i % cols.length];
+      if (k <= 0) continue;
+      ctx.save(); ctx.translate(x, fy); ctx.rotate(rot); ctx.scale(k, k); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 9; ctx.lineCap = 'round';
+      const kind = i % 5; ctx.beginPath();
+      if (kind === 0) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.fill(); }
+      else if (kind === 1) { ctx.moveTo(0, -sz / 2); ctx.lineTo(sz / 2, sz / 2); ctx.lineTo(-sz / 2, sz / 2); ctx.closePath(); ctx.fill(); }
+      else if (kind === 2) { ctx.arc(0, 0, sz / 2, 0, 6.283); ctx.stroke(); }
+      else if (kind === 3) { ctx.moveTo(-sz / 2, 0); ctx.lineTo(sz / 2, 0); ctx.moveTo(0, -sz / 2); ctx.lineTo(0, sz / 2); ctx.stroke(); }
+      else { for (let j = 0; j <= 12; j++) { const px = -sz + j * sz / 6, py = Math.sin(j * 1.2) * sz / 5; j ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
+      ctx.restore();
+    }
   }
   function measureBadge(ctx, label, size) { ctx.save(); ctx.font = `800 ${size}px ${FONT}`; const w = ctx.measureText(label).width + size * 1.3; ctx.restore(); return w; }
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
     o = { n: 1, q: '', choices: null, emoji: '🤔', badge: '', numbered: false, ...o };
-    bg(ctx, 'deep', t + 100);
+    paint(ctx, LOOK.dark, t + 100);
     badge(ctx, o.badge || `QUIZ · QUESTION ${o.n}`, 120, 150, { fill: C.sun, color: C.navy, scale: pop(t, 0.1), size: 32 });
-    text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.aqua });
+    text(ctx, o.q, 120, 240, { size: 68, weight: 700, color: '#fff', maxW: 1250, alpha: P(t, 0.3, 0.6), accent: C.glow });
     if (o.choices) o.choices.forEach((c, i) => {
       const k = P(t, 0.8 + i * 0.25, 0.5); card(ctx, 120, 560 + i * 120, 1000, 96, { fill: 'rgba(255,255,255,0.1)', shadow: false, alpha: k, r: 20 });
       // a teacher's questions are numbered (they are not options to pick); a long line shrinks to fit its card
@@ -299,19 +774,19 @@
   // Quiz answer: big check + answer + explanation.
   function quizA(ctx, t, s, o = {}) {
     o = { answer: '', why: '', ...o };
-    bg(ctx, 'deep', t + 100);
+    paint(ctx, LOOK.dark, t + 100);
     const k = pop(t, 0.05, 0.6);
     circle(ctx, 260, 470, 120 * k, C.leaf); check(ctx, 262, 470, 130, P(t, 0.3, 0.5), '#fff');
     text(ctx, o.answer, 460, 360, { size: 96, weight: 800, color: C.sun, alpha: P(t, 0.2, 0.5), maxW: 1340 });
-    text(ctx, o.why, 460, 500, { size: 50, weight: 500, color: '#fff', alpha: P(t, 0.8, 0.6), maxW: 1300, accent: C.aqua });
+    text(ctx, o.why, 460, 500, { size: 50, weight: 500, color: '#fff', alpha: P(t, 0.8, 0.6), maxW: 1300, accent: C.glow });
   }
   // Recap checklist on paper.
   function recap(ctx, t, s, items, times, o = {}) {
-    bg(ctx, 'paper');
+    paint(ctx, LOOK.light, t);
     heading(ctx, o.title || 'Recap', t, { kicker: o.kicker || 'In 30 seconds' });
     const gap = o.gap || 130, ch = gap - 24, size = o.size || 44;
-    items.forEach((it, i) => { const k = P(t, times[i] ?? 0, 0.5); const y = 250 + i * gap; card(ctx, 120, y, 1680, ch, { fill: '#fff', alpha: k, r: 22 }); check(ctx, 190, y + ch / 2, 60, P(t, (times[i] ?? 0) + 0.2, 0.5)); const m = measure(ctx, it, { size, maxW: 1480, weight: 600 }).h; text(ctx, it, 260, y + (ch - m) / 2 - 2, { size, weight: 600, color: C.ink, maxW: 1480, alpha: k, accent: C.teal }); });
-    if (o.next) text(ctx, o.next, W / 2, o.nextY || 840, { size: 40, weight: 700, color: C.sea, align: 'center', alpha: P(t, o.nextAt ?? s.end - 3, 0.6) });
+    items.forEach((it, i) => { const k = P(t, times[i] ?? 0, 0.5); const y = 250 + i * gap; card(ctx, 120, y, 1680, ch, { fill: '#fff', alpha: k, r: 22 }); check(ctx, 190, y + ch / 2, 60, P(t, (times[i] ?? 0) + 0.2, 0.5)); const m = measure(ctx, it, { size, maxW: 1480, weight: 600 }).h; text(ctx, it, 260, y + (ch - m) / 2 - 2, { size, weight: 600, color: C.ink, maxW: 1480, alpha: k, accent: C.main }); });
+    if (o.next) text(ctx, o.next, W / 2, o.nextY || 840, { size: 40, weight: 700, color: C.note, align: 'center', alpha: P(t, o.nextAt ?? s.end - 3, 0.6) });
   }
 
   // ---------- overlays: chapter bug, progress bar, captions ----------
@@ -347,7 +822,7 @@
   }
   function chrome(ctx, t, sc) {
     const k = clamp(t / T.duration);
-    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(0, 0, W, 8); ctx.fillStyle = C.teal; ctx.fillRect(0, 0, W * k, 8); ctx.restore();
+    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(0, 0, W, 8); ctx.fillStyle = C.main; ctx.fillRect(0, 0, W * k, 8); ctx.restore();
     if (sc && sc.opts.bug !== false && T.chapter) {
       const dark = sc.opts.dark; ctx.save(); ctx.font = `700 24px ${FONT}`; ctx.fillStyle = dark ? 'rgba(255,255,255,0.75)' : 'rgba(11,37,69,0.55)'; ctx.textAlign = 'right'; ctx.fillText(T.chapter, W - 60, 56); ctx.restore();
     }
@@ -370,7 +845,7 @@
     const ts = T.scenes[i], sc = scenes[ts.id], si = INFOS[i];
     const lt = gt - ts.start; si.t = lt;
     ctx.save();
-    if (!sc) { bg(ctx, 'deep', gt); text(ctx, `missing scene: ${ts.id}`, W / 2, H / 2, { align: 'center', color: '#fff' }); }
+    if (!sc) { paint(ctx, LOOK.dark, gt); text(ctx, `missing scene: ${ts.id}`, W / 2, H / 2, { align: 'center', color: '#fff' }); }
     else sc.draw(ctx, lt, si);
     ctx.restore();
   }
@@ -389,7 +864,7 @@
     if (!sc?.opts.noCaptions && window.CAPTIONS !== false) captions(g, gt, sc?.opts.dark ? 'dark' : 'light');
   }
 
-  window.Engine = { W, H, C, E, FONT, HAND, P, pop, clamp, lerp, rng, noise, text, measure, rr, card, circle, arrow, line, check, cross, assets, img, drawImg, clip, bg, heading, badge, tip, bullets, label, wander, molecule, membrane, ring, table, emoji, titleCard, quizQ, quizA, recap, imgs, get pending() { return pending; }, waitLoads: () => pending ? new Promise(r => waiters.push(r)) : Promise.resolve() };
+  window.Engine = { W, H, C, E, FONT, HAND, theme, LOOKS, P, pop, clamp, lerp, rng, noise, text, measure, rr, card, circle, arrow, line, check, cross, assets, img, drawImg, clip, bg, heading, badge, tip, bullets, label, wander, molecule, membrane, ring, table, emoji, titleCard, intro, quizQ, quizA, recap, imgs, get pending() { return pending; }, waitLoads: () => pending ? new Promise(r => waiters.push(r)) : Promise.resolve() };
   window.scene = scene;
   window.FILM = { duration: T.duration };
   window.__render = render;
