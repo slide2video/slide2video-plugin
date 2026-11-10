@@ -8,7 +8,11 @@ import pytest
 
 from conftest import PLUGIN
 
-MOODS = ["polished", "cinematic", "calm", "energetic", "playful", "themed"]
+OLD_MOODS = ["polished", "cinematic", "calm", "energetic", "playful", "themed"]
+NEW_MOODS = ["kinetic", "split", "flare", "constellation", "liquid", "isometric", "ribbon", "glitch", "spotlight", "duotone",
+             "typewriter", "burst", "parallax", "route", "flow", "countdown"]
+MOODS = OLD_MOODS + NEW_MOODS
+PHOTO_MOODS = ["cinematic", "split", "duotone", "parallax"]
 LONG = {"kicker": "Quarterly review for the whole northern region and all of its partners",
         "title": "Everything you need to know about the *new process* for reviews, goals, check-ins and promotions, "
                  "step by step, from the first of January",
@@ -102,7 +106,7 @@ def draw(pg, opts, t):
 
 def opts_for(mood, text, **more):
     o = {"mood": mood, **text, **more}
-    if mood == "cinematic":
+    if mood in PHOTO_MOODS:
         o.setdefault("photo", "photo")
     if mood == "playful":
         o.setdefault("emojis", ["☀️", "🌊"])
@@ -227,6 +231,11 @@ BAD = [
     ({"mood": "calm", "title": "T", "at": {"title": -1}}, "at.title"),
     ({"mood": "calm", "title": "T", "at": {"title": "1"}}, "at.title"),
     ({"mood": "calm", "title": "T", "at": [1]}, "at"),
+    ({"mood": [], "title": "T"}, "empty list"),
+    ({"mood": ["calm", "nope"], "title": "T"}, "unknown mood"),
+    ({"mood": ["calm", 5], "title": "T"}, "unknown mood"),
+    ({"mood": ["calm", "flow"], "title": "T", "photo": "photo"}, "cinematic"),
+    ({"mood": ["calm", "burst"], "title": "T", "emojis": ["☀️"]}, "playful"),
 ]
 
 
@@ -246,9 +255,10 @@ def test_an_undefined_at_value_is_rejected(page):
 def test_intro_is_a_pure_function_of_time(page):
     for mood in MOODS:
         o = opts_for(mood, SHORT, logo="dark")
-        a = draw(page, o, 2.25)["url"]
-        draw(page, o, 7)
-        assert draw(page, o, 2.25)["url"] == a, mood
+        for t in (0, 0.6, 2.25):   # 0 and 0.6: inside the glitch mood's bursts and the duotone mask
+            a = draw(page, o, t)["url"]
+            draw(page, o, 7)
+            assert draw(page, o, t)["url"] == a, (mood, t)
 
 
 def test_guide_documents_intro_and_its_moods():
@@ -365,3 +375,109 @@ def test_guides_keep_scene_options_out_of_intro_and_look_none_out_of_theme():
     hook = next(l for l in sample.splitlines() if l.startswith("scene('hook'"))
     inside = hook.split("intro(g, t, s, ", 1)[1].rsplit("}),", 1)[0]
     assert "bug:" not in inside and "dark:" not in inside, inside
+
+
+FRAME = """([o, t, w, h]) => { const a = document.createElement('canvas'); a.width = 1920; a.height = 1080; const g = a.getContext('2d');
+  Engine.intro(g, t, { dur: 12, end: 10, start: 0 }, o);
+  const b = document.createElement('canvas'); b.width = w; b.height = h; const x = b.getContext('2d'); x.drawImage(a, 0, 0, w, h);
+  return Array.from(x.getImageData(0, 0, w, h).data); }"""
+
+
+def frame(pg, opts, t, w=96, h=54):
+    d = pg.evaluate(FRAME, [opts, t, w, h])
+    return [d[i:i + 3] for i in range(0, len(d), 4)]
+
+
+DECK = {"main": "#0E5C6E", "accent": "#E0A038"}
+
+
+@pytest.mark.parametrize("mood", NEW_MOODS)
+def test_a_new_mood_is_visible_on_frame_0(page, mood):
+    """Frame 0 already shows the mood's backdrop moving in: not one flat colour, and not all black."""
+    px = frame(page, opts_for(mood, SHORT, logo="dark", **DECK), 0)
+    lum = [0.2126 * r + 0.7152 * g + 0.0722 * b for r, g, b in px]
+    mean = sum(lum) / len(lum)
+    sd = (sum((v - mean) ** 2 for v in lum) / len(lum)) ** 0.5
+    colours = {(r // 16, g // 16, b // 16) for r, g, b in px}
+    assert sd >= 4 and len(colours) >= 8 and max(lum) >= 40, (mood, round(sd, 1), len(colours), max(lum))
+
+
+def test_every_mood_looks_different(page):
+    """With the same deck (colours, logo, words), no two moods give nearly the same frame, early or settled."""
+    for t in (1.0, 5.0):
+        shots = {m: frame(page, opts_for(m, SHORT, logo="dark", **DECK), t) for m in MOODS}
+        for i, a in enumerate(MOODS):
+            for b in MOODS[i + 1:]:
+                diff = sum(abs(x - y) for p, q in zip(shots[a], shots[b]) for x, y in zip(p, q)) / (len(shots[a]) * 3)
+                assert diff >= 12, (a, b, t, round(diff, 1))
+
+
+def test_a_list_of_moods_is_picked_by_the_title(page):
+    """`mood` may list several moods: the title picks one, always the same for the same title, and a dozen titles
+    spread over the list. A photo or emojis meant for another mood of the list are left out without an error."""
+    mine = ["kinetic", "split", "parallax", "flare"]
+    picked = []
+    for i in range(12):
+        title = f"Quarterly results {2020 + i}"
+        o = {"mood": mine, "title": title, "photo": "photo", **DECK}
+        got = page.evaluate(FRAME, [o, 3, 96, 54])
+        assert page.evaluate(FRAME, [o, 3, 96, 54]) == got, title
+        alone = [m for m in mine if page.evaluate(FRAME, [{**o, "mood": m} if m in PHOTO_MOODS else {**{k: v for k, v in o.items() if k != "photo"}, "mood": m}, 3, 96, 54]) == got]
+        assert len(alone) == 1, (title, alone)
+        picked.append(alone[0])
+    assert len(set(picked)) >= 3, picked
+    r = page.evaluate("""() => { try { Engine.intro(document.createElement('canvas').getContext('2d'), 1, { dur: 5 },
+        { mood: ['flow', 'playful'], title: 'A title that picks flow, or playful', emojis: ['☀️'] }); return 'ok'; } catch (e) { return String(e.message); } }""")
+    assert r == "ok", r
+    assert page.log["errors"] == []
+
+
+@pytest.mark.parametrize("mood", ["split", "parallax"])
+def test_the_photo_moods_draw_the_photo(page, mood):
+    assert "photo" in draw(page, opts_for(mood, SHORT), 5)["images"], mood
+    r = draw(page, opts_for(mood, SHORT, photo="missing"), 5)
+    assert "missing" not in r["images"] and "Water" in " ".join(d["s"] for d in r["texts"]), mood
+
+
+def test_duotone_draws_the_photo_in_the_decks_two_colours(page):
+    """The duotone mood draws its own two-colour copy of the photo, so check the pixels: the photo changes the frame,
+    a missing photo falls back to the abstract (with a warning, never a failed render)."""
+    before = len(page.log["console"])
+    with_photo, without = frame(page, opts_for("duotone", SHORT, **DECK), 5), frame(page, {**opts_for("duotone", SHORT, **DECK), "photo": None}, 5)
+    missing = frame(page, opts_for("duotone", SHORT, photo="missing", **DECK), 5)
+    assert with_photo != without and missing == without
+    new = page.log["console"][before:]
+    assert any("warning" in m and '"missing"' in m for m in new) and not any("asset failed" in m for m in new), new
+
+
+# engine.js exactly as released in 2.6.0: the six moods it had must draw the same pixels now (published videos use them)
+ENGINE_2_6_0 = PLUGIN.parent / "tests/fixtures/engine-2.6.0.js"
+
+
+def test_the_2_6_0_fixture_is_the_released_engine():
+    import subprocess
+    out = subprocess.run(["git", "show", "v2.6.0:slide2video/engine/engine.js"], cwd=PLUGIN.parent, capture_output=True)
+    if out.returncode:
+        pytest.skip("tag v2.6.0 isn't in this checkout")
+    assert out.stdout == ENGINE_2_6_0.read_bytes()
+
+
+def test_the_older_moods_draw_the_same_pixels_as_2_6_0(page):
+    shots = {}
+    for name, engine in (("2.6.0", ENGINE_2_6_0), ("now", PLUGIN / "engine/engine.js")):
+        pg = page.context.browser.new_page()
+        pg.set_content('<canvas id="c" width="1920" height="1080"></canvas>')
+        pg.add_script_tag(content=SETUP)
+        pg.add_script_tag(content=engine.read_text(encoding="utf-8"))
+        pg.add_script_tag(content=HELPERS)
+        pg.wait_for_function("['dark', 'light', 'photo'].every(k => Engine.imgs[k].complete && Engine.imgs[k].naturalWidth > 0)")
+        got = []
+        for mood in OLD_MOODS:
+            for more in ({"logo": "dark", **DECK}, {"name": "Acme Co", "main": "#FFFFFF", "accent": "#FFE600"},
+                         {"logo": "light", "at": {"title": 2, "sub": 4}}):
+                for t in (0, 0.4, 1.3, 2.5, 6):
+                    got.append(pg.evaluate("([o, t]) => drawIntro(o, t).url", [opts_for(mood, SHORT, **more), t]))
+        shots[name] = got
+        pg.close()
+    diff = [i for i, (a, b) in enumerate(zip(shots["2.6.0"], shots["now"])) if a != b]
+    assert len(shots["now"]) == 90 and not diff, diff

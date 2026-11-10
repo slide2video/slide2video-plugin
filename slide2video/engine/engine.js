@@ -386,14 +386,32 @@
   // intro(g, t, s, {mood, title, kicker, sub, by, logo, name, photo, main, accent, panel, emojis, at}); see guide.md.
   // Every text colour is checked against what is behind it (4.5:1 at least) and moved toward black or white until
   // it reads; the text block shrinks, and at worst is cut short, so it stays between the logo and the captions.
+  // photo: the mood draws `photo`; at: its own default cue times (others: logo 0.15, kicker 0.35, title 0.55).
   const MOODS = {
     polished: { main: '#0B2545', accent: '#2563EB', stagger: 0.09, dur: 0.75 },
-    cinematic: { main: '#134E6F', accent: '#FFC145', stagger: 0.09, dur: 0.9 },
+    cinematic: { main: '#134E6F', accent: '#FFC145', stagger: 0.09, dur: 0.9, photo: true, at: { logo: 1.2, kicker: 0.9, title: 1.1 } },
     calm: { main: '#1F7A6D', accent: '#4FC3F7', stagger: 0.07, dur: 1.0 },
     energetic: { main: '#16212E', accent: '#FF6B57', stagger: 0.12, dur: 0.35 },
     playful: { main: '#0B2545', accent: '#FF6B57', stagger: 0.09, dur: 0.6 },
     themed: { main: '#0B2545', accent: '#7FE0D6', stagger: 0.09, dur: 0.8 },
+    kinetic: { main: '#1B1F3B', accent: '#FFC145', stagger: 0.08, dur: 0.32 },
+    split: { main: '#0B2545', accent: '#2563EB', stagger: 0.09, dur: 0.7, photo: true },
+    flare: { main: '#2B1B3D', accent: '#FFB15C', stagger: 0.1, dur: 0.9 },
+    constellation: { main: '#0E1A3A', accent: '#7FE0D6', stagger: 0.1, dur: 0.9 },
+    liquid: { main: '#5B4BC4', accent: '#FF8FB1', stagger: 0.09, dur: 0.8 },
+    isometric: { main: '#1F6FB2', accent: '#FFC145', stagger: 0.09, dur: 0.6 },
+    ribbon: { main: '#C2410C', accent: '#1FA7A0', stagger: 0.09, dur: 0.55 },
+    glitch: { main: '#141A2E', accent: '#2DE2E6', stagger: 0.1, dur: 0.45 },
+    spotlight: { main: '#3A2A5C', accent: '#FFC145', stagger: 0.1, dur: 1.0 },
+    duotone: { main: '#134E6F', accent: '#FFB4A2', stagger: 0.09, dur: 0.75, photo: true, at: { logo: 1.5, kicker: 1.55, title: 1.75 } },
+    typewriter: { main: '#1B2B3A', accent: '#7FE0D6', stagger: 0.16, dur: 0.16 },
+    burst: { main: '#B0174F', accent: '#FFC145', stagger: 0.09, dur: 0.6 },
+    parallax: { main: '#13315C', accent: '#FF6B57', stagger: 0.09, dur: 0.75, photo: true },
+    route: { main: '#1F7A6D', accent: '#E8743B', stagger: 0.09, dur: 0.6 },
+    flow: { main: '#2F6F9F', accent: '#5FB894', stagger: 0.08, dur: 1.0 },
+    countdown: { main: '#101828', accent: '#F26B3A', stagger: 0.1, dur: 0.4 },
   };
+  const PHOTO_MOODS = Object.keys(MOODS).filter(m => MOODS[m].photo);
   const INTRO_KEYS = ['mood', 'title', 'kicker', 'sub', 'by', 'logo', 'name', 'photo', 'main', 'accent', 'panel', 'emojis', 'at'];
   const AT_KEYS = ['logo', 'kicker', 'title', 'sub', 'by'], INK = '#16212E', WHITE = '#FFFFFF', BLACK = '#000000';
   const hexRgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
@@ -415,14 +433,18 @@
     if (o === null || typeof o !== 'object' || Array.isArray(o)) fail('the fourth argument is { mood, title, ... }');
     if (Object.hasOwn(o, 'look')) fail('`look` is now `mood`: one of ' + Object.keys(MOODS).join(', '));
     for (const k of Object.keys(o)) if (!INTRO_KEYS.includes(k)) fail(`unknown option "${k}"; use ${INTRO_KEYS.join(', ')}`);
-    if (typeof o.mood !== 'string' || !Object.hasOwn(MOODS, o.mood)) fail(`unknown mood ${JSON.stringify(o.mood)}; use one of ${Object.keys(MOODS).join(', ')}`);
+    // `mood` is one mood, or a list of moods that suit the deck, of which the title picks one (see introPick)
+    const list = Array.isArray(o.mood) ? o.mood : [o.mood];
+    if (!list.length) fail(`mood is an empty list; use one or more of ${Object.keys(MOODS).join(', ')}`);
+    for (const m of list) if (typeof m !== 'string' || !Object.hasOwn(MOODS, m)) fail(`unknown mood ${JSON.stringify(m)}; use one of ${Object.keys(MOODS).join(', ')}`);
     if (typeof o.title !== 'string' || !o.title.trim()) fail("title must be the title slide's title, a non-empty string");
     for (const k of ['kicker', 'sub', 'by', 'name', 'logo', 'photo']) if (o[k] != null && typeof o[k] !== 'string') fail(`${k} must be a string, not ${JSON.stringify(o[k])}`);
     for (const k of ['main', 'accent']) if (o[k] != null && !isHex(o[k])) fail(`${k} must be a colour like '#1B3358', not ${JSON.stringify(o[k])}`);
     if (o.panel != null && typeof o.panel !== 'boolean') fail('panel must be true or false');
-    if (o.photo != null && o.mood !== 'cinematic') fail('photo is drawn only by the cinematic mood');
+    if (o.photo != null && !list.some(m => MOODS[m].photo)) fail(`photo is drawn only by the ${PHOTO_MOODS.join(', ')} moods`);
     if (o.emojis != null && !(Array.isArray(o.emojis) && o.emojis.every(e => typeof e === 'string'))) fail("emojis must be a list like ['🌍', '📜']");
-    if (o.emojis?.length && o.mood !== 'playful') fail('emojis are drawn only by the playful mood');
+    if (o.emojis?.length && !list.includes('playful')) fail('emojis are drawn only by the playful mood');
+    const mood = introPick(list, o.title);
     const at = o.at ?? {};
     if (at === null || typeof at !== 'object' || Array.isArray(at)) fail('at must be { logo, kicker, title, sub, by } times in seconds');
     for (const [k, v] of Object.entries(at)) {
@@ -430,9 +452,18 @@
       if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) fail(`at.${k} must be a time in seconds, not ${JSON.stringify(v)}`);
     }
     // with Engine.theme, playful and themed take the lesson's colours: headings and accent, or the glow on dark
-    const d = THEMED && o.mood === 'playful' ? { main: C.head, accent: C.accent } : o.mood === 'themed' ? { main: C.head, accent: C.glow } : MOODS[o.mood];
-    return { kicker: o.kicker || '', sub: o.sub || '', by: o.by || '', name: o.name || '', logo: o.logo || null, photo: o.photo || null,
-      emojis: o.emojis || [], panel: o.panel, title: o.title, mood: o.mood, main: o.main || d.main, accent: o.accent || d.accent, at };
+    const d = THEMED && mood === 'playful' ? { main: C.head, accent: C.accent } : mood === 'themed' ? { main: C.head, accent: C.glow } : MOODS[mood];
+    // a photo or emojis meant for other moods of the list are left out when the title picks one that doesn't draw them
+    return { kicker: o.kicker || '', sub: o.sub || '', by: o.by || '', name: o.name || '', logo: o.logo || null, photo: (MOODS[mood].photo && o.photo) || null,
+      emojis: mood === 'playful' ? o.emojis || [] : [], panel: o.panel, title: o.title, mood, main: o.main || d.main, accent: o.accent || d.accent, at };
+  }
+  // One mood of the list, picked by the title (FNV-1a hash of the title as written): the same deck always opens the
+  // same way, and two decks given the same list rarely do.
+  function introPick(list, title) {
+    if (list.length === 1) return list[0];
+    let h = 0x811c9dc5;
+    for (const ch of title) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+    return list[h % list.length];
   }
 
   // ---- text: wrapping that also breaks scripts written without spaces, shrinking, cutting short ----
@@ -504,23 +535,42 @@
   }
   const pieceCount = lines => lines.reduce((s, L) => s + L.runs.filter(r => !r.sp).length, 0);
   // One laid-out block at (x, y). With a mode, its pieces come in one by one ('rise', 'slam', 'bounce', 'focus',
-  // 'fade'); without, the block slides in as one at `at`. Returns its height.
+  // 'fade', 'wipe', 'type', 'drop', 'flip', 'glitch'); without, the block slides in as one at `at`. Returns its height.
   function drawBlock(ctx, lines, x, y, size, slot, o, t, at, mode, stagger = 0, dur = 0.7) {
-    const f = { size, weight: SLOTS[slot].weight }, lh = size * SLOTS[slot].lh; let i = 0;
+    const f = { size, weight: SLOTS[slot].weight }, lh = size * SLOTS[slot].lh, last = pieceCount(lines) - 1; let i = 0;
     lines.forEach((L, li) => {
       const top = y + li * lh, base = top + size * 0.82; let cx = x;
       for (const r of L.runs) {
         if (r.sp) { cx += r.w; continue; }
-        const k = mode ? P(t, at + i++ * stagger, dur, mode === 'bounce' ? E.back : E.out) : P(t, at, 0.7);
+        const idx = i++, k = mode ? P(t, at + idx * stagger, dur, mode === 'bounce' || mode === 'flip' ? E.back : mode === 'type' ? E.lin : E.out) : P(t, at, 0.7);
         if (k > 0) {
           ctx.save(); ctx.font = fontStr(f, r.bold); ctx.fillStyle = r.acc ? o.accent : o.color; ctx.textBaseline = 'alphabetic';
           if (o.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4; }
+          if (o.depth) { ctx.shadowColor = o.depth; ctx.shadowBlur = 0; ctx.shadowOffsetX = ctx.shadowOffsetY = Math.max(3, Math.round(size * 0.05)); }   // a solid offset: the letters look extruded
           const mx = cx + r.w / 2, my = base - size * 0.35;
           if (!mode) { ctx.globalAlpha *= k; ctx.fillText(r.s, cx + (1 - k) * 40, base); }
           else if (mode === 'rise') { ctx.beginPath(); ctx.rect(cx - 30, top - size * 0.15, r.w + 60, size * 1.25); ctx.clip(); ctx.fillText(r.s, cx, base + (1 - k) * size * 1.3); }
           else if (mode === 'slam') { const z = 1 + 0.7 * (1 - k); ctx.globalAlpha *= clamp(k * 2.5); ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
           else if (mode === 'bounce') { ctx.globalAlpha *= clamp(k * 3); ctx.translate(mx, my); ctx.scale(Math.max(0, k), Math.max(0, k)); ctx.rotate((1 - k) * 0.25); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
           else if (mode === 'focus') { const z = 1 + 0.12 * (1 - k); ctx.globalAlpha *= k; if (k < 1) ctx.filter = `blur(${((1 - k) * 14).toFixed(1)}px)`; ctx.translate(mx, my); ctx.scale(z, z); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else if (mode === 'wipe') {   // uncovered left to right behind a moving accent bar
+            ctx.save(); ctx.beginPath(); ctx.rect(cx - 8, top - size * 0.25, 8 + (r.w + 8) * k, size * 1.5); ctx.clip(); ctx.fillText(r.s, cx, base); ctx.restore();
+            if (k < 1) { ctx.shadowColor = 'transparent'; ctx.fillStyle = o.accent; ctx.fillRect(cx + (r.w + 8) * k - 4, top + size * 0.02, 8, size); }
+          }
+          else if (mode === 'type') {   // typed a character at a time; the cursor blinks after the last piece
+            const gs = pieces(r.s, 'grapheme'), n = Math.min(gs.length, Math.floor(k * gs.length + 1e-6)), s = gs.slice(0, n).join('');
+            if (s) ctx.fillText(s, cx, base);
+            const cw = s ? ctx.measureText(s).width : 0;
+            if (k < 1 || (idx === last && Math.floor(t * 2) % 2 === 0)) { ctx.shadowColor = 'transparent'; ctx.fillStyle = o.accent; ctx.fillRect(cx + cw + size * 0.06, top + size * 0.08, size * 0.09, size * 0.9); }
+          }
+          else if (mode === 'drop') { ctx.beginPath(); ctx.rect(cx - 30, top - size * 0.15, r.w + 60, size * 1.25); ctx.clip(); ctx.fillText(r.s, cx, base - (1 - k) * size * 1.3); }
+          else if (mode === 'flip') { ctx.globalAlpha *= clamp(k * 2); ctx.translate(mx, my); ctx.scale(1, Math.max(0.001, k)); ctx.fillText(r.s, -r.w / 2, size * 0.35); }
+          else if (mode === 'glitch') {   // red and cyan copies pull apart, then lock onto the word
+            const j = 1 - k, jit = Math.round(noise(idx, t * 30) * j * 10);
+            ctx.globalAlpha *= clamp(k * 3);
+            if (j > 0.02) { ctx.save(); ctx.globalAlpha *= 0.55; ctx.fillStyle = '#FF2E63'; ctx.fillText(r.s, cx - j * 16 + jit, base); ctx.fillStyle = '#2DE2E6'; ctx.fillText(r.s, cx + j * 16 + jit, base); ctx.restore(); }
+            ctx.fillText(r.s, cx + jit, base);
+          }
           else { ctx.globalAlpha *= k; ctx.fillText(r.s, cx, base + (1 - k) * 26); }
           ctx.restore();
         }
@@ -532,7 +582,7 @@
   // Kicker, title, rule, sub and by, left-aligned at st.x: centred between st.y0 and st.y1, or resting on st.y1.
   function introText(ctx, t, a, st, lay) {
     const { L, size } = lay;
-    let y = st.anchor === 'bottom' ? st.y1 - lay.h : clamp(590 - lay.h / 2, st.y0, st.y1 - lay.h);
+    let y = st.anchor === 'bottom' ? st.y1 - lay.h : st.anchor === 'top' ? st.y0 : clamp(590 - lay.h / 2, st.y0, st.y1 - lay.h);
     const top = y, x = st.x;
     ctx.save();
     if (st.skew) ctx.transform(1, 0, -st.skew, 1, st.skew * (top + lay.h / 2), 0);
@@ -545,7 +595,7 @@
       }
       y += 70;
     }
-    y += drawBlock(ctx, L.title, x, y, size.title, 'title', { color: st.title, accent: st.accent, shadow: st.shadow }, t, a.title, st.mode, a.stagger, st.dur);
+    y += drawBlock(ctx, L.title, x, y, size.title, 'title', { color: st.title, accent: st.accent, shadow: st.shadow, depth: st.depth }, t, a.title, st.mode, a.stagger, st.dur);
     if (st.rule) { const k = P(t, a.sub - 0.3, 0.9, E.inOut); ctx.save(); ctx.fillStyle = st.rule; ctx.fillRect(x, y + 18, 280 * k, 8); ctx.restore(); y += 40; }
     if (L.sub.length) y += 16 + drawBlock(ctx, L.sub, x, y + 16, size.sub, 'sub', { color: st.sub, accent: st.accent, shadow: st.shadow }, t, a.sub, null);
     if (L.by.length) y += 12 + drawBlock(ctx, L.by, x, y + 12, size.by, 'by', { color: st.by, accent: st.accent, shadow: st.shadow }, t, a.by, null);
@@ -614,6 +664,7 @@
   // ---- the moods ----
   function introStyle(ctx, o, t, s) {
     const M = o.main, A = o.accent;
+    if (Object.hasOwn(INTROS, o.mood)) return INTROS[o.mood].style(o);
     if (o.mood === 'polished') {
       const light = contrast(M, INK) > contrast(M, WHITE);
       const base = light ? readable(M, INK, 7) : readable(M, WHITE, 7), ends = light ? [mixHex(base, WHITE, 0.35), base] : [base, mixHex(base, BLACK, 0.5)];
@@ -661,12 +712,18 @@
     st.dur = mood.dur;
     const lay = introLayout(ctx, o, st, st.y1 - st.y0), n = pieceCount(lay.L.title);
     const stagger = Math.min(mood.stagger, 1.6 / Math.max(1, n - 1));
-    const a = { ...(o.mood === 'cinematic' ? { logo: 1.2, kicker: 0.9, title: 1.1 } : { logo: 0.15, kicker: 0.35, title: 0.55 }), ...o.at, stagger };
+    const a = { ...(mood.at || { logo: 0.15, kicker: 0.35, title: 0.55 }), ...o.at, stagger };
     const titleDone = a.title + Math.max(0, n - 1) * stagger + mood.dur;
     if (a.sub == null) a.sub = titleDone + 0.15;
     if (a.by == null) a.by = a.sub + 0.6;
     const M = o.main, A = o.accent, r = rng(o.mood.length * 977 + 13);
-    if (o.mood === 'polished') {
+    if (Object.hasOwn(INTROS, o.mood)) {
+      const look = INTROS[o.mood];
+      ctx.save(); look.back(ctx, t, o, st, a, s); ctx.restore();
+      introLogo(ctx, o, P(t, a.logo, 0.8), ...st.logo, st);
+      introText(ctx, t, a, st, lay);
+      if (look.front) { ctx.save(); look.front(ctx, t, o, st, a, s); ctx.restore(); }
+    } else if (o.mood === 'polished') {
       const gr = ctx.createLinearGradient(0, 0, W, H); gr.addColorStop(0, st.ends[0]); gr.addColorStop(1, st.ends[1]);
       ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
       for (let i = 0; i < 8; i++) for (let j = 0; j < 9; j++) {   // a field of tiles breathing in a slow wave (decoration, never data)
@@ -753,6 +810,484 @@
       ctx.restore();
     }
   }
+  // ---- the newer moods: each is a style (where the text sits and its colours, as introStyle gives) and a backdrop
+  // drawn under the logo and text, some also with an overlay drawn over them. Their decoration keeps right of the text
+  // (x >= 1180) or stays faint behind it, so `on`, the colours the text is checked against, is what it really sits on.
+  const plain = s => s.replace(/[*_]/g, '');
+  const darkOf = (c, k) => readable(mixHex(c, BLACK, k), WHITE, 7);   // the deck's colour, dark enough for white text
+  const paintAll = (ctx, p) => { ctx.fillStyle = p; ctx.fillRect(0, 0, W, H); };
+  function lin(ctx, x0, y0, x1, y1, stops) { const gr = ctx.createLinearGradient(x0, y0, x1, y1); for (const [k, c] of stops) gr.addColorStop(k, c); return gr; }
+  function softLight(ctx, x, y, r, c, a) {
+    if (a <= 0 || r <= 0) return;
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rgba(c, Math.min(1, a))); gr.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  // The layout and text colours of a block sitting on the colours `on`: white on dark ones, ink on light ones.
+  function inks(on, A, extra = {}) {
+    const dark = on.reduce((s, b) => s + lum(b), 0) / on.length <= 0.179, text = dark ? WHITE : INK;
+    const acc = readable(dark ? mixHex(A, WHITE, 0.15) : A, on, 4.5);
+    return { x: 140, maxW: 1040, size: 116, y0: 260, y1: 880, panel: dark, behind: on[0], logo: [148, 110, 100],
+      title: readable(text, on, 7), accent: acc, kick: acc, sub: readable(mixHex(text, on[0], 0.12), on, 4.5),
+      by: readable(mixHex(text, on[0], 0.2), on, 4.5), ...extra };
+  }
+  function introHasPhoto(o) {
+    const ok = loaded(o.photo);
+    if (o.photo && !ok) warnOnce(`Engine.intro: no loaded Engine.assets() entry "${o.photo}" for the photo; drawing ${o.mood} without it`);
+    return ok;
+  }
+  const glitchBurst = (t, a) => Math.max(clamp(1 - t / 0.7), t >= a.title && t < a.title + 0.35 ? 1 - (t - a.title) / 0.35 : 0) * (0.6 + 0.4 * (Math.floor(t * 24) % 2));
+  // isometric: unit cubes (x, y, z, accent), drawn back to front
+  const VOXELS = (() => {
+    const v = [];
+    for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) v.push([x, y, 0]);
+    for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) v.push([x, y, 1]);
+    v.push([0, 0, 2], [0, 1, 2], [0, 0, 3], [3, 2, 1], [3, 3, 1], [3, 3, 2], [2, 1, 2, true]);
+    return v.sort((p, q) => (p[0] + p[1] + p[2]) - (q[0] + q[1] + q[2]));
+  })();
+  // parallax: panes [x, y, w, h, depth, kind], far ones first
+  const PANES = [[1560, 60, 380, 260, 0.3, 'glass'], [1300, 700, 300, 340, 0.4, 'tone'], [1790, 470, 240, 300, 0.45, 'glass'],
+    [1270, 150, 180, 180, 0.55, 'accent'], [1380, 300, 440, 300, 0.75, 'photo'], [1600, 640, 360, 240, 0.9, 'glass'], [1290, 590, 200, 130, 1, 'accent']];
+  // route: the stops, and the smooth line through them (Catmull-Rom), sampled with the length travelled so far
+  const ROUTE = [[1240, 850], [1390, 480], [1660, 640], [1790, 230]], SEG = 40;
+  let routePts = null;
+  function routePath() {
+    if (routePts) return routePts;
+    const p = [ROUTE[0], ...ROUTE, ROUTE[ROUTE.length - 1]], out = []; let len = 0;
+    for (let i = 1; i < p.length - 2; i++) for (let j = 0; j < SEG; j++) {
+      const s = j / SEG, s2 = s * s, s3 = s2 * s, [p0, p1, p2, p3] = [p[i - 1], p[i], p[i + 1], p[i + 2]];
+      const q = [0, 1].map(d => 0.5 * (2 * p1[d] + (p2[d] - p0[d]) * s + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * s2 + (3 * p1[d] - p0[d] - 3 * p2[d] + p3[d]) * s3));
+      if (out.length) len += Math.hypot(q[0] - out[out.length - 1][0], q[1] - out[out.length - 1][1]);
+      out.push([q[0], q[1], len]);
+    }
+    const e = ROUTE[ROUTE.length - 1]; len += Math.hypot(e[0] - out[out.length - 1][0], e[1] - out[out.length - 1][1]); out.push([e[0], e[1], len]);
+    return (routePts = out);
+  }
+  // duotone: the photo (or, without one, a soft abstract) in two colours, made once; and the canvas for the mask
+  const duoCache = new Map(); let maskCv = null;
+  function duoSource(o, st) {
+    const key = `${st.photo ? o.photo : ''}|${st.dark}|${st.light}`;
+    if (duoCache.has(key)) return duoCache.get(key);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+    if (st.photo) { x.filter = 'grayscale(1) contrast(1.25)'; drawImg(x, imgs[o.photo], 0, 0, W, H, { fit: 'cover' }); x.filter = 'none'; }
+    else {
+      x.fillStyle = lin(x, 0, H, W, 0, [[0, '#2A2A2A'], [0.5, '#9A9A9A'], [1, '#F4F4F4']]); x.fillRect(0, 0, W, H);
+      for (const [cx, cy, r, al] of [[1500, 280, 520, 0.55], [960, 540, 520, 0.45], [1780, 860, 300, 0.4], [600, 200, 420, 0.25]]) softLight(x, cx, cy, r, WHITE, al);
+      x.fillStyle = 'rgba(255,255,255,0.12)';
+      for (let i = 0; i < 6; i++) { const sx = 900 + i * 170; x.beginPath(); x.moveTo(sx, 0); x.lineTo(sx + 60, 0); x.lineTo(sx - 340, H); x.lineTo(sx - 400, H); x.closePath(); x.fill(); }
+    }
+    x.globalCompositeOperation = 'screen'; x.fillStyle = st.dark; x.fillRect(0, 0, W, H);      // black becomes the dark colour
+    x.globalCompositeOperation = 'multiply'; x.fillStyle = st.light; x.fillRect(0, 0, W, H);   // white becomes the light one
+    if (duoCache.size >= 6) duoCache.delete(duoCache.keys().next().value);
+    duoCache.set(key, cv);
+    return cv;
+  }
+  // the title's longest *accent* word (or its longest word): the word the opening zooms through
+  function maskWord(title) {
+    const acc = parseRich(title).filter(r => r.acc).map(r => r.s).join(' ').split(/\s+/).filter(Boolean);
+    const all = plain(title).split(/\s+/).filter(Boolean), pool = acc.length ? acc : all;
+    return pool.reduce((b, w) => ([...w].length > [...b].length ? w : b), pool[0] || plain(title));
+  }
+  function introRibbon(ctx, t, [x0, y0], [x1, y1], n, amp, w, front, back, delay) {   // a paper strip folding out
+    const m = E.out(clamp((t - delay) / 1.9)) * n, dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const pt = i => { const s = (i % 2 ? 1 : -1) * amp + 12 * Math.sin(t * 0.9 + i * 1.3); return [x0 + dx * i / n - uy * s, y0 + dy * i / n + ux * s]; };
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.16)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 10;
+    for (let i = 0; i < Math.ceil(m); i++) {
+      const a = pt(i), b0 = pt(i + 1), f = Math.min(1, m - i), b = [lerp(a[0], b0[0], f), lerp(a[1], b0[1], f)];
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(b[0] + ux * w, b[1] + uy * w); ctx.lineTo(a[0] + ux * w, a[1] + uy * w); ctx.closePath();
+      ctx.fillStyle = i % 2 ? back : front; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  const INTROS = {
+    // giant outlined words of the title march across in tilted rows; an accent block sweeps the frame; words wiped in
+    kinetic: {
+      style(o) { const base = darkOf(o.main, 0.35), deep = mixHex(base, BLACK, 0.3);
+        return inks([base, deep, mixHex(base, WHITE, 0.1)], o.accent, { size: 140, maxW: 1150, y1: 860, anchor: 'bottom', mode: 'wipe', base, deep }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, 0, H, [[0, st.base], [1, st.deep]]));
+        const unit = plain(o.title).trim().split(/\s+/).slice(0, 4).join(' ').toUpperCase() + '   —   ';
+        ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(-0.14); ctx.font = `800 190px ${FONT}`; ctx.lineJoin = 'round'; ctx.lineWidth = 2.5;
+        const u = Math.max(600, ctx.measureText(unit).width), run = t * 60 + 480 * (1 - Math.exp(-t * 2.5));
+        for (let i = 0; i < 6; i++) {
+          let x = (((i % 2 ? run : -run) + i * 530) % u + u) % u; while (x > -1200) x -= u;
+          ctx.strokeStyle = i === 3 ? rgba(o.accent, 0.32) : 'rgba(255,255,255,0.085)';
+          for (; x < 1250; x += u) ctx.strokeText(unit, x, -560 + i * 250);
+        }
+        ctx.restore();
+        const k = E.inOut(clamp((t + 0.45) / 1.2));
+        if (k < 1) { const x = lerp(-1000, W + 400, k); ctx.fillStyle = o.accent; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 520, 0); ctx.lineTo(x + 220, H); ctx.lineTo(x - 300, H); ctx.closePath(); ctx.fill(); }
+      },
+    },
+    // the frame splits on a slant: a dark panel slides in from the left over the photo (or a band of the deck's
+    // colours), a translucent accent band trailing it and an accent seam drawn down the cut
+    split: {
+      style(o) { const base = darkOf(o.main, 0.45), deep = mixHex(base, BLACK, 0.35);
+        return inks([base, deep], o.accent, { maxW: 880, size: 112, mode: 'rise', base, deep, rule: readable(o.accent, [base, deep], 3), photo: introHasPhoto(o) }); },
+      back(ctx, t, o, st, a, s) {
+        const kz = E.out(clamp(t / Math.max(6, s.dur || 10)));
+        if (st.photo) { img(ctx, o.photo, 0, 0, W, H, { fit: 'cover', zoom: 1.16 - 0.1 * kz, panX: 0.6 - 0.4 * kz }); paintAll(ctx, rgba(st.deep, 0.15)); }
+        else {
+          paintAll(ctx, lin(ctx, W, 0, 1100, H, [[0, mixHex(o.accent, WHITE, 0.15)], [1, mixHex(o.main, o.accent, 0.45)]]));
+          ctx.fillStyle = 'rgba(255,255,255,0.10)';
+          for (let i = -4; i < 12; i++) { const x = 1050 + i * 110 + (t * 30) % 110; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 46, 0); ctx.lineTo(x - 254, H); ctx.lineTo(x - 300, H); ctx.closePath(); ctx.fill(); }
+        }
+        const k = P(t, -0.35, 1.2), k2 = P(t, -0.2, 1.4), edge = (y, d) => 1200 - y * 0.16 - (1 - d) * 1400;
+        const slab = (d, w, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(edge(0, d) + w, 0); ctx.lineTo(edge(H, d) + w, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill(); };
+        slab(k2, 130, rgba(o.accent, 0.55));
+        slab(k, 0, lin(ctx, 0, 0, 0, H, [[0, st.base], [1, st.deep]]));
+        const ks = P(t, 0.2, 0.8, E.inOut);
+        if (ks > 0) { ctx.strokeStyle = o.accent; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(edge(0, k) + 5, 0); ctx.lineTo(edge(H * ks, k) + 5, H * ks); ctx.stroke(); }
+      },
+    },
+    // warm light leaks drift over a dark frame; a lens flare with an anamorphic streak and ghosts; the title in focus
+    flare: {
+      style(o) { const base = darkOf(o.main, 0.62), deep = mixHex(base, BLACK, 0.55), warm = mixHex(o.accent, '#FFB060', 0.35);
+        return inks([base, deep, mixHex(base, warm, 0.14)], o.accent, { size: 120, mode: 'focus', base, deep, warm }); },
+      back(ctx, t, o, st) {
+        const gr = ctx.createRadialGradient(1560, 200, 0, 1560, 200, 1750); gr.addColorStop(0, mixHex(st.base, st.warm, 0.22)); gr.addColorStop(0.45, st.base); gr.addColorStop(1, st.deep); paintAll(ctx, gr);
+        const on = 0.6 + 0.4 * E.out(clamp(t / 1.2)), sx = 1610 - 150 * E.out(clamp(t / 4)), sy = 190, hot = mixHex(st.warm, WHITE, 0.5);
+        ctx.globalCompositeOperation = 'lighter';
+        softLight(ctx, 1700 + 70 * Math.sin(t * 0.3), 110 + 50 * Math.sin(t * 0.23 + 1), 650, st.warm, 0.3 * on);
+        softLight(ctx, 1960, 760 + 90 * Math.sin(t * 0.2), 560, o.accent, 0.2 * on);
+        const sw = P(t, -0.3, 2.6, E.inOut); softLight(ctx, lerp(-300, 900, sw), -90, 760, hot, 0.3 * (1 - sw));   // a leak crossing the top once
+        ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.022); softLight(ctx, 0, 0, 1050, hot, 0.65 * on); ctx.restore();
+        softLight(ctx, sx, sy, 320, st.warm, 0.4 * on); softLight(ctx, sx, sy, 110, WHITE, 0.9 * on);
+        [[0.22, 44, 0.12], [0.4, 92, 0.07], [0.58, 28, 0.14], [0.8, 128, 0.06]].forEach(([f, rad, al], i) => {
+          const gx = lerp(sx, 1800, f), gy = lerp(sy, 1020, f);
+          ctx.beginPath(); for (let j = 0; j < 6; j++) { const an = j * Math.PI / 3 + 0.4; ctx.lineTo(gx + rad * Math.cos(an), gy + rad * Math.sin(an)); } ctx.closePath();
+          ctx.fillStyle = rgba(i % 2 ? o.accent : st.warm, al * on); ctx.fill();
+        });
+        const r = rng(4242);
+        for (let i = 0; i < 36; i++) { const x = 1180 + r() * 720, sp = 8 + r() * 18, y = ((r() * 1100 - t * sp) % 1100 + 1100) % 1100, z = 1 + r() * 2.4; circle(ctx, x + 12 * Math.sin(t * 0.5 + i), y, z, rgba(st.warm, 0.3 + 0.2 * Math.sin(t + i))); }
+      },
+    },
+    // a night sky; stars join into a slowly turning constellation from right to left, a few nodes glowing
+    constellation: {
+      style(o) { const base = darkOf(o.main, 0.7), deep = mixHex(base, BLACK, 0.45);
+        return inks([base, deep, mixHex(base, WHITE, 0.07)], o.accent, { mode: 'fade', base, deep, star: mixHex(o.accent, WHITE, 0.45), rule: readable(o.accent, [base, deep], 3) }); },
+      back(ctx, t, o, st) {
+        const gr = ctx.createRadialGradient(1540, 480, 0, 1540, 480, 1500); gr.addColorStop(0, mixHex(st.base, o.accent, 0.16)); gr.addColorStop(0.5, st.base); gr.addColorStop(1, st.deep); paintAll(ctx, gr);
+        let r = rng(9001);
+        for (let i = 0; i < 150; i++) { const x = r() * W, y = r() * H, z = 0.6 + r() * 1.5, f = 0.8 + r() * 2; circle(ctx, x, y, z, rgba(WHITE, 0.1 + 0.16 * (0.5 + 0.5 * Math.sin(t * f + i)))); }
+        r = rng(77);
+        const an = 0.07 * Math.sin(t * 0.15), c0 = Math.cos(an), s0 = Math.sin(an), pts = [];
+        for (let i = 0; i < 60; i++) {
+          const bx = 1240 + r() * 640, by = 90 + r() * 840, d0 = r() * 0.3;
+          const dx = bx - 1560 + 18 * noise(i, t, 0.35), dy = by - 510 + 18 * noise(i + 50, t, 0.35);
+          pts.push({ x: 1560 + dx * c0 - dy * s0, y: 510 + dx * s0 + dy * c0, k: P(t, (1880 - bx) / 640 * 1.2 - 0.7 + d0, 0.7), hot: i % 7 === 0 });
+        }
+        ctx.lineWidth = 2; ctx.lineCap = 'round';
+        for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+          const p = pts[i], q = pts[j], d = Math.hypot(p.x - q.x, p.y - q.y), m = Math.min(p.k, q.k);
+          if (d < 190 && m > 0) { ctx.strokeStyle = rgba(st.star, (1 - d / 190) * 0.8 * m); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(lerp(p.x, q.x, m), lerp(p.y, q.y, m)); ctx.stroke(); }
+        }
+        pts.forEach((p, i) => {
+          if (p.k <= 0) return;
+          if (p.hot) softLight(ctx, p.x, p.y, 40 + 8 * Math.sin(t * 2 + i), o.accent, 0.45 * p.k);
+          circle(ctx, p.x, p.y, (p.hot ? 6 : 3.2) * (0.5 + 0.5 * p.k), p.hot ? mixHex(o.accent, WHITE, 0.3) : st.star, { alpha: p.k });
+        });
+      },
+    },
+    // soft blobs of the deck's colours swell and drift like a gradient mesh; a veil keeps the text side light
+    liquid: {
+      style(o) {
+        const page = mixHex(WHITE, o.main, 0.04), blobs = [o.main, o.accent, mixHex(o.main, o.accent, 0.5), mixHex(o.accent, WHITE, 0.35), mixHex(o.main, WHITE, 0.45)].map(c => lum(c) < 0.06 ? mixHex(c, WHITE, 0.4) : c);
+        return inks([page, ...blobs.slice(0, 3).map(c => mixHex(c, page, 0.7))], o.accent, { maxW: 940, mode: 'rise', page, blobs, rule: readable(o.accent, page, 3) });
+      },
+      back(ctx, t, o, st) {
+        paintAll(ctx, st.page);
+        const g0 = P(t, -0.6, 2.2);
+        [[1500, 300, 560, 0, 0.37, 0.29], [1720, 820, 520, 1, 0.31, 0.41], [1260, 640, 470, 2, 0.27, 0.33], [1860, 140, 430, 3, 0.43, 0.23], [1080, 1150, 520, 4, 0.21, 0.37]].forEach(([x, y, rad, ci, fx, fy], i) => {
+          const cx = x + 190 * Math.sin(t * fx + i * 1.7), cy = y + 140 * Math.sin(t * fy + i * 2.3), R = rad * (0.6 + 0.4 * g0) * (1 + 0.06 * Math.sin(t * 0.5 + i)), c = st.blobs[ci];
+          const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, R); gr.addColorStop(0, rgba(c, 0.95)); gr.addColorStop(0.5, rgba(c, 0.55)); gr.addColorStop(1, rgba(c, 0));
+          ctx.fillStyle = gr; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+        });
+        paintAll(ctx, lin(ctx, 0, 0, 1400, 0, [[0, rgba(st.page, 0.96)], [0.72, rgba(st.page, 0.88)], [1, rgba(st.page, 0)]]));
+      },
+    },
+    // an isometric sculpture of cubes drops into place and floats, an accent cube hovering; the title drops in with depth
+    isometric: {
+      style(o) {
+        const page = mixHex(WHITE, o.main, 0.05), floor = mixHex(WHITE, o.main, 0.14), M = lum(o.main) > 0.35 ? mixHex(o.main, BLACK, 0.4) : o.main;
+        return inks([page, floor], o.accent, { size: 112, maxW: 1000, mode: 'drop', page, floor, M, depth: mixHex(M, WHITE, 0.72) });
+      },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, 0, H, [[0, st.page], [1, st.floor]]));
+        const s = 78, cs = s * 0.866, hs = s * 0.5, pt = (x, y, z) => [1500 + (x - y) * cs, 520 + (x + y) * hs - z * s];
+        ctx.lineWidth = 2; ctx.strokeStyle = rgba(st.M, 0.14 * P(t, -0.6, 1.2));
+        for (let i = -1; i <= 5; i++) { ctx.beginPath(); ctx.moveTo(...pt(i, -1, 0)); ctx.lineTo(...pt(i, 5, 0)); ctx.moveTo(...pt(-1, i, 0)); ctx.lineTo(...pt(5, i, 0)); ctx.stroke(); }
+        const faces = c => [mixHex(c, WHITE, 0.55), c, mixHex(c, BLACK, 0.3)], main = faces(st.M), acc = faces(o.accent);
+        const quad = (pts, fill) => { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(...p) : ctx.moveTo(...p))); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke(); };
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+        for (const [x, y, z, hot] of VOXELS) {
+          const k = P(t, (x + y + z) * 0.07 - 0.5 + (hot ? 0.6 : 0), 0.7, hot ? E.back : E.out);
+          if (k <= 0) continue;
+          const zz = z + (1 - k) * 5 + (hot ? 0.3 + 0.12 * Math.sin(t * 1.5) : 0), f = hot ? acc : main;
+          ctx.globalAlpha = clamp(k * 2.5);
+          quad([pt(x, y, zz + 1), pt(x + 1, y, zz + 1), pt(x + 1, y + 1, zz + 1), pt(x, y + 1, zz + 1)], f[0]);
+          quad([pt(x, y + 1, zz + 1), pt(x + 1, y + 1, zz + 1), pt(x + 1, y + 1, zz), pt(x, y + 1, zz)], f[1]);
+          quad([pt(x + 1, y, zz + 1), pt(x + 1, y + 1, zz + 1), pt(x + 1, y + 1, zz), pt(x + 1, y, zz)], f[2]);
+        }
+      },
+    },
+    // warm paper; two folded paper ribbons in the deck's colours fold out up the right side and sway; words flip in
+    ribbon: {
+      style(o) { const page = mixHex('#FBF8F1', o.main, 0.04), shade = mixHex(page, o.main, 0.09);
+        return inks([page, shade], o.accent, { size: 112, maxW: 1000, mode: 'flip', page, shade }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, W, H, [[0, st.page], [1, st.shade]]));
+        introRibbon(ctx, t, [1330, 1200], [1720, -140], 7, 165, 120, o.main, mixHex(o.main, BLACK, 0.3), -0.45);
+        introRibbon(ctx, t, [1640, 1220], [1990, 60], 5, 110, 70, o.accent, mixHex(o.accent, BLACK, 0.25), -0.2);
+      },
+    },
+    // dark with fine scanlines; dashed rings with a red and cyan split that locks in; brief glitches on arrival only
+    glitch: {
+      style(o) { const base = readable(mixHex(o.main, '#05070D', 0.7), WHITE, 12), deep = mixHex(base, BLACK, 0.4);
+        return inks([base, deep, mixHex(base, WHITE, 0.06)], o.accent, { size: 120, mode: 'glitch', base, deep, rule: readable(o.accent, [base, deep], 3) }); },
+      back(ctx, t, o, st, a) {
+        paintAll(ctx, lin(ctx, 0, 0, 0, H, [[0, st.base], [1, st.deep]]));
+        const b = glitchBurst(t, a), ring = mixHex(o.accent, WHITE, 0.2);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (const [col, side] of [['#FF2E63', -1], ['#2DE2E6', 1], [ring, 0]]) {
+          for (let i = 0; i < 3; i++) {
+            const rad = 140 + i * 90, k = P(t, -0.4 + i * 0.15, 0.9);
+            ctx.setLineDash([rad * 0.5, rad * 0.16]); ctx.lineDashOffset = t * 50 * (i % 2 ? 1 : -1) + i * 40;
+            ctx.lineWidth = [14, 8, 4][i]; ctx.strokeStyle = rgba(col, side ? 0.5 : 0.9);
+            ctx.beginPath(); ctx.arc(1570 + side * (3 + 22 * b), 500, rad, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * k); ctx.stroke();
+          }
+        }
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.03)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+        if (b > 0.02) { const r = rng(1 + Math.floor(t * 24)); for (let i = 0; i < 6; i++) { ctx.fillStyle = rgba(i % 2 ? o.accent : '#2DE2E6', 0.35 * b); ctx.fillRect(r() * W * 0.8, r() * H, 200 + r() * 700, 3 + r() * 16); } }
+      },
+      front(ctx, t, o, st, a) {   // a few slices of the frame shift sideways, only during a burst
+        const b = glitchBurst(t, a), cv = ctx.canvas;
+        if (b < 0.05 || !cv || cv.width !== W || cv.height !== H) return;
+        const r = rng(7 + Math.floor(t * 24));
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        for (let i = 0; i < 5; i++) { const y = Math.floor(r() * (H - 60)), h = 8 + Math.floor(r() * 50), dx = Math.round((r() - 0.5) * 56 * b); if (dx) ctx.drawImage(cv, 0, y, W, h, dx, y, W, h); }
+      },
+    },
+    // a dark stage; a spotlight sweeps in and settles on the text, dust drifting in its beam
+    spotlight: {
+      style(o) { const pool = readable(mixHex(o.main, BLACK, 0.2), WHITE, 9), base = mixHex(pool, BLACK, 0.8);
+        return inks([pool, base, mixHex(pool, WHITE, 0.1)], o.accent, { size: 120, mode: 'fade', pool, base }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, st.base);
+        const k = E.inOut(clamp((t + 0.35) / 2.3)), px = lerp(1640, 640, k), py = lerp(330, 580, k) + 8 * Math.sin(t * 0.6), pr = lerp(360, 820, k), sx = lerp(1700, 1250, k), sy = -160;
+        const gr = ctx.createRadialGradient(px, py, 0, px, py, pr); gr.addColorStop(0, rgba(st.pool, 1)); gr.addColorStop(0.55, rgba(st.pool, 0.85)); gr.addColorStop(1, rgba(st.pool, 0)); paintAll(ctx, gr);
+        ctx.save(); ctx.translate(px, py + pr * 0.5); ctx.scale(1, 0.14); softLight(ctx, 0, 0, pr * 0.9, mixHex(st.pool, WHITE, 0.25), 0.45); ctx.restore();   // the lit floor
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = lin(ctx, sx, sy, px, py, [[0, 'rgba(255,255,255,0.03)'], [1, 'rgba(255,255,255,0.006)']]);
+        for (let i = 0; i < 5; i++) {   // the beam in five widths, so its edges are soft
+          const f = 1 - i * 0.12; ctx.beginPath(); ctx.moveTo(sx - 30 * f, sy); ctx.lineTo(sx + 30 * f, sy); ctx.lineTo(px + pr * 0.75 * f, py + pr * 0.15); ctx.lineTo(px - pr * 0.75 * f, py + pr * 0.15); ctx.closePath(); ctx.fill();
+        }
+        const r = rng(616);
+        for (let i = 0; i < 46; i++) {
+          const u = (r() + t * 0.015 * (0.5 + r())) % 1, v = r() * 2 - 1, z = 1 + r() * 2, x = lerp(sx, px, u) + v * lerp(30, pr * 0.7, u), y = lerp(sy, py + pr * 0.15, u);
+          circle(ctx, x + 6 * Math.sin(t * 0.7 + i), y, z, rgba(WHITE, 0.18 + 0.14 * Math.sin(t * 1.3 + i * 2)));
+        }
+      },
+    },
+    // starts dark, the duotone photo seen only through one word of the title, then zooms through it; the photo in the
+    // deck's two colours behind the text (a soft abstract in them without a photo)
+    duotone: {
+      style(o) {
+        // the scrim is weakest at the text's right end (x 1240), where it is about 0.88 of its strength at the left
+        const dark = darkOf(o.main, 0.55), light = mixHex(o.accent, WHITE, 0.3); let sc = 0.3;
+        while (sc < 1 && contrast(WHITE, mixHex(light, dark, sc * 0.88)) < 7) sc = Math.min(1, sc + 0.03);
+        const on = [mixHex(light, dark, sc * 0.88), dark];
+        return inks(on, o.accent, { size: 132, maxW: 1100, y1: 860, anchor: 'bottom', mode: 'rise', dark, light, sc, rule: readable(o.accent, on, 3), photo: introHasPhoto(o) });
+      },
+      back(ctx, t, o, st, a, s) {
+        const kz = E.out(clamp(t / Math.max(6, s.dur || 10))), z = 1.16 - 0.1 * kz, dw = W * z, dh = H * z;
+        ctx.drawImage(duoSource(o, st), (W - dw) / 2 + (0.3 - 0.5 * kz) * (dw - W) / 2, (H - dh) / 2, dw, dh);
+        const fade = 1 - P(t, 1.15, 0.45, E.in), sa = st.sc * Math.max(1 - fade, P(t, Math.min(a.kicker, a.title) - 0.3, 0.3));   // in as the word zooms away, or before any text
+        if (sa > 0) paintAll(ctx, lin(ctx, 0, 0, W, 0, [[0, rgba(st.dark, sa)], [0.66, rgba(st.dark, sa * 0.9)], [1, rgba(st.dark, 0)]]));
+        if (fade <= 0) return;
+        const zoom = t < 0.5 ? 0.94 + 0.12 * t : Math.exp((t - 0.5) * 3.4), word = maskWord(o.title);
+        if (!maskCv) { maskCv = document.createElement('canvas'); maskCv.width = W; maskCv.height = H; }
+        const m = maskCv.getContext('2d');
+        m.setTransform(1, 0, 0, 1, 0, 0); m.globalCompositeOperation = 'source-over'; m.fillStyle = st.dark; m.fillRect(0, 0, W, H);
+        m.font = `800 100px ${FONT}`; const fs = Math.min(560, 1700 / Math.max(1, m.measureText(word).width) * 100);
+        m.globalCompositeOperation = 'destination-out'; m.setTransform(zoom, 0, 0, zoom, 960 * (1 - zoom), 540 * (1 - zoom));
+        m.font = `800 ${fs}px ${FONT}`; m.textAlign = 'center'; m.textBaseline = 'middle'; m.fillText(word, 960, 540);
+        ctx.globalAlpha = fade; ctx.drawImage(maskCv, 0, 0, W, H);
+        ctx.translate(960 * (1 - zoom), 540 * (1 - zoom)); ctx.scale(zoom, zoom);   // the word's edge, in the accent
+        ctx.font = m.font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3 / zoom; ctx.strokeStyle = rgba(o.accent, 0.9); ctx.strokeText(word, 960, 540);
+      },
+    },
+    // a dark screen with a dot grid; lines of code type themselves on the right; the title is typed with a cursor
+    typewriter: {
+      style(o) { const base = readable(mixHex(o.main, '#0B0F14', 0.72), WHITE, 12);
+        return inks([base, mixHex(base, WHITE, 0.05)], o.accent, { size: 108, y0: 290, anchor: 'top', mode: 'type', base }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, st.base); dotsGrid(ctx, 'rgba(255,255,255,0.045)');
+        softLight(ctx, 1600, 200, 760, o.accent, 0.07);
+        const cols = [mixHex(o.accent, st.base, 0.2), mixHex(o.main, WHITE, 0.55), mixHex(WHITE, st.base, 0.5), mixHex(o.accent, WHITE, 0.5)];
+        const r = rng(31337), IND = [0, 1, 1, 2, 2, 1, -1, 0, 1, 2, 3, 2, 1, -1, 0, 1, 0], cur = t > 2.4 ? Math.floor((t - 2.4) / 0.7) % IND.length : -1;
+        ctx.save(); ctx.beginPath(); ctx.rect(1200, 0, 640, H); ctx.clip();
+        IND.forEach((ind, j) => {
+          const y = 150 + j * 44, k = clamp((t + 1.4 - j * 0.16) / 0.3), toks = [];
+          for (let q = 0, n = 1 + Math.floor(r() * 4); q < n; q++) toks.push([40 + r() * 150, Math.floor(r() * cols.length)]);
+          if (j === cur) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(1200, y - 18, 640, 36); }
+          ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(1224, y - 4, 22, 8);   // the line numbers' place
+          if (ind < 0) return;   // a blank line
+          let x = 1290 + ind * 44, shown = toks.reduce((sum, [w]) => sum + w + 16, 0) * k;
+          for (const [w, c] of toks) { const ww = Math.min(w, shown); if (ww <= 0) break; rr(ctx, x, y - 7, ww, 14, 7); ctx.fillStyle = cols[c]; ctx.globalAlpha = 0.75; ctx.fill(); ctx.globalAlpha = 1; x += w + 16; shown -= w + 16; }
+        });
+        ctx.restore();
+      },
+    },
+    // rays turn slowly around a glowing core on the right, rings pulse out and sparks burst as the title lands
+    burst: {
+      style(o) { const base = darkOf(o.main, 0.3), deep = mixHex(base, BLACK, 0.4);
+        return inks([base, deep, mixHex(base, WHITE, 0.07)], o.accent, { mode: 'bounce', base, deep }); },
+      back(ctx, t, o, st, a) {
+        const fx = 1480, fy = 520, hot = mixHex(o.accent, WHITE, 0.15);
+        const gr = ctx.createRadialGradient(fx, fy, 0, fx, fy, 1500); gr.addColorStop(0, mixHex(st.base, o.accent, 0.4)); gr.addColorStop(0.4, st.base); gr.addColorStop(1, st.deep); paintAll(ctx, gr);
+        ctx.save(); ctx.translate(fx, fy); ctx.rotate(t * 0.07); ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        for (let i = 0; i < 28; i += 2) { const a0 = i * Math.PI / 14, a1 = a0 + Math.PI / 14; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(2400 * Math.cos(a0), 2400 * Math.sin(a0)); ctx.lineTo(2400 * Math.cos(a1), 2400 * Math.sin(a1)); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+        ctx.lineWidth = 6;
+        for (const te of [-0.6, 0.2, a.title, ...Array.from({ length: 10 }, (_, i) => 2.6 + i * 2.2)]) {
+          const age = t - te; if (age < 0 || age > 1.8) continue;
+          ctx.strokeStyle = rgba(hot, 0.55 * (1 - age / 1.8)); ctx.beginPath(); ctx.arc(fx, fy, 90 + 700 * E.out(age / 1.8), 0, 2 * Math.PI); ctx.stroke();
+        }
+        paintAll(ctx, lin(ctx, 0, 0, 1500, 0, [[0, rgba(st.base, 0.8)], [0.75, rgba(st.base, 0.55)], [1, rgba(st.base, 0)]]));   // calm behind the text
+        [-0.45, a.title].forEach((te, b) => {
+          const age = t - te; if (age < 0 || age > 1.3) return;
+          const r = rng(500 + b), q = age / 1.3; ctx.lineCap = 'round';
+          for (let i = 0; i < 34; i++) {
+            const an = r() * 2 * Math.PI, d = (500 + r() * 600) * E.out(q), len = 16 + 30 * (1 - q), w = 3 + r() * 4;
+            const hx = fx + Math.cos(an) * d; ctx.strokeStyle = rgba(i % 3 ? hot : WHITE, (1 - q) * clamp((hx - 1180) / 260)); ctx.lineWidth = w;
+            ctx.beginPath(); ctx.moveTo(fx + Math.cos(an) * Math.max(0, d - len), fy + Math.sin(an) * Math.max(0, d - len)); ctx.lineTo(fx + Math.cos(an) * d, fy + Math.sin(an) * d); ctx.stroke();
+          }
+        });
+        const kc = pop(t, -0.3, 0.6);
+        softLight(ctx, fx, fy, 320 * kc, o.accent, 0.55); softLight(ctx, fx, fy, 120 * kc, WHITE, 0.8);
+        circle(ctx, fx, fy, (78 + 5 * Math.sin(t * 2)) * kc, null, { stroke: hot, lw: 5 });
+        circle(ctx, fx, fy, 26 * kc, WHITE);
+      },
+    },
+    // translucent panes at different depths fly in from the right and drift, nearer ones faster (one may hold the photo)
+    parallax: {
+      style(o) { const base = darkOf(o.main, 0.45), deep = mixHex(base, BLACK, 0.45);
+        return inks([base, deep], o.accent, { maxW: 1000, mode: 'rise', base, deep, rule: readable(o.accent, [base, deep], 3), photo: introHasPhoto(o) }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, W, H, [[0, st.base], [1, st.deep]]));
+        softLight(ctx, 1560, 420, 800, mixHex(o.main, WHITE, 0.3), 0.18);
+        const drift = E.out(clamp(t / 12));
+        PANES.forEach(([x, y, w, h, z, kind], i) => {
+          const k = P(t, -0.55 + i * 0.09, 1.0 + 0.5 * (1 - z)), sc = 0.72 + 0.28 * z, w2 = w * sc, h2 = h * sc, rad = 26 * sc;
+          const X = x + (1 - k) * 1100 * z - 60 * z * drift, Y = y + 14 * z * Math.sin(t * 0.6 + i * 1.7);
+          if (X >= W) return;
+          ctx.save(); ctx.globalAlpha = kind === 'glass' ? 1 : 0.55 + 0.45 * z;
+          if (z > 0.7) { ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 18; }
+          rr(ctx, X, Y, w2, h2, rad);
+          ctx.fillStyle = kind === 'accent' ? o.accent : kind === 'tone' ? mixHex(o.main, WHITE, 0.3) : kind === 'photo' ? mixHex(o.main, o.accent, 0.4) : 'rgba(255,255,255,0.09)';
+          ctx.fill(); ctx.shadowColor = 'transparent';
+          if (kind === 'photo' && st.photo) img(ctx, o.photo, X, Y, w2, h2, { fit: 'cover', r: rad, zoom: 1.12 - 0.06 * drift });
+          if (kind === 'glass') { rr(ctx, X, Y, w2, h2, rad); ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2; ctx.stroke(); }
+          ctx.restore();
+        });
+      },
+    },
+    // a light map with contour lines; a dotted route draws itself between stops, pins dropping as it reaches them
+    route: {
+      style(o) {
+        const page = mixHex('#F6F3EA', o.main, 0.05), land = mixHex(page, o.main, 0.07), ink = lum(o.main) > 0.3 ? mixHex(o.main, BLACK, 0.45) : o.main;
+        return inks([page, land], o.accent, { size: 112, maxW: 1000, mode: 'drop', page, land, ink, path: readable(o.accent, [page, land], 3), rule: readable(o.accent, [page, land], 3) });
+      },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, 0, H, [[0, st.page], [1, st.land]]));
+        ctx.save(); ctx.beginPath(); ctx.rect(1180, 0, W - 1180, H); ctx.clip();
+        ctx.strokeStyle = rgba(st.ink, 0.08); ctx.lineWidth = 2;
+        for (let i = 0; i < 7; i++) { const x = 1220 + i * 110; ctx.beginPath(); ctx.moveTo(x, 0); ctx.quadraticCurveTo(x + 40, H / 2, x, H); ctx.stroke(); }
+        for (let j = 0; j < 6; j++) { const y = 90 + j * 180; ctx.beginPath(); ctx.moveTo(1180, y); ctx.quadraticCurveTo(1550, y - 30, W, y); ctx.stroke(); }
+        for (const [cx, cy, c] of [[1500, 360, 1], [1730, 780, 2], [1320, 850, 3]]) for (let k = 0; k < 5; k++) {
+          ctx.beginPath();
+          for (let q = 0; q <= 48; q++) { const an = q / 48 * 2 * Math.PI, rad = (40 + k * 34) * (1 + 0.14 * Math.sin(3 * an + c) + 0.08 * Math.sin(5 * an + 2 * c)); const px = cx + rad * Math.cos(an) * 1.3, py = cy + rad * Math.sin(an); q ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+          ctx.closePath(); if (!k) { ctx.fillStyle = rgba(st.ink, 0.09); ctx.fill(); } ctx.strokeStyle = rgba(st.ink, 0.16); ctx.stroke();
+        }
+        ctx.restore();
+        const R = routePath(), L = R[R.length - 1][2], u = E.inOut(clamp((t + 0.3) / 3)) * L;
+        let n = 0; while (n < R.length - 1 && R[n + 1][2] <= u) n++;
+        ctx.save(); ctx.strokeStyle = st.path; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.setLineDash([2, 19]); ctx.lineDashOffset = -t * 30;
+        ctx.beginPath(); for (let i = 0; i <= n; i++) i ? ctx.lineTo(R[i][0], R[i][1]) : ctx.moveTo(R[i][0], R[i][1]); ctx.stroke(); ctx.restore();
+        ROUTE.forEach(([x, y], i) => {
+          const at = i === ROUTE.length - 1 ? L : R[i * SEG][2], k = clamp((u - at) / (L * 0.06) + (i ? 0 : 1)), last = i === ROUTE.length - 1;
+          if (last && u >= L) for (const ph of [0, 0.8]) { const q = ((t + ph) % 1.6) / 1.6; circle(ctx, x, y, 12 + 50 * q, null, { stroke: st.path, lw: 3, alpha: 1 - q }); }
+          if (k <= 0) return;
+          const sc = E.back(k);
+          ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
+          ctx.fillStyle = rgba(BLACK, 0.14); ctx.beginPath(); ctx.ellipse(0, 2, 20, 6, 0, 0, 2 * Math.PI); ctx.fill();
+          ctx.beginPath(); ctx.arc(0, -58, 28, Math.PI * 0.85, Math.PI * 0.15); ctx.lineTo(0, 0); ctx.closePath(); ctx.fillStyle = last ? st.path : st.ink; ctx.fill();
+          circle(ctx, 0, -58, 10, WHITE); ctx.restore();
+        });
+        if (u < L) { const [mx, my] = R[n]; circle(ctx, mx, my, 19, WHITE); circle(ctx, mx, my, 12, st.path); }
+      },
+    },
+    // white and quiet; translucent waves of the deck's colours flow in from the right and keep flowing, light orbs rising
+    flow: {
+      style(o) { const ends = [mixHex(WHITE, o.accent, 0.06), mixHex(WHITE, o.main, 0.16)];
+        return inks(ends, o.accent, { size: 104, maxW: 960, mode: 'fade', ends, rule: readable(mixHex(o.accent, o.main, 0.3), ends, 3) }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, 0, H, [[0, st.ends[0]], [1, st.ends[1]]]));
+        const x0 = lerp(W + 50, -50, E.out(clamp((t + 0.8) / 2.8)));
+        for (let i = 0; i < 7; i++) {
+          const c = i % 2 ? o.accent : o.main, al = 0.2 + 0.05 * (i % 3), th = 60 + 30 * ((i * 7) % 4), ph = i * 1.9, f = 0.0021 + i * 0.00023;
+          const ys = x => 1010 - x * 0.36 + i * 40 + 50 * Math.sin(x * f + t * 0.45 + ph), yb = x => ys(x) + th * (1 + 0.35 * Math.sin(x * 0.003 + t * 0.6 + ph * 2));
+          ctx.beginPath(); ctx.moveTo(x0, ys(x0));
+          for (let x = x0 + 40; x <= W + 40; x += 40) ctx.lineTo(x, ys(x));
+          for (let x = W + 40; x >= x0; x -= 40) ctx.lineTo(x, yb(x));
+          ctx.lineTo(x0, yb(x0)); ctx.closePath();
+          ctx.fillStyle = lin(ctx, 0, 0, W, 0, [[0.22, rgba(c, 0)], [0.62, rgba(c, al)], [1, rgba(c, al)]]); ctx.fill();
+        }
+        const r = rng(2718);
+        for (let i = 0; i < 12; i++) { const x = 1200 + r() * 680, sp = 10 + r() * 16, y = ((r() * 1200 - t * sp) % 1200 + 1200) % 1200 - 60, rad = 20 + r() * 44; softLight(ctx, x + 20 * Math.sin(t * 0.4 + i), y, rad, mixHex(i % 2 ? o.accent : o.main, WHITE, 0.4), 0.3 * P(t, -0.5 + i * 0.1, 1)); }
+      },
+    },
+    // an arena: 3, 2, 1 counts down on the right, then a stopwatch runs; stadium beams and a chasing strip of lights
+    countdown: {
+      style(o) { const base = darkOf(o.main, 0.6), deep = mixHex(base, BLACK, 0.4);
+        return inks([base, deep, mixHex(base, WHITE, 0.06)], o.accent, { size: 120, mode: 'flip', base, deep }); },
+      back(ctx, t, o, st) {
+        paintAll(ctx, lin(ctx, 0, 0, 0, H, [[0, st.base], [1, st.deep]]));
+        const cx = 1530, cy = 520, hot = mixHex(o.accent, WHITE, 0.1), ph = t + 0.2;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        [[1320, -0.35], [1860, 0.3]].forEach(([bx, sw], i) => {
+          ctx.save(); ctx.translate(bx, -80); ctx.rotate(sw + 0.08 * Math.sin(t * 0.5 + i * 2));
+          ctx.fillStyle = lin(ctx, 0, 0, 0, 1200, [[0, 'rgba(255,255,255,0.12)'], [1, 'rgba(255,255,255,0)']]);
+          ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(20, 0); ctx.lineTo(260, 1200); ctx.lineTo(-260, 1200); ctx.closePath(); ctx.fill(); ctx.restore();
+        });
+        if (ph >= 1.5) softLight(ctx, cx, cy, 420, hot, 0.6 * (1 - clamp((ph - 1.5) / 0.4)));   // a flash as the count ends
+        ctx.restore();
+        for (let i = 0; i < 26; i++) circle(ctx, 1250 + i * 22, 64, 5, ((Math.floor(t * 14) - i) % 8 + 8) % 8 < 2 ? hot : 'rgba(255,255,255,0.1)');
+        ctx.lineCap = 'round';
+        circle(ctx, cx, cy, 250, null, { stroke: 'rgba(255,255,255,0.12)', lw: 14 });
+        if (ph < 1.5) {
+          const i = Math.floor(ph / 0.5), k = ph / 0.5 - i, sc = 1.25 - 0.25 * E.out(clamp(k * 2));
+          ctx.save(); ctx.globalAlpha = 1 - E.in(clamp((k - 0.75) / 0.25)); ctx.translate(cx, cy); ctx.scale(sc, sc);
+          ctx.font = `800 400px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 12; ctx.lineJoin = 'round'; ctx.strokeStyle = hot;
+          ctx.strokeText(String(3 - i), 0, 12); ctx.restore();
+          ctx.strokeStyle = hot; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(cx, cy, 250, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * (1 - k)); ctx.stroke();
+        } else {
+          const age = ph - 1.5, sw = (age / 6) % 1, an = -Math.PI / 2 + 2 * Math.PI * sw;
+          for (let q = 0; q < 60; q++) {
+            if (q / 60 > age / 0.6) break;
+            const a0 = q * Math.PI / 30 - Math.PI / 2, r0 = q % 5 ? 212 : 196;
+            ctx.strokeStyle = q % 5 ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.75)'; ctx.lineWidth = q % 5 ? 3 : 6;
+            ctx.beginPath(); ctx.moveTo(cx + r0 * Math.cos(a0), cy + r0 * Math.sin(a0)); ctx.lineTo(cx + 228 * Math.cos(a0), cy + 228 * Math.sin(a0)); ctx.stroke();
+          }
+          ctx.strokeStyle = hot; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(cx, cy, 250, -Math.PI / 2, an); ctx.stroke();
+          ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 180 * Math.cos(an), cy + 180 * Math.sin(an)); ctx.stroke();
+          circle(ctx, cx, cy, 14, hot); circle(ctx, cx, cy, 6, st.base);
+        }
+      },
+    },
+  };
   function measureBadge(ctx, label, size) { ctx.save(); ctx.font = `800 ${size}px ${FONT}`; const w = ctx.measureText(label).width + size * 1.3; ctx.restore(); return w; }
   // Quiz question with a countdown ring during the hold after the narration ends.
   function quizQ(ctx, t, s, o = {}) {
