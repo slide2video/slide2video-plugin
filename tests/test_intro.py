@@ -432,6 +432,22 @@ def test_a_list_of_moods_is_picked_by_the_title(page):
     assert page.log["errors"] == []
 
 
+def test_a_list_picks_cinematic_only_with_a_photo_and_split_only_without(page):
+    """Daniel's rule (2026-11-10): from a list, cinematic needs a photo and split must not have one. A single mood is
+    still drawn as asked, so chapters that name one keep rendering as before."""
+    for i in range(8):
+        title = f"Seven days on the coast {i}"
+        both = {"title": title, **DECK}
+        with_photo = page.evaluate(FRAME, [{**both, "mood": ["cinematic", "split"], "photo": "photo"}, 3, 96, 54])
+        assert with_photo == page.evaluate(FRAME, [{**both, "mood": "cinematic", "photo": "photo"}, 3, 96, 54]), title
+        without = page.evaluate(FRAME, [{**both, "mood": ["cinematic", "split"]}, 3, 96, 54])
+        assert without == page.evaluate(FRAME, [{**both, "mood": "split"}, 3, 96, 54]), title
+    alone = {"title": "T", **DECK}
+    assert page.evaluate(FRAME, [{**alone, "mood": "cinematic"}, 3, 96, 54]) != page.evaluate(FRAME, [{**alone, "mood": "split"}, 3, 96, 54])
+    assert "photo" in draw(page, opts_for("split", SHORT), 5)["images"]
+    assert page.log["errors"] == []
+
+
 @pytest.mark.parametrize("mood", ["split", "parallax"])
 def test_the_photo_moods_draw_the_photo(page, mood):
     assert "photo" in draw(page, opts_for(mood, SHORT), 5)["images"], mood

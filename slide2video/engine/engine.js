@@ -444,7 +444,10 @@
     if (o.photo != null && !list.some(m => MOODS[m].photo)) fail(`photo is drawn only by the ${PHOTO_MOODS.join(', ')} moods`);
     if (o.emojis != null && !(Array.isArray(o.emojis) && o.emojis.every(e => typeof e === 'string'))) fail("emojis must be a list like ['🌍', '📜']");
     if (o.emojis?.length && !list.includes('playful')) fail('emojis are drawn only by the playful mood');
-    const mood = introPick(list, o.title);
+    // from a list, cinematic only with a photo (its sky without one is plain) and split only without (over a photo the
+    // panel hides most of it); a single mood is always drawn as asked
+    const fit = list.filter(m => (m !== 'cinematic' || !!o.photo) && (m !== 'split' || !o.photo));
+    const mood = introPick(fit.length ? fit : list, o.title);
     const at = o.at ?? {};
     if (at === null || typeof at !== 'object' || Array.isArray(at)) fail('at must be { logo, kicker, title, sub, by } times in seconds');
     for (const [k, v] of Object.entries(at)) {
