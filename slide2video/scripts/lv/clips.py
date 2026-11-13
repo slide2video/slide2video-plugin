@@ -70,6 +70,12 @@ def check_name(name: str) -> str:
     return name
 
 
+def made_except(work: Path, name: str) -> int:
+    """How many clips the lesson already has, leaving out `name` (making it again replaces it)."""
+    folder = paths.lesson(work).sources / "clips"
+    return sum(1 for p in folder.glob("*.mp4") if p.stem != name) if folder.is_dir() else 0
+
+
 def make_clip(image: Path, prompt: str, name: str, work: Path, frac: float = 0.5, request=None, strip: bool = True) -> Path:
     check_name(name)
     out = paths.lesson(work).sources / "clips" / f"{name}.mp4"

@@ -12,6 +12,15 @@ API behaviours are not files and live here:
   (at most 200 characters each) that Claude wrote about this turn, oldest first. A website that doesn't know a field
   ignores it.
 
+## AI clips in a turn
+
+Since 2.8.0 a turn may carry `clips`: the most AI clips this video project may have (0 to 50). With `clips` 0 the plan
+lists no clips and none are made; with more, the plan lists at most that many, and only those it lists are made. The
+choice is the website's (the person makes it when they create the project), so the plugin never asks about clips then.
+A turn without `clips` works as before, with one exception: a turn that carries `mode` (only the website's own
+processing sends `mode`) is treated as `clips` 0, so nobody gets clips they never chose. A turn with neither (a
+computer's) plans clips as the plugin always has. A website that doesn't know the field never sends it.
+
 ## Versions
 
 `contract.json` `plugin` is the plugin version slide2video.com is built for. Its major is the contract version

@@ -145,6 +145,40 @@ def _site_mode_paths_ok(args) -> None:
                     raise UserError(f"{item} is outside this lesson's folder; in site mode only files in the lesson folder can be used.")
 
 
+CLIPS_OFF = ("AI clips are off for this video project: the person didn't choose them on slide2video.com. Plan and make "
+             "none, and leave them out of the plan.")
+
+
+def _site_clips() -> int | None:
+    """In site mode, the most AI clips this video project may have (LV_SITE_CLIPS, which the worker sets from the turn's
+    `clips`), else None: no limit. A value that isn't a whole number counts as 0."""
+    if os.environ.get("LV_SITE_MODE") != "1":
+        return None
+    value = os.environ.get("LV_SITE_CLIPS", "").strip()
+    if not value:
+        return None
+    try:
+        return max(0, int(value))
+    except ValueError:
+        return 0
+
+
+def _plan_clips_ok(planned: int) -> None:
+    """In site mode, refuses (UserError) a plan of more AI clips than the video project may have."""
+    limit = _site_clips()
+    if limit is not None and planned > limit:
+        raise UserError(CLIPS_OFF if limit == 0 else f"This video project may have at most {limit} AI "
+                        f"clip{'' if limit == 1 else 's'}: plan no more than that.")
+
+
+def _one_more_clip_ok(made: int) -> None:
+    """In site mode, refuses (UserError) another AI clip once the video project has `made` of the most it may have."""
+    limit = _site_clips()
+    if limit is not None and made >= limit:
+        raise UserError(CLIPS_OFF if limit == 0 else f"This video project already has the {limit} AI "
+                        f"clip{'' if limit == 1 else 's'} it may have: make the chapters without more.")
+
+
 def dispatch(args) -> int:
     from . import keys
     if os.environ.get("LV_SITE_MODE") == "1" and (
@@ -272,6 +306,7 @@ def dispatch(args) -> int:
         return 0
     from . import config, estimate, status
     if args.cmd == "estimate":
+        _plan_clips_ok(args.clips)
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
         paid = bool(keys.get("ELEVENLABS_API_KEY", required=False))
         if args.json:
@@ -288,6 +323,8 @@ def dispatch(args) -> int:
         print(music.make_bed(args.work.resolve(), args.prompt))
         return 0
     if args.cmd == "clip":
+        if _site_clips() is not None:
+            _one_more_clip_ok(clips.made_except(args.work.resolve(), args.name))
         clips.make_clip(args.image, args.prompt, args.name, args.work.resolve(), args.frac)
         return 0
     if args.cmd == "frames":
