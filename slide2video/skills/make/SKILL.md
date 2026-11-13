@@ -146,7 +146,7 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   the card's message says which defaults were used.
 - **Questions:** at most 8 per card. If there are more, keep the most important and decide the rest with the
   defaults, saying so in the message.
-- **Clips:** `clips` in `site/turn.json` is the most AI clips this video project may have, and the person chose it on
+- **Clips:** `clips` in `site/turn.json` is how many AI clips this video project may still have, and the person chose it on
   the website: never ask about clips, in any card. A turn with `mode` but no `clips` counts as `clips` 0. With 0, plan
   none: no clips in `plan.md`, in the plan card or in `estimate` (leave out `--clips`). With more, plan at most that
   many (0–2 photos per unit, the style's `clips` saying which) and pass the count to `estimate --clips`. `estimate` and

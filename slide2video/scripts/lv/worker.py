@@ -127,11 +127,15 @@ def claude_command(lv: str, kind: str = "", mode: str | None = None) -> list[str
 
 
 CLIPS_ENV = "LV_SITE_CLIPS"     # the most AI clips the lesson may have, for Claude's commands (clips_allowed)
-CLIP_LEDGER_ENV = "LV_SITE_CLIP_LEDGER"  # where `clip` counts this step's clips: the private folder, never the lesson
+# Where `clip` counts this step's clips: the step's private folder, never the lesson. Per step by design: the website's
+# own processing runs every step in a new container, so nothing on disk carries over between steps; the website sends
+# `clips` as the clips the project still has (its most less those already made) and itself enforces the project's
+# total. A computer's turn has no limit at all (its clips run on the teacher's own key).
+CLIP_LEDGER_ENV = "LV_SITE_CLIP_LEDGER"
 
 
 def clips_allowed(turn: dict) -> int | None:
-    """The most AI clips a turn's video project may have: its `clips` (contract 2.8.0), or None for no limit. A turn of
+    """The AI clips a turn's video project may still have: its `clips` (contract 2.8.0), or None for no limit. A turn of
     the website's own processing (it carries `mode`) without `clips` comes from a website before the field, where
     nobody chose clips: 0. A computer's turn carries neither and keeps the plugin's own clip planning. A `clips` that
     isn't a whole number from 0 also counts as 0."""

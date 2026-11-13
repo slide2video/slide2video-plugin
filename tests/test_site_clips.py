@@ -65,7 +65,7 @@ def test_site_mode_plans_no_more_clips_than_allowed(monkeypatch, tmp_path, capsy
     monkeypatch.setenv("LV_SITE_MODE", "1")
     monkeypatch.setenv("LV_SITE_CLIPS", "0")
     assert _estimate(tmp_path, 1) == 1
-    assert "AI clips are off" in capsys.readouterr().err
+    assert "No AI clips are left" in capsys.readouterr().err
     assert _estimate(tmp_path, 0) == 0
     assert json.loads(capsys.readouterr().out)["quantities"]["clips"] == 0
     monkeypatch.setenv("LV_SITE_CLIPS", "2")
@@ -117,7 +117,7 @@ def test_site_mode_makes_no_more_clips_than_allowed_whatever_happens_to_the_less
         return cli.main(["clip", str(photo), "--work", str(lesson / work), "--name", name, "--prompt", name])
     _site(monkeypatch, lesson, "0")
     assert clip("river") == 1
-    assert "AI clips are off" in capsys.readouterr().err
+    assert "No AI clips are left" in capsys.readouterr().err
     _site(monkeypatch, lesson, "2")
     assert clip("river") == 0
     assert clip("kelp") == 0
@@ -149,7 +149,8 @@ def test_clip_commands_started_together_never_share_a_place(tmp_path):
 
 
 @pytest.mark.parametrize("fails, given_back", [
-    ("error answer", True),        # the service said no: nothing billed
+    ("error answer", True),        # the service refused the call (4xx): nothing billed
+    ("server error", False),       # a 5xx may come after the work was done
     ("no answer", False),          # a timeout or a dropped connection may have been billed
     ("no video", False),           # the service answered: billed
     ("bad photo", True),           # never sent
@@ -168,6 +169,8 @@ def test_a_place_is_given_back_only_when_the_clip_cant_have_been_billed(monkeypa
     def request(url, **kw):
         if fails == "error answer":
             raise net.ApiError(400, "INVALID_ARGUMENT", url)
+        if fails == "server error":
+            raise net.ApiError(500, "INTERNAL", url)
         if fails == "no answer":
             raise net.ApiError(0, "timed out", url)
         return {"status": "completed", "steps": []} if fails == "no video" else _video()

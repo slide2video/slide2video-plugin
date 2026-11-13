@@ -46,7 +46,7 @@ def video_of(resp: dict) -> bytes:
 
 
 class NotBilled(UserError):
-    """The clip service answered the call with an error status: no clip was made or billed."""
+    """The clip service refused the call (a 4xx answer): no clip was made or billed."""
 
 
 def omni(image_png: bytes, prompt: str, request=None) -> bytes:
@@ -64,8 +64,9 @@ def omni(image_png: bytes, prompt: str, request=None) -> bytes:
         resp = request(f"{config.gemini_root()}/interactions", data=payload, headers=h, timeout=900, retries=0)
     except net.ApiError as e:
         err = net.gemini_error(e, "AI clip")
-        # an error answer bills nothing; no answer at all (status 0: a timeout, a dropped connection) may have
-        raise (NotBilled(str(err)) if e.status >= 400 else err) from None
+        # only a refusal (4xx) surely billed nothing; a server error (5xx) or no answer at all (status 0: a timeout, a
+        # dropped connection) may come after the work was done, so it keeps its place
+        raise (NotBilled(str(err)) if 400 <= e.status < 500 else err) from None
     return video_of(resp)
 
 
@@ -96,8 +97,8 @@ def reserve_place(ledger: Path, limit: int) -> Path:
 def make_clip(image: Path, prompt: str, name: str, work: Path, frac: float = 0.5, request=None, strip: bool = True,
               place: Path | None = None) -> Path:
     """One clip into the lesson's clips folder. With `place` (reserve_place), the place is given back only when the
-    clip can't have been billed: the photo couldn't be prepared, there is no key, or the service answered with an
-    error."""
+    clip can't have been billed: the photo couldn't be prepared, there is no key, or the service refused the call
+    (4xx)."""
     check_name(name)
     out = paths.lesson(work).sources / "clips" / f"{name}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)

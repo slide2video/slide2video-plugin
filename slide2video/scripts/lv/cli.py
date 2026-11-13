@@ -145,8 +145,8 @@ def _site_mode_paths_ok(args) -> None:
                     raise UserError(f"{item} is outside this lesson's folder; in site mode only files in the lesson folder can be used.")
 
 
-CLIPS_OFF = ("AI clips are off for this video project: the person didn't choose them on slide2video.com. Plan and make "
-             "none, and leave them out of the plan.")
+CLIPS_OFF = ("No AI clips are left for this video project: they weren't chosen on slide2video.com, or the plan's clips "
+             "are made. Plan and make no more, and leave them out of the plan.")
 
 
 def _site_clips() -> int | None:
