@@ -127,6 +127,7 @@ def claude_command(lv: str, kind: str = "", mode: str | None = None) -> list[str
 
 
 CLIPS_ENV = "LV_SITE_CLIPS"     # the most AI clips the lesson may have, for Claude's commands (clips_allowed)
+CLIP_LEDGER_ENV = "LV_SITE_CLIP_LEDGER"  # where `clip` counts this step's clips: the private folder, never the lesson
 
 
 def clips_allowed(turn: dict) -> int | None:
@@ -157,7 +158,8 @@ def _site_env(private: Path, api_key: bool = False, root: Path | None = None) ->
     API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
     token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept. With `api_key`, ANTHROPIC_API_KEY and
     ANTHROPIC_BASE_URL from the environment are kept instead (and the sign-in token is dropped), and Claude Code's
-    non-essential traffic is off. The turn's clip limit, when it has one, is LV_SITE_CLIPS (clips_allowed)."""
+    non-essential traffic is off. The turn's clip limit, when it has one, is LV_SITE_CLIPS (clips_allowed), counted in
+    LV_SITE_CLIP_LEDGER inside `private`."""
     if api_key and not os.environ.get("ANTHROPIC_API_KEY"):
         raise UserError(NEEDS_API_KEY)
     env = {k: v for k, v in os.environ.items() if k not in DROPPED_ENV
@@ -172,9 +174,13 @@ def _site_env(private: Path, api_key: bool = False, root: Path | None = None) ->
     if root is not None:   # the lesson folder the site-mode path guard holds every path to, wherever Claude cds
         env["LV_SITE_ROOT"] = str(Path(root).resolve())
     env.pop(CLIPS_ENV, None)
+    env.pop(CLIP_LEDGER_ENV, None)
     clips = _turn_clips(root)
     if clips is not None:
+        # counted in the private folder (outside the lesson, removed after the step): Claude's tools write only inside
+        # the lesson, so deleting, renaming or moving a clip there never frees a place
         env[CLIPS_ENV] = str(clips)
+        env[CLIP_LEDGER_ENV] = str(Path(private) / "clip-places")
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
     env["BASH_DEFAULT_TIMEOUT_MS"] = env["BASH_MAX_TIMEOUT_MS"] = BASH_TIMEOUT_MS
     return env

@@ -63,8 +63,11 @@ Each is optional; with none set, behaviour is unchanged.
   basic plans with Sonnet). With no mode, `normal`. `LV_CLAUDE_MODEL` / `LV_CLAUDE_EFFORT` still override it.
 - A turn may carry `clips` (since 2.8.0): the most AI clips the project may have (`site-contract/README.md`). The
   worker hands it to Claude's commands as `LV_SITE_CLIPS` (`worker.clips_allowed`: a turn with `mode` but no `clips`
-  gets 0), and in site mode `estimate --clips` and `clip` refuse more than that. A turn with neither keeps the
-  plugin's own clip planning.
+  gets 0), and in site mode `estimate --clips` and `clip` refuse more than that. `clip` takes a place before it asks
+  for a clip (`clips.reserve_place`: an exclusively created file in `LV_SITE_CLIP_LEDGER`, inside the worker's private
+  folder, outside the lesson Claude can write to), so the count is per step and holds against clips deleted, renamed
+  or made in another folder; a place comes back only when the clip can't have been billed. The website enforces the
+  project's total. A turn with neither keeps the plugin's own clip planning.
 
 A publish runs `S2V_PUBLISH=1 uv run pytest -q`, which needs the maintainer's local `.private-terms.txt`
 (git-ignored; one term per line). `tests/test_public_repo.py` scans every tracked text file for those terms.

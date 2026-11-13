@@ -171,12 +171,20 @@ def _plan_clips_ok(planned: int) -> None:
                         f"clip{'' if limit == 1 else 's'}: plan no more than that.")
 
 
-def _one_more_clip_ok(made: int) -> None:
-    """In site mode, refuses (UserError) another AI clip once the video project has `made` of the most it may have."""
+def _clip_place():
+    """In site mode with a clip limit, one of this step's clip places, taken before the clip is asked for
+    (clips.reserve_place in LV_SITE_CLIP_LEDGER, the folder the worker keeps outside the lesson); None without a limit.
+    Refused (UserError) with the limit 0, with no place left, or with a limit but no ledger (never so from the worker)."""
+    from . import clips
     limit = _site_clips()
-    if limit is not None and made >= limit:
-        raise UserError(CLIPS_OFF if limit == 0 else f"This video project already has the {limit} AI "
-                        f"clip{'' if limit == 1 else 's'} it may have: make the chapters without more.")
+    if limit is None:
+        return None
+    if limit == 0:
+        raise UserError(CLIPS_OFF)
+    ledger = os.environ.get("LV_SITE_CLIP_LEDGER", "").strip()
+    if not ledger:
+        raise UserError("AI clips can't be made here: this step has nowhere to count them.")
+    return clips.reserve_place(Path(ledger), limit)
 
 
 def dispatch(args) -> int:
@@ -323,9 +331,8 @@ def dispatch(args) -> int:
         print(music.make_bed(args.work.resolve(), args.prompt))
         return 0
     if args.cmd == "clip":
-        if _site_clips() is not None:
-            _one_more_clip_ok(clips.made_except(args.work.resolve(), args.name))
-        clips.make_clip(args.image, args.prompt, args.name, args.work.resolve(), args.frac)
+        clips.check_name(args.name)  # a bad name never takes a place
+        clips.make_clip(args.image, args.prompt, args.name, args.work.resolve(), args.frac, place=_clip_place())
         return 0
     if args.cmd == "frames":
         print(f"{clips.frames(args.clip, args.dest, args.max)} frames → {args.dest}")
