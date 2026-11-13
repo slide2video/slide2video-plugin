@@ -92,13 +92,38 @@ def lv_command() -> str:
     return f'"{shutil.which("uv") or "uv"}" run "{config.ENTRY}"'
 
 
-def read_rule(folder: PurePath) -> str:
-    """A Read rule for an absolute folder. Claude Code matches Windows paths in POSIX form: C:\\Plugins\\lv is
-    /c/Plugins/lv, so the rule is Read(//c/Plugins/lv/**); //C:/Plugins/lv never matches."""
+def read_rule(folder: PurePath, tree: bool = True) -> str:
+    """A Read rule for an absolute folder (everything under it), or with `tree=False` for that one file. Claude Code
+    matches Windows paths in POSIX form: C:\\Plugins\\lv is /c/Plugins/lv, so the rule is Read(//c/Plugins/lv/**);
+    //C:/Plugins/lv never matches."""
     path = folder.as_posix()
     if re.match(r"[A-Za-z]:/", path):
         path = "/" + path[0].lower() + path[2:]
-    return f"Read(/{path}/**)"
+    return f"Read(/{path}/**)" if tree else f"Read(/{path})"
+
+
+_STYLE_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
+
+
+def turn_style(turn: dict) -> str:
+    """The style a turn's lesson is made in (`school` when the turn names none)."""
+    return (turn.get("project") or {}).get("style") or "school"
+
+
+def plugin_reads(style: str = "school", root: PurePath | None = None) -> tuple[list[str], list[str]]:
+    """What a site turn may read in the plugin folder, as (allow, deny) rules: only what the make skill sends it to,
+    that is the chapter guide and the sample chapter (the skill's references/) and the lesson's own style guide (the
+    `guide` path `LV style` prints). Every other style's folder is also denied outright, so no other rule (a broader
+    allow added later, a default of Claude Code's) can open it. The skill's own instructions come with the skill."""
+    root = root or config.PLUGIN_ROOT
+    allow = [read_rule(root / "skills" / "make" / "references")]
+    if _STYLE_ID.fullmatch(style or ""):
+        allow.append(read_rule(root / "styles" / style / "guide.md", tree=False))
+    try:
+        others = sorted(p.name for p in Path(root, "styles").iterdir() if p.is_dir() and p.name != style)
+    except OSError:
+        others = []
+    return allow, [read_rule(root / "styles" / name) for name in others]
 
 
 def model_and_effort(kind: str = "", mode: str | None = None) -> tuple[str, str]:
@@ -110,24 +135,27 @@ def model_and_effort(kind: str = "", mode: str | None = None) -> tuple[str, str]
     return os.environ.get("LV_CLAUDE_MODEL") or model, os.environ.get("LV_CLAUDE_EFFORT") or effort
 
 
-def claude_command(lv: str, kind: str = "", mode: str | None = None) -> list[str]:
+def claude_command(lv: str, kind: str = "", mode: str | None = None, style: str = "school") -> list[str]:
     """Claude Code pinned to this job: one model at one effort (model_and_effort), no user, project or local settings
     (so no hooks, extra allow rules or permission mode of the teacher's own), no MCP servers, this plugin loaded
-    explicitly, and anything not allowed below is refused without asking (nobody is there to answer)."""
+    explicitly, reading only the lesson folder and what plugin_reads allows for the lesson's `style`, and anything not
+    allowed below is refused without asking (nobody is there to answer)."""
     claude = shutil.which("claude")
     if not claude:
         raise UserError("Claude Code isn't installed on this computer (no `claude` command). Install it from "
                         "https://claude.com/claude-code, sign in once, then try again.")
     model, effort = model_and_effort(kind, mode)
+    reads, unreadable = plugin_reads(style)
     return [claude, "-p", PROMPT, "--model", model, *([] if effort == "default" else ["--effort", effort]),
             "--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config",
             "--plugin-dir", str(config.PLUGIN_ROOT),
-            "--allowedTools", f"Bash({lv}:*)", "Read(./**)", read_rule(config.PLUGIN_ROOT), "Edit(./**)",
-            "--disallowedTools", *DENIED]
+            "--allowedTools", f"Bash({lv}:*)", "Read(./**)", *reads, "Edit(./**)",
+            "--disallowedTools", *DENIED, *unreadable]
 
 
-def _site_env(private: Path, api_key: bool = False, root: Path | None = None) -> dict:
-    """Claude's environment: site mode on, and no registered project folder to redirect output into. The settings
+def _site_env(private: Path, api_key: bool = False, root: Path | None = None, style: str | None = None) -> dict:
+    """Claude's environment: site mode on, the lesson's style (`style`, else the running turn's: the only one `style`
+    and `styles` show in site mode), and no registered project folder to redirect output into. The settings
     file is never created and sits in a private folder outside the lesson, where Claude's file tools can't plant one.
     Variables a parent Claude Code session set are dropped (the job is its own session), and so is every way to use an
     API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
@@ -145,6 +173,7 @@ def _site_env(private: Path, api_key: bool = False, root: Path | None = None) ->
                 env[k] = os.environ[k]
         env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     env["LV_SITE_MODE"] = "1"
+    env["LV_SITE_STYLE"] = style or _turn_style
     if root is not None:   # the lesson folder the site-mode path guard holds every path to, wherever Claude cds
         env["LV_SITE_ROOT"] = str(Path(root).resolve())
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
@@ -167,6 +196,8 @@ class LeaseLost(Exception):
 
 # set by the heartbeat when the website says this computer no longer holds the turn; cleared at each turn's start
 _turn_stop = threading.Event()
+# the running turn's style (turn_style), for Claude's environment (_site_env); set as each turn starts Claude
+_turn_style = "school"
 
 
 def _private_dir(cwd: Path) -> Path:
@@ -562,7 +593,9 @@ def _claude_turn(turn: dict, folder: Path, sitedir: Path, log: Path, claude) -> 
     lv = lv_command()
     write_text(sitedir / "lv.txt", lv + "\n")
     card_file = sitedir / "card.json"
-    code = claude(claude_command(lv, turn["turn"]["kind"], turn.get("mode")), folder, log)
+    global _turn_style
+    _turn_style = turn_style(turn)
+    code = claude(claude_command(lv, turn["turn"]["kind"], turn.get("mode"), _turn_style), folder, log)
     if code != 0 or not card_file.exists():
         return error_card("Claude stopped before it finished this step.", _log_text(log), detect_limit=True)
     card = read_json(card_file)

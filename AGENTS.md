@@ -72,6 +72,11 @@ style). A private style is never committed here. Styles change what is asked and
 written, never the engine API or the job contract. `tests/test_styles.py`
 validates every style.
 
+A site turn reads only what it needs: Claude Code may read the lesson folder, the make skill's `references/` and the
+lesson's own style guide, nothing else in the plugin folder (`worker.plugin_reads`), and `style` / `styles` show
+only the lesson's style (`LV_SITE_STYLE`, set by the worker). Anything new a turn must read goes in `references/` or
+the style's `guide.md`, or `plugin_reads` must allow it.
+
 ## Kept names
 
 The rename to slide2video left these unchanged on purpose, because the website,
