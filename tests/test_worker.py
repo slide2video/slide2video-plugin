@@ -240,36 +240,6 @@ def test_non_school_style_is_an_error_without_claude(paired, lessons):
     assert not worker.project_dir({"id": PRJ, "title": "Unit 3: Water/Cycle"}).exists()
 
 
-def test_a_turn_reads_only_its_own_style(paired, lessons):
-    paired.turns.append(_turn())
-    paired.files["fil_0123456789abcdefghijkl"] = DECK
-    fake = _claude_writing(QUESTIONS)
-    assert worker.run_once(claude=fake) == 0
-    cmd = fake.calls[0][0]
-    allow, deny = worker.plugin_reads("school")
-    assert _flag(cmd, "--allowedTools")[2:-1] == allow
-    assert set(deny) <= set(_flag(cmd, "--disallowedTools"))
-    assert fake.styles == ["school"]   # and Claude's environment names it (run_claude -> _site_env)
-
-
-def test_site_env_names_the_lessons_style(tmp_path, monkeypatch):
-    monkeypatch.setattr(worker, "_turn_style", "second")   # the running turn's
-    assert worker._site_env(tmp_path)["LV_SITE_STYLE"] == "second"
-    assert worker._site_env(tmp_path, style="third")["LV_SITE_STYLE"] == "third"
-
-
-def test_run_claude_passes_the_turns_style_on(monkeypatch, tmp_path):
-    seen = {}
-
-    def fake_run(cmd, **kw):
-        seen.update(kw["env"])
-        return subprocess.CompletedProcess(cmd, 0)
-    monkeypatch.setattr(worker, "_run_in_group", fake_run)
-    monkeypatch.setattr(worker, "_turn_style", "second")
-    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
-    assert seen["LV_SITE_STYLE"] == "second" and seen["LV_SITE_MODE"] == "1"
-
-
 def test_live_lock_makes_a_second_run_exit(paired, lessons, lv_pid):
     lessons.mkdir(parents=True)
     holder = worker._lock(lessons, ".worker.lock")  # another run holds it
@@ -465,6 +435,36 @@ def test_claude_command_pins_claude_codes_configuration(monkeypatch):
     assert {"WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "Edit(./CLAUDE.md)",
             "Edit(./CLAUDE.local.md)", "Edit(./AGENTS.md)"} <= denied
     assert "--bare" not in cmd  # --bare never reads the subscription login
+
+
+def test_a_turn_reads_only_its_own_style(paired, lessons):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    fake = _claude_writing(QUESTIONS)
+    assert worker.run_once(claude=fake) == 0
+    cmd = fake.calls[0][0]
+    allow, deny = worker.plugin_reads("school")
+    assert _flag(cmd, "--allowedTools")[2:-1] == allow
+    assert set(deny) <= set(_flag(cmd, "--disallowedTools"))
+    assert fake.styles == ["school"]   # and Claude's environment names it (run_claude -> _site_env)
+
+
+def test_site_env_names_the_lessons_style(tmp_path, monkeypatch):
+    monkeypatch.setattr(worker, "_turn_style", "second")   # the running turn's
+    assert worker._site_env(tmp_path)["LV_SITE_STYLE"] == "second"
+    assert worker._site_env(tmp_path, style="third")["LV_SITE_STYLE"] == "third"
+
+
+def test_run_claude_passes_the_turns_style_on(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw["env"])
+        return subprocess.CompletedProcess(cmd, 0)
+    monkeypatch.setattr(worker, "_run_in_group", fake_run)
+    monkeypatch.setattr(worker, "_turn_style", "second")
+    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    assert seen["LV_SITE_STYLE"] == "second" and seen["LV_SITE_MODE"] == "1"
 
 
 def test_run_claude_removes_planted_claude_config_and_cleans_the_env(monkeypatch, tmp_path):
