@@ -388,9 +388,11 @@ def test_plugin_reads_cover_every_file_a_site_turn_is_sent_to():
     allow, deny = worker.plugin_reads("school", root)
 
     def readable(f: Path) -> bool:
+        target = worker.read_rule(f, tree=False)[len("Read(/"):-1]   # the file in Claude Code's form (/c/... on Windows)
+
         def hit(rule):
             pattern = rule[len("Read(/"):-1]
-            return fnmatch.fnmatchcase(f.as_posix(), pattern.replace("/**", "/*")) or f.as_posix() == pattern
+            return fnmatch.fnmatchcase(target, pattern.replace("/**", "/*")) or target == pattern
         return any(hit(r) for r in allow) and not any(hit(r) for r in deny)
 
     refs = root / "skills" / "make" / "references"
