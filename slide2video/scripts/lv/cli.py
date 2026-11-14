@@ -293,11 +293,15 @@ def dispatch(args) -> int:
         return 0
     if args.cmd in ("styles", "style"):
         from . import styles
+        # in site mode a turn sees only its own lesson's style (the worker sets LV_SITE_STYLE)
+        own = (os.environ.get("LV_SITE_STYLE") or "school") if os.environ.get("LV_SITE_MODE") == "1" else None
         if args.cmd == "style":
+            if own is not None and args.id != own:
+                raise UserError(f"This lesson's style is {own!r}; in site mode only that style can be looked up.")
             s = styles.get(args.id)
             print(json.dumps({**s.data, "guide": str(s.guide)}, ensure_ascii=False, indent=1))
             return 0
-        rows = list(styles.installed().values())
+        rows = [s for s in styles.installed().values() if own is None or s.id == own]
         if args.json:
             print(json.dumps([{"id": s.id, "name": s.data["name"], "description": s.data["description"],
                                "origin": s.origin} for s in rows], ensure_ascii=False))

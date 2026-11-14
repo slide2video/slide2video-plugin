@@ -95,6 +95,39 @@ def test_site_mode_refuses_risky_commands(monkeypatch, capsys):
     assert "isn't available while working" not in capsys.readouterr().err
 
 
+def test_site_mode_shows_only_the_lessons_own_style(monkeypatch, tmp_path, capsys):
+    import json
+    import shutil
+    from lv import styles
+    root = tmp_path / "styles"
+    shutil.copytree(styles.ROOT / "school", root / "school")
+    shutil.copy(styles.SCHEMA, root / "style.schema.json")
+    data = json.loads((root / "school" / "style.json").read_text(encoding="utf-8"))
+    (root / "second").mkdir()
+    (root / "second" / "style.json").write_text(json.dumps({**data, "id": "second", "name": "Second"}), encoding="utf-8")
+    (root / "second" / "guide.md").write_text("# Second\n", encoding="utf-8")
+    monkeypatch.setattr(styles, "ROOT", root)
+    monkeypatch.setattr(styles, "SCHEMA", root / "style.schema.json")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LV_SITE_MODE", "1")
+    for own, other in (("school", "second"), ("second", "school")):
+        monkeypatch.setenv("LV_SITE_STYLE", own)
+        assert cli.main(["style", other]) == 1
+        assert "only that style can be looked up" in capsys.readouterr().err
+        assert cli.main(["style", own]) == 0
+        assert json.loads(capsys.readouterr().out)["id"] == own
+        assert cli.main(["styles", "--json"]) == 0
+        assert [s["id"] for s in json.loads(capsys.readouterr().out)] == [own]
+    monkeypatch.delenv("LV_SITE_STYLE")   # site mode without it: the lesson is school
+    assert cli.main(["style", "second"]) == 1
+    capsys.readouterr()
+    monkeypatch.delenv("LV_SITE_MODE")    # outside site mode, every installed style
+    assert cli.main(["style", "second"]) == 0
+    capsys.readouterr()
+    assert cli.main(["styles", "--json"]) == 0
+    assert [s["id"] for s in json.loads(capsys.readouterr().out)] == ["school", "second"]
+
+
 def test_site_mode_keeps_paths_inside_the_lesson(monkeypatch, tmp_path, capsys):
     import json
     lesson = tmp_path / "lesson"
