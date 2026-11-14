@@ -65,12 +65,24 @@ Each is optional; with none set, behaviour is unchanged.
 A publish runs `S2V_PUBLISH=1 uv run pytest -q`, which needs the maintainer's local `.private-terms.txt`
 (git-ignored; one term per line). `tests/test_public_repo.py` scans every tracked text file for those terms.
 
+## What the plugin opens from a deck
+
+`ingest` takes a deck's text and its pictures (an embedded video's poster frame included). It never takes a deck's
+embedded video or sound, or anything inside them, and `frames` (24 fps) runs only on the AI clips in `clips/`.
+slide2video.com relies on this list: before the plugin opens, shows or turns into frames any other kind of input,
+open an issue on `slide2video/slide2video-site` and change the website's side first.
+
 ## Styles
 
 A public style lives only in `slide2video/styles/` (today: `school`, the public
 style). A private style is never committed here. Styles change what is asked and
 written, never the engine API or the job contract. `tests/test_styles.py`
 validates every style.
+
+A site turn reads only what it needs: Claude Code may read the lesson folder, the make skill's `references/` and the
+lesson's own style guide, nothing else in the plugin folder (`worker.plugin_reads`), and `style` / `styles` show
+only the lesson's style (`LV_SITE_STYLE`, set by the worker). Anything new a turn must read goes in `references/` or
+the style's `guide.md`, or `plugin_reads` must allow it.
 
 ## Kept names
 

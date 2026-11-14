@@ -44,17 +44,18 @@ def lessons(tmp_path, monkeypatch):
 
 
 def _claude_writing(card, also=None, code=0, log="ok\n"):
-    calls = []
+    calls, styles = [], []
 
     def fake(cmd, cwd, logfile):
         calls.append((cmd, cwd))
+        styles.append(worker._site_env(logfile.parent)["LV_SITE_STYLE"])   # the style Claude's environment names
         logfile.write_text(log, encoding="utf-8")
         if also:
             also(cwd)
         if card is not None:
             write_json(cwd / "site" / "card.json", card)
         return code
-    fake.calls = calls
+    fake.calls, fake.styles = calls, styles
     return fake
 
 
@@ -297,8 +298,11 @@ def test_claude_command_limits_tools(monkeypatch):
     cmd = worker.claude_command('"/usr/bin/uv" run "/p/slide2video.py"')
     assert cmd[1:3] == ["-p", worker.PROMPT]
     allowed = _flag(cmd, "--allowedTools")
+    root = worker.config.PLUGIN_ROOT
     assert allowed == ['Bash("/usr/bin/uv" run "/p/slide2video.py":*)', "Read(./**)",
-                       worker.read_rule(worker.config.PLUGIN_ROOT), "Edit(./**)"]
+                       worker.read_rule(root / "skills" / "make" / "references"),
+                       worker.read_rule(root / "styles" / "school" / "guide.md", tree=False), "Edit(./**)"]
+    assert worker.read_rule(root) not in cmd  # never the whole plugin folder (its scripts, other skills, other styles)
     assert not any(t.startswith("Write(") for t in cmd)  # Claude Code ignores Write rules; Edit rules cover writing
     assert not any(t.startswith("Bash") and t != 'Bash("/usr/bin/uv" run "/p/slide2video.py":*)' for t in cmd)
     for bare in ("Read", "Write", "Edit", "Glob", "Grep", "Bash"):
@@ -310,6 +314,67 @@ def test_read_rule_uses_claude_codes_posix_form():
     assert worker.read_rule(PurePosixPath("/Users/t/.claude/plugins/lv")) == "Read(//Users/t/.claude/plugins/lv/**)"
     assert (worker.read_rule(PureWindowsPath(r"C:\Users\Daniel Landi\.claude\plugins\lv"))
             == "Read(//c/Users/Daniel Landi/.claude/plugins/lv/**)")
+    assert (worker.read_rule(PurePosixPath("/opt/lv/styles/school/guide.md"), tree=False)
+            == "Read(//opt/lv/styles/school/guide.md)")
+    assert (worker.read_rule(PureWindowsPath(r"C:\Plugins\lv\styles\school\guide.md"), tree=False)
+            == "Read(//c/Plugins/lv/styles/school/guide.md)")
+
+
+def _plugin_tree(root: Path, styles=("school", "second", "third")) -> Path:
+    for name in styles:
+        write_text(root / "styles" / name / "guide.md", f"# {name}\n")
+        write_json(root / "styles" / name / "style.json", {"id": name})
+    write_text(root / "styles" / "style.schema.json", "{}")
+    write_text(root / "skills" / "make" / "references" / "guide.md", "# guide\n")
+    write_text(root / "scripts" / "lv" / "worker.py", "")
+    return root
+
+
+def test_plugin_reads_allow_only_the_references_and_the_lessons_own_style_guide(tmp_path):
+    root = _plugin_tree(tmp_path / "plugin")
+    allow, deny = worker.plugin_reads("second", root)
+    assert allow == [worker.read_rule(root / "skills" / "make" / "references"),
+                     worker.read_rule(root / "styles" / "second" / "guide.md", tree=False)]
+    # every other style's folder is denied outright; the style's own folder (its guide) is not
+    assert deny == [worker.read_rule(root / "styles" / "school"), worker.read_rule(root / "styles" / "third")]
+    for rule in allow:   # nothing that opens the scripts, the other skills or another style
+        assert "/scripts" not in rule and "/third" not in rule and "/school" not in rule
+        assert rule != worker.read_rule(root)
+
+
+@pytest.mark.parametrize("style", ["../third", "second/../third", "", "Second", "a b", "*", "x" * 65])
+def test_plugin_reads_give_no_style_guide_for_a_malformed_style(tmp_path, style):
+    root = _plugin_tree(tmp_path / "plugin")
+    allow, deny = worker.plugin_reads(style, root)
+    assert allow == [worker.read_rule(root / "skills" / "make" / "references")]
+    assert {worker.read_rule(root / "styles" / n) for n in ("school", "second", "third")} <= set(deny)
+
+
+def test_plugin_reads_cover_every_file_a_site_turn_is_sent_to():
+    """The make skill sends a site turn to its references (guide.md, the sample chapter) and to the style's guide;
+    each of those files must be readable under the rules, and nothing in the skill points elsewhere in the plugin."""
+    import fnmatch
+    root = worker.config.PLUGIN_ROOT
+    allow, deny = worker.plugin_reads("school", root)
+
+    def readable(f: Path) -> bool:
+        target = worker.read_rule(f, tree=False)[len("Read(/"):-1]   # the file in Claude Code's form (/c/... on Windows)
+
+        def hit(rule):
+            pattern = rule[len("Read(/"):-1]
+            return fnmatch.fnmatchcase(target, pattern.replace("/**", "/*")) or target == pattern
+        return any(hit(r) for r in allow) and not any(hit(r) for r in deny)
+
+    refs = root / "skills" / "make" / "references"
+    for f in [*refs.rglob("*"), root / "styles" / "school" / "guide.md"]:
+        if f.is_file():
+            assert readable(f), f
+    for f in (root / "scripts" / "lv" / "worker.py", root / "engine" / "engine.js", root / "styles" / "school" / "style.json",
+              root / "skills" / "make" / "SKILL.md", root / "skills" / "setup" / "SKILL.md"):
+        assert not readable(f), f
+    skill = (root / "skills" / "make" / "SKILL.md").read_text(encoding="utf-8")
+    site_mode = skill[skill.index("## Site mode"):]
+    assert "${CLAUDE_SKILL_DIR}" not in site_mode and "../../" not in site_mode
 
 
 def test_claude_command_model_can_be_overridden_for_comparisons(monkeypatch):
@@ -370,6 +435,36 @@ def test_claude_command_pins_claude_codes_configuration(monkeypatch):
     assert {"WebFetch", "WebSearch", "Edit(./.claude/**)", "Edit(./.mcp.json)", "Edit(./CLAUDE.md)",
             "Edit(./CLAUDE.local.md)", "Edit(./AGENTS.md)"} <= denied
     assert "--bare" not in cmd  # --bare never reads the subscription login
+
+
+def test_a_turn_reads_only_its_own_style(paired, lessons):
+    paired.turns.append(_turn())
+    paired.files["fil_0123456789abcdefghijkl"] = DECK
+    fake = _claude_writing(QUESTIONS)
+    assert worker.run_once(claude=fake) == 0
+    cmd = fake.calls[0][0]
+    allow, deny = worker.plugin_reads("school")
+    assert _flag(cmd, "--allowedTools")[2:-1] == allow
+    assert set(deny) <= set(_flag(cmd, "--disallowedTools"))
+    assert fake.styles == ["school"]   # and Claude's environment names it (run_claude -> _site_env)
+
+
+def test_site_env_names_the_lessons_style(tmp_path, monkeypatch):
+    monkeypatch.setattr(worker, "_turn_style", "second")   # the running turn's
+    assert worker._site_env(tmp_path)["LV_SITE_STYLE"] == "second"
+    assert worker._site_env(tmp_path, style="third")["LV_SITE_STYLE"] == "third"
+
+
+def test_run_claude_passes_the_turns_style_on(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw["env"])
+        return subprocess.CompletedProcess(cmd, 0)
+    monkeypatch.setattr(worker, "_run_in_group", fake_run)
+    monkeypatch.setattr(worker, "_turn_style", "second")
+    worker.run_claude(["claude"], tmp_path, tmp_path / "log")
+    assert seen["LV_SITE_STYLE"] == "second" and seen["LV_SITE_MODE"] == "1"
 
 
 def test_run_claude_removes_planted_claude_config_and_cleans_the_env(monkeypatch, tmp_path):

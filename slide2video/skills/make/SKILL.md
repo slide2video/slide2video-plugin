@@ -122,7 +122,8 @@ below. **Never ask in chat** and never wait for an answer: do the work for this 
 check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
 
 - **Commands:** use the command in `site/lv.txt` exactly, in place of the command at the top of this skill (it is
-  the same plugin with absolute paths). Only that command, file reading and file editing are allowed. Run each command
+  the same plugin with absolute paths). Only that command, file reading and file editing are allowed; outside this
+  folder you can read only `guide.md` and the sample chapter next to this skill, and the style's guide. Run each command
   as its own Bash call that starts with the text of `site/lv.txt`, followed by its arguments: never `cd`, a variable,
   `eval` or another command before it, and never `;`, `&&` or a pipe. Anything else is refused. Read and write files
   (progress, notes, cards) with the file tools, not the shell.
