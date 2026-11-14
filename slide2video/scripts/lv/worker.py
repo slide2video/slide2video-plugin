@@ -153,6 +153,35 @@ def claude_command(lv: str, kind: str = "", mode: str | None = None, style: str 
             "--disallowedTools", *DENIED, *unreadable]
 
 
+CLIPS_ENV = "LV_SITE_CLIPS"     # the most AI clips the lesson may have, for Claude's commands (clips_allowed)
+# Where `clip` counts this step's clips: the step's private folder, never the lesson. Per step by design: the website's
+# own processing runs every step in a new container, so nothing on disk carries over between steps; the website sends
+# `clips` as the clips the project still has (its most less those already made) and itself enforces the project's
+# total. A computer's turn has no limit at all (its clips run on the teacher's own key).
+CLIP_LEDGER_ENV = "LV_SITE_CLIP_LEDGER"
+
+
+def clips_allowed(turn: dict) -> int | None:
+    """The AI clips a turn's video project may still have: its `clips` (contract 2.8.0), or None for no limit. A turn of
+    the website's own processing (it carries `mode`) without `clips` comes from a website before the field, where
+    nobody chose clips: 0. A computer's turn carries neither and keeps the plugin's own clip planning. A `clips` that
+    isn't a whole number from 0 also counts as 0."""
+    if "clips" in turn:
+        n = turn["clips"]
+        return n if isinstance(n, int) and not isinstance(n, bool) and n >= 0 else 0
+    return 0 if "mode" in turn else None
+
+
+def _turn_clips(root: Path | None) -> int | None:
+    """clips_allowed of the turn the worker just wrote to the lesson's site/turn.json (read before Claude starts, so an
+    edit of that file during the turn changes nothing). None when there is no readable turn."""
+    try:
+        turn = read_json(Path(root) / "site" / "turn.json") if root is not None else None
+    except (OSError, ValueError):
+        return None
+    return clips_allowed(turn) if isinstance(turn, dict) else None
+
+
 def _site_env(private: Path, api_key: bool = False, root: Path | None = None, style: str | None = None) -> dict:
     """Claude's environment: site mode on, the lesson's style (`style`, else the running turn's: the only one `style`
     and `styles` show in site mode), and no registered project folder to redirect output into. The settings
@@ -161,7 +190,8 @@ def _site_env(private: Path, api_key: bool = False, root: Path | None = None, st
     API key or another provider: the job always runs on the teacher's Claude subscription. The subscription sign-in
     token a teacher may keep in CLAUDE_CODE_OAUTH_TOKEN is kept. With `api_key`, ANTHROPIC_API_KEY and
     ANTHROPIC_BASE_URL from the environment are kept instead (and the sign-in token is dropped), and Claude Code's
-    non-essential traffic is off."""
+    non-essential traffic is off. The turn's clip limit, when it has one, is LV_SITE_CLIPS (clips_allowed), counted in
+    LV_SITE_CLIP_LEDGER inside `private`."""
     if api_key and not os.environ.get("ANTHROPIC_API_KEY"):
         raise UserError(NEEDS_API_KEY)
     env = {k: v for k, v in os.environ.items() if k not in DROPPED_ENV
@@ -176,6 +206,14 @@ def _site_env(private: Path, api_key: bool = False, root: Path | None = None, st
     env["LV_SITE_STYLE"] = style or _turn_style
     if root is not None:   # the lesson folder the site-mode path guard holds every path to, wherever Claude cds
         env["LV_SITE_ROOT"] = str(Path(root).resolve())
+    env.pop(CLIPS_ENV, None)
+    env.pop(CLIP_LEDGER_ENV, None)
+    clips = _turn_clips(root)
+    if clips is not None:
+        # counted in the private folder (outside the lesson, removed after the step): Claude's tools write only inside
+        # the lesson, so deleting, renaming or moving a clip there never frees a place
+        env[CLIPS_ENV] = str(clips)
+        env[CLIP_LEDGER_ENV] = str(Path(private) / "clip-places")
     env["LESSON_VIDEOS_SETTINGS"] = str(private / "no-settings.json")
     env["BASH_DEFAULT_TIMEOUT_MS"] = env["BASH_MAX_TIMEOUT_MS"] = BASH_TIMEOUT_MS
     return env

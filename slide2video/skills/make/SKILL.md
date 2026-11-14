@@ -61,7 +61,7 @@ Then check the teacher's instructions (what they asked for when they started) ag
 - Chapters: propose a split from the deck's sections or titles (for example one video per unit/entry/lesson) and ask them to confirm or adjust.
 - Length per video: default 4–6 minutes.
 - Voice: with an ElevenLabs key (`LV keys check`), Jessica (warm, upbeat young American woman; the default) or Daniel (steady British man, news-presenter tone), recorded as `"voice"` in each `script.json`; without one, the free Microsoft voice (Ava), which needs no account. They can also ask for the computer's own voice (offline, more robotic) or captions only; record the choice as `"narrator"` in each `script.json` (see `guide.md`). If `LV keys check` prints **Allowed voices**, offer only those.
-- Music and AI clips: only if a Gemini key is set (`LV keys check`).
+- Music and AI clips: only if a Gemini key is set (`LV keys check`). In site mode the website may already have settled clips (see **Clips** under Site mode).
 
 ## 3. Content brief
 
@@ -69,7 +69,7 @@ Write `WORK/brief.md`. Per chapter: what the style's `brief` lists. Then a secti
 
 ## 4. Plan and approval gate
 
-Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (the style's `outline`), which deck questions it shows open (from the brief's "left open" section), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (the style's `clips` says which). When the style's guide has a **Look** section, add the lesson's `Look:` line as it says. Then run:
+Write `WORK/plan.md`: for each chapter, the title, the output file name (`Chapter N - <Title>.mp4`), a scene outline (the style's `outline`), which deck questions it shows open (from the brief's "left open" section), which deck images it uses, and 0–2 photos per unit worth animating as AI clips (the style's `clips` says which; in site mode only as **Clips** under Site mode allows). When the style's guide has a **Look** section, add the lesson's `Look:` line as it says. Then run:
 
 ```
 LV estimate "WORK" --chapters <N> --minutes <M> --clips <K> [--music]
@@ -147,6 +147,12 @@ check it with `LV card "site/card.json"`, fix anything it reports, and **stop**.
   the card's message says which defaults were used.
 - **Questions:** at most 8 per card. If there are more, keep the most important and decide the rest with the
   defaults, saying so in the message.
+- **Clips:** `clips` in `site/turn.json` is how many AI clips this video project may still have, and the person chose it on
+  the website: never ask about clips, in any card. A turn with `mode` but no `clips` counts as `clips` 0. With 0, plan
+  none: no clips in `plan.md`, in the plan card or in `estimate` (leave out `--clips`). With more, plan at most that
+  many (0–2 photos per unit, the style's `clips` saying which) and pass the count to `estimate --clips`. `estimate` and
+  `clip` refuse more than allowed; if `clip` refuses, make the chapter without that clip and say so in the card's
+  message. A turn with neither `clips` nor `mode` plans clips as step 4 says.
 - **Approval:** `approve` approves exactly the plan card's estimate. Only make music or clips if the plan card
   listed them with their cost; otherwise make none. When the plan card's `markdown` includes music or clips, it
   must list them with their costs.
