@@ -56,6 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--json", action="store_true", help="print the plan card's estimate (total and parts) as JSON")
     st = sub.add_parser("status", help="which chapters are done and what each needs next")
     st.add_argument("work", type=Path)
+    chp = sub.add_parser("chapter", help="one chapter's slides and part of the brief (from plan.md's Slides: line), "
+                                         "and a contact sheet of its pictures, next to slides.md")
+    chp.add_argument("work", type=Path)
+    chp.add_argument("n", type=int)
     sts = sub.add_parser("styles", help="the installed styles (School)")
     sts.add_argument("--json", action="store_true")
     sty = sub.add_parser("style", help="one style's questions, check, brief, outline, clips, music and guide path, as JSON")
@@ -321,8 +325,15 @@ def dispatch(args) -> int:
     if args.cmd == "ingest":
         ingest.ingest(args.deck, args.work or ingest.default_work(args.deck))
         return 0
-    from . import config, estimate, status
+    from . import chapter, config, estimate, status
+    if args.cmd == "chapter":
+        out, sheets = chapter.extract(args.work.resolve(), args.n)
+        print(f"chapter {args.n}: {out}")
+        print("pictures: " + (", ".join(str(s) for s in sheets) if sheets else "none on these slides"))
+        return 0
     if args.cmd == "estimate":
+        if args.chapters:
+            chapter.check_plan(args.work.resolve(), args.chapters)
         _plan_clips_ok(args.clips)
         chars = estimate.plan_chars(args.chapters, args.minutes) if args.chapters else estimate.chars_in_scripts(args.work)
         paid = bool(keys.get("ELEVENLABS_API_KEY", required=False))
