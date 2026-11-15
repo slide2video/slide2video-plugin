@@ -8,6 +8,13 @@ pytest_plugins = ["site_fake"]
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "slide2video"
+# The make skill is SKILL.md plus the files its turns read from references/ (guide.md is separate)
+MAKE_PARTS = ("SKILL.md", "references/plan-steps.md", "references/build-steps.md", "references/cowork.md")
+
+
+def make_skill_text() -> str:
+    """The whole make skill as a session can read it: SKILL.md, then its steps and Cowork files."""
+    return "\n".join((PLUGIN / "skills/make" / part).read_text(encoding="utf-8") for part in MAKE_PARTS)
 
 
 @pytest.fixture(autouse=True)

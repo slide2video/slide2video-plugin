@@ -1,15 +1,20 @@
 import json
 import re
 
-from conftest import PLUGIN, REPO
+from conftest import MAKE_PARTS, PLUGIN, REPO, make_skill_text
 from lv import narrate, render, sfx
 from lv.cli import build_parser
 
 SKILLS = ["setup", "make", "serve", "elevenlabs-get-api-key", "google-get-api-key"]
 
 
+def site_row(site, kind):
+    """The site-mode table row that says what a `kind` turn does (the last one: SKILL.md's own row may only point to it)."""
+    return [l for l in site.splitlines() if l.startswith(f"| `{kind}`")][-1]
+
+
 def frontmatter(name):
-    text = (PLUGIN / f"skills/{name}/SKILL.md").read_text(encoding="utf-8")
+    text = make_skill_text() if name == "make" else (PLUGIN / f"skills/{name}/SKILL.md").read_text(encoding="utf-8")
     m = re.match(r"---\n(.*?)\n---\n", text, re.S)
     return dict(l.split(": ", 1) for l in m.group(1).splitlines()), text
 
@@ -191,17 +196,17 @@ def test_setup_asks_about_slide2video_and_pairs_in_the_background():
 def test_site_mode_plans_only_after_the_interview():
     _, text = frontmatter("make")
     site = text.split("## Site mode", 1)[1]
-    row = next(l for l in site.splitlines() if l.startswith("| `answer`"))
+    row = site_row(site, "answer")
     assert "for every case" not in row
     assert "Otherwise (`interview.md` exists or was just written in this turn), step 4" in row
     assert "then leave the flagged slides out everywhere" not in row
     assert "if the decision is `remove`, leave the flagged slides out everywhere" in row
-    start = next(l for l in site.splitlines() if l.startswith("| `start`"))
+    start = site_row(site, "start")
     assert "don't write `brief.md` yet" in start
 
 
 def test_site_mode_sends_the_new_card_details():
-    text = (PLUGIN / "skills" / "make" / "SKILL.md").read_text(encoding="utf-8")
+    text = make_skill_text()
     site = text.split("## Site mode (slide2video.com)", 1)[1]
     assert '--json' in site and '"items"' in site          # cost items from estimate --json
     assert '"recommended": true' in site                   # Claude's suggested option
@@ -214,10 +219,10 @@ def test_impossible_instructions_are_asked_about_first():
     read = text.split("## 1. Read the deck", 1)[1].split("## 2.", 1)[0]
     assert "before anything else" in read and "recommend none" in read
     site = text.split("## Site mode", 1)[1]
-    start = next(l for l in site.splitlines() if l.startswith("| `start`"))
+    start = site_row(site, "start")
     assert start.index("instructions.md") < start.index("the style's check")   # notes first, students second
     assert "instructions-1" in start and "no option is `recommended`" in start
-    answer = next(l for l in site.splitlines() if l.startswith("| `answer`"))
+    answer = site_row(site, "answer")
     assert answer.index("instructions-") < answer.index("check.id")
     assert "the rest of the `start` row" in answer
     assert "`instructions.md`" in site.split("**Files between turns**", 1)[1]
@@ -381,3 +386,24 @@ def test_scenes_name_the_deck_slide_they_show():
     slides = {s["id"]: s.get("slide") for s in sample["scenes"]}
     assert slides == {"hook": 1, "evaporation": 2, "condensation": 3, "precipitation": 4, "tq": 6,
                       "q1": None, "a1": None, "outro": None}
+
+
+def test_make_skill_loads_only_what_a_turn_needs():
+    """SKILL.md holds what every turn needs; the steps are in two files, each read only by the turns that use them."""
+    make = PLUGIN / "skills/make"
+    skill = (make / "SKILL.md").read_text(encoding="utf-8")
+    plan = (make / "references/plan-steps.md").read_text(encoding="utf-8")
+    build = (make / "references/build-steps.md").read_text(encoding="utf-8")
+    assert len(skill.encode()) < 16_000          # what every turn loads; it was 27 KB with every step in it
+    whole = make_skill_text()
+    for n, part in ((0, plan), (1, plan), (2, plan), (3, plan), (4, plan), (5, build), (6, build), (7, build), (8, build)):
+        assert f"\n## {n}. " in part and whole.count(f"\n## {n}. ") == 1, n
+    assert not re.search(r"^## \d\. ", skill, re.M)
+    for name in ("references/plan-steps.md", "references/build-steps.md", "references/cowork.md"):
+        assert f"${{CLAUDE_SKILL_DIR}}/{name}" in skill, name
+    site = skill.split("## Site mode", 1)[1]
+    rule = " ".join(site.split("**Steps for this turn:**", 1)[1].split("\n\n", 1)[0].split())
+    assert "`start`, `answer` and `change` turns read `references/plan-steps.md`" in rule
+    assert "`approve`, `feedback` and `continue` turns read `references/build-steps.md`" in rule
+    assert "Site mode: the `start` and `answer` turns" in plan and "Cowork" not in plan + build
+    assert "In a Cowork cloud session" in skill and "LV keys load" not in skill

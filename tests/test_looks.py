@@ -246,6 +246,7 @@ def test_the_look_lives_in_the_plan_and_follows_changes():
     look = school.split("## Look", 1)[1].split("\n## ", 1)[0]
     assert "change the `Look:` line in `plan.md` first" in look
     assert "A lesson resumed without a `Look:` line" in look and "`Look: none" in look
-    make = (PLUGIN / "skills/make/SKILL.md").read_text(encoding="utf-8")
+    from conftest import make_skill_text
+    make = make_skill_text()
     resume = make.split("## 0. Resume?", 1)[1].split("\n## ", 1)[0]
     assert "no `Look:` line" in resume
