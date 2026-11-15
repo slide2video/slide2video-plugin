@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .util import UserError
+from .util import NOT_FINISHED, NotFinished, UserError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -89,11 +89,13 @@ def build_parser() -> argparse.ArgumentParser:
                       help="run the job in this file without taking one from the website or finishing it; "
                            "needs --card-out")
     wk.add_argument("--card-out", type=Path, metavar="CARD.json", help="where --turn writes the resulting card")
-    pt = sub.add_parser("_part")
-    for a in ("chapter", "out"):
+    pt = sub.add_parser("_part")   # one of render's workers: some pieces of the video
+    for a in ("chapter", "folder"):
         pt.add_argument(a, type=Path)
-    for a in ("fps", "f0", "f1"):
+    for a in ("fps", "size", "frames"):
         pt.add_argument(a, type=int)
+    pt.add_argument("deadline", type=float)
+    pt.add_argument("pieces", type=int, nargs="+")
     return p
 
 
@@ -116,6 +118,9 @@ def main(argv=None) -> int:
         print(f"note: couldn't copy the old lesson-videos settings ({e}); they are still in place.", file=sys.stderr)
     try:
         return dispatch(args)
+    except NotFinished as e:
+        print(f"not finished: {e}")
+        return NOT_FINISHED
     except UserError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -343,7 +348,7 @@ def dispatch(args) -> int:
         return 0
     from . import narrate, render
     if args.cmd == "narrate":
-        T = narrate.narrate(args.chapter.resolve(), cached_only=args.cached_only)
+        T = narrate.narrate(args.chapter.resolve(), cached_only=args.cached_only, seconds=config.step_seconds())
         print(f"narration {T['duration']:.1f}s, {len(T['scenes'])} scenes")
         for s in T["scenes"]:
             print(f"  {s['id']:<16} start {s['start']:7.2f}  dur {s['dur']:6.2f}")
@@ -352,10 +357,12 @@ def dispatch(args) -> int:
         print(render.stills(args.chapter.resolve(), args.times))
         return 0
     if args.cmd == "render":
-        render.render(args.chapter.resolve(), args.workers, args.fps, args.out.resolve() if args.out else None)
+        render.render(args.chapter.resolve(), args.workers, args.fps, args.out.resolve() if args.out else None,
+                      seconds=config.step_seconds())
         return 0
     if args.cmd == "_part":
-        render.video_part(args.chapter, args.out, args.fps, args.f0, args.f1)
+        render.video_pieces(args.chapter, args.folder, args.fps, args.size, args.frames, args.pieces,
+                            deadline=args.deadline or None)
         return 0
     raise UserError(f"unknown command {args.cmd}")
 

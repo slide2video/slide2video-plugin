@@ -9,6 +9,8 @@ How to build one chapter video with the slide2video engine. **LV** = the full `u
 4. `LV stills "WORK/chN" t1 t2 ...` (absolute seconds; one per scene, late enough that its reveals have happened) → `build/stills.jpg`. Read it and fix problems; it also prints `cue miss` warnings for cue words that never occur in the narration.
 5. `LV render "WORK/chN"` → the MP4 and a `.vtt` (it prints where).
 
+`narrate` and `render` each return within about 4 minutes. When one ends with `not finished` (exit code 3), run the same command again until it finishes: what it already made is kept.
+
 ## Engine API (globals)
 `const { W, H, C, E, P, pop, theme, clamp, lerp, text, measure, card, circle, arrow, line, check, cross, img, clip, bg, heading, badge, tip, bullets, label, emoji, titleCard, intro, quizQ, quizA, recap, rr, molecule, wander, membrane, ring, table, rng, noise } = Engine;`
 - `scene(id, (g, t, s) => {...}, opts)`: `g` = canvas 2D context (1920×1080), `t` = seconds since the scene started. `s.cue('word', n=0)` = local time the n-th occurrence of a word (prefix match, case- and punctuation-insensitive) is spoken; **sync every reveal to a cue word**. `s.after('word')` = when it ends. `s.end` = narration end, `s.dur` = scene length.

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import functools
+import hashlib
 import http.server
 import math
 import os
@@ -10,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
@@ -17,7 +19,7 @@ from pathlib import Path
 from . import captions, chromium, config, mix, paths, sfx, status, tools
 from .narrate import read_timing
 from .page import ensure_page, output_path, routes
-from .util import UserError, read_json, run, write_json, write_text
+from .util import NotFinished, UserError, read_json, run, write_json, write_text
 
 GRAB = """async ([t, q]) => {
   window.__render(t);
@@ -165,23 +167,47 @@ def stills(ch: Path, times: list[float], cols: int = 3) -> Path:
     return sheet_path
 
 
-def video_part(ch: Path, out: Path, fps: int, f0: int, f1: int) -> None:
+def _encode(pg, logs: list[str], out: Path, fps: int, f0: int, f1: int) -> None:
+    """Frames f0..f1-1 into the MP4 `out`, written under a temporary name first, so `out` exists only when whole."""
+    tmp = out.with_name(out.stem + ".part.mp4")
+    ff = subprocess.Popen([tools.ffmpeg(), "-v", "error", "-y", "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg",
+                           "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+                           "-r", str(fps), str(tmp)], stdin=subprocess.PIPE)
+    try:
+        for i in range(f0, f1):
+            ff.stdin.write(grab(pg, i / fps, 0.94))
+    finally:
+        ff.stdin.close()
+        code = ff.wait()
+    fail_on_errors(logs)
+    if code:
+        tmp.unlink(missing_ok=True)
+        raise UserError(f"ffmpeg failed while encoding {out.name} (exit {code}).")
+    os.replace(tmp, out)
+
+
+def piece_name(i: int) -> str:
+    return f"piece{i:04d}.mp4"
+
+
+def video_pieces(ch: Path, folder: Path, fps: int, size: int, frames: int, pieces: list[int],
+                 deadline: float | None = None) -> None:
+    """Render the given pieces (`size` frames each, of `frames` in all) into `folder`, one page for all of them. With
+    a deadline (time.time()), a piece starts only while it would likely end before it; the first always starts."""
+    count = math.ceil(frames / size)
     with page_for(ch) as (pg, logs):
         fail_on_errors(logs)
-        ff = subprocess.Popen([tools.ffmpeg(), "-v", "error", "-y", "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg",
-                               "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-                               "-r", str(fps), str(out)], stdin=subprocess.PIPE)
-        try:
-            for i in range(f0, f1):
-                ff.stdin.write(grab(pg, i / fps, 0.94))
-                if (i - f0) % 600 == 0:
-                    print(f"  [{out.name}] frame {i - f0}/{f1 - f0}", file=sys.stderr, flush=True)
-        finally:
-            ff.stdin.close()
-            code = ff.wait()
-        fail_on_errors(logs)
-    if code:
-        raise UserError(f"ffmpeg failed while encoding {out.name} (exit {code}).")
+        made, slowest = 0, 0.0
+        for i in pieces:
+            out = folder / piece_name(i)
+            if out.exists():
+                continue
+            if deadline is not None and made and time.time() + slowest > deadline:
+                break
+            t0 = time.time()
+            _encode(pg, logs, out, fps, i * size, min(frames, (i + 1) * size))
+            made, slowest = made + 1, max(slowest, time.time() - t0)
+            print(f"  rendered piece {i + 1}/{count}", flush=True)
 
 
 def final_sheet(video: Path, sheet: Path) -> Path:
@@ -202,7 +228,43 @@ def default_workers() -> int:
     return max(1, min(4, (os.cpu_count() or 2) // 2))
 
 
-def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir: Path | None = None) -> Path:
+FINISH_SECONDS = 30   # kept free at the end of a timed render for joining the pieces, the sound and the checks
+
+
+def _inputs_key(p: paths.ChapterPaths, fps: int, frames: int, size: int) -> str:
+    """A fingerprint of everything the frames are drawn from (the page, scenes.js, timing, engine, assets, fonts) and
+    how they are cut into pieces. Pieces rendered under another fingerprint are stale."""
+    h = hashlib.sha1(f"pieces 1|{fps}|{frames}|{size}|{config.W}x{config.H}".encode())
+    files = {p.build / "timing.js", p.build / "engine.js", p.build / "index.html"}
+    files |= {f for f in p.code.iterdir() if f.is_file()}
+    for f in sorted(files):
+        if f.is_file():
+            h.update(f"{f.name}|".encode() + hashlib.sha1(f.read_bytes()).digest())
+    for root in (p.assets, config.FONTS_DIR):
+        if root.is_dir():
+            for f in sorted(root.rglob("*")):
+                if f.is_file():
+                    st = f.stat()
+                    h.update(f"{f.relative_to(root).as_posix()}|{st.st_size}|{st.st_mtime_ns}".encode())
+    return h.hexdigest()
+
+
+def _pieces_folder(p: paths.ChapterPaths, key: str) -> Path:
+    """build/pieces, emptied when what it holds was rendered from other inputs."""
+    folder = p.build / "pieces"
+    stamp = folder / "inputs.txt"
+    if not stamp.is_file() or stamp.read_text(encoding="utf-8") != key:
+        shutil.rmtree(folder, ignore_errors=True)
+        write_text(stamp, key)
+    return folder
+
+
+def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir: Path | None = None,
+           seconds: float | None = None) -> Path:
+    """Render the chapter in pieces of config.RENDER_PIECE_SECONDS, kept in build/pieces until the video is made.
+    With `seconds`, stop starting pieces once they would end after that many seconds (less FINISH_SECONDS) and raise
+    NotFinished if pieces are left: running it again renders only the rest, unless an input changed in between."""
+    started = time.time()
     p = paths.chapter(ch)
     spec = read_json(p.code / "script.json")
     T = read_timing(ch)
@@ -210,20 +272,24 @@ def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir:
     b = p.build
     write_json(b / "sfx.json", events(ch))
     n = round(T["duration"] * fps)
-    workers = workers or default_workers()
-    seg = math.ceil(n / workers)
-    parts, procs = [], []
-    for w in range(workers):
-        f0, f1 = w * seg, min(n, (w + 1) * seg)
-        if f0 >= f1:
-            continue
-        p = b / f"part{w}.mp4"
-        parts.append(p)
-        procs.append(subprocess.Popen([sys.executable, str(config.ENTRY), "_part", str(ch), str(p), str(fps), str(f0), str(f1)]))
-    codes = [p.wait() for p in procs]
-    if any(codes):
-        raise UserError(f"Rendering failed in {sum(1 for c in codes if c)} of {len(codes)} worker(s); see the messages above.")
-    lst = write_text(b / "parts.txt", "".join(f"file '{p.name}'\n" for p in parts))
+    size = max(1, round(config.RENDER_PIECE_SECONDS * fps))
+    count = math.ceil(n / size)
+    folder = _pieces_folder(p, _inputs_key(p, fps, n, size))
+    todo = [i for i in range(count) if not (folder / piece_name(i)).exists()]
+    if todo:
+        workers = max(1, min(workers or default_workers(), len(todo)))
+        deadline = 0.0 if seconds is None else started + seconds - FINISH_SECONDS
+        procs = [subprocess.Popen([sys.executable, str(config.ENTRY), "_part", str(ch), str(folder), str(fps), str(size),
+                                   str(n), repr(deadline), *map(str, todo[w::workers])]) for w in range(workers)]
+        codes = [pr.wait() for pr in procs]
+        if any(codes):
+            raise UserError(f"Rendering failed in {sum(1 for c in codes if c)} of {len(codes)} worker(s); see the messages above.")
+        left = [i for i in todo if not (folder / piece_name(i)).exists()]
+        if left:
+            raise NotFinished(f"Rendering isn't finished: {count - len(left)} of {count} pieces of the video are done, "
+                              f"{len(left)} left. Run the same render command again to carry on (finished pieces are "
+                              "kept).")
+    lst = write_text(folder / "pieces.txt", "".join(f"file '{piece_name(i)}'\n" for i in range(count)))
     run(tools.ffmpeg(), "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", b / "video.mp4")
     sfx.build()  # no-op when the library exists; rebuilds it if ~/.slide2video was cleared
     audio = mix.mix_audio(ch, T, spec)
@@ -234,8 +300,7 @@ def render(ch: Path, workers: int | None = None, fps: int = config.FPS, out_dir:
     write_text(out.with_suffix(".vtt"), captions.vtt(T))
     if out_dir is None:  # a check render elsewhere doesn't count as the chapter's video
         status.mark_rendered(ch, out)
-    for p in parts:
-        p.unlink(missing_ok=True)
+    shutil.rmtree(folder, ignore_errors=True)
     print(f"wrote {out} ({tools.duration(out):.1f}s; narration {T['duration']:.1f}s)")
     print(f"frames from the finished video: {final_sheet(out, b / 'final.jpg')}")
     return out

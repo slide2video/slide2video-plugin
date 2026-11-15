@@ -11,6 +11,14 @@ class UserError(RuntimeError):
     """A failure with a plain-language message; the CLI prints it without a traceback."""
 
 
+class NotFinished(Exception):
+    """A long command (narrate, render) used up its time and stopped with work left. What it finished is kept, so
+    running the same command again carries on from there. The CLI prints the message and exits with NOT_FINISHED."""
+
+
+NOT_FINISHED = 3   # the exit code of a command that stopped early with work left: run it again
+
+
 def read_text(p) -> str:
     return Path(p).read_text(encoding="utf-8")
 

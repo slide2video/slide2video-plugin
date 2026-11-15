@@ -117,3 +117,21 @@ CHARS_PER_MINUTE = 900                     # narration characters per video minu
 FPS = 30
 W, H = 1920, 1080
 USER_AGENT = "slide2video/1.1 (+https://github.com/slide2video/slide2video-plugin)"
+
+# The longest `narrate` and `render` keep Claude waiting: each stops starting new work so that it returns within about
+# this many seconds, saying to run it again (what it finished is kept). Claude Code's prompt cache lasts five minutes
+# after its last use, so a command that runs longer makes Claude's next call write the whole conversation into the
+# cache again. LV_STEP_SECONDS overrides it; 0 means no limit.
+STEP_SECONDS = 200
+RENDER_PIECE_SECONDS = 10                  # video seconds per rendered piece: the unit `render` stops and resumes at
+
+
+def step_seconds() -> float | None:
+    """How long one `narrate` or `render` may work before it stops and asks to be run again: LV_STEP_SECONDS when it
+    is a number (0 or less: no limit), else STEP_SECONDS. None means no limit."""
+    raw = (os.environ.get("LV_STEP_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else float(STEP_SECONDS)
+    except ValueError:
+        value = float(STEP_SECONDS)
+    return value if value > 0 else None

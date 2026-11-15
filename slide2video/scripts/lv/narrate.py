@@ -6,10 +6,11 @@ import concurrent.futures as cf
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 
 from . import config, keys, net, paths, tools, voices
-from .util import UserError, read_json, read_text, run, write_json, write_text
+from .util import NotFinished, UserError, read_json, read_text, run, write_json, write_text
 
 
 def cache_key(voice: str, say: str) -> str:
@@ -106,18 +107,22 @@ def check_slides(spec: dict, ch: Path) -> None:
             raise UserError(f'Scene "{sc.get("id")}": "slide" must be a slide number of the deck{span}.')
 
 
-def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, cached_only: bool = False) -> dict:
-    """Voice every scene with the first voice in the chain that works for the whole chapter."""
+def narrate(ch: Path, speak_fn=None, workers: int = config.NARRATION_WORKERS, cached_only: bool = False,
+            seconds: float | None = None) -> dict:
+    """Voice every scene with the first voice in the chain that works for the whole chapter. With `seconds`, stop
+    starting new takes once they would end after that many seconds (at least one take is always made) and raise
+    NotFinished if scenes are left: the takes made are kept, so the next run records only the rest."""
+    deadline = None if seconds is None else time.monotonic() + seconds
     p = paths.chapter(ch)
     spec = read_json(p.code / "script.json")
     check_slides(spec, ch)
     if speak_fn is not None:  # a single, caller-supplied voice (tests, tools)
-        return _narrate(p, spec, "elevenlabs", speak_fn, workers, cached_only)
+        return _narrate(p, spec, "elevenlabs", speak_fn, workers, cached_only, deadline)
     order = voices.chain(spec)
     for k, provider in enumerate(order):
         try:
-            return _narrate(p, spec, provider, None, workers, cached_only)
-        except NeedsNewTakes:
+            return _narrate(p, spec, provider, None, workers, cached_only, deadline)
+        except (NeedsNewTakes, NotFinished):
             raise
         except (voices.VoiceUnavailable, UserError) as e:
             if k == len(order) - 1:
@@ -149,7 +154,15 @@ def _words(f: Path) -> list[dict]:
     return d["words"] if "words" in d else words_from(d)
 
 
-def _narrate(p: paths.ChapterPaths, spec: dict, provider: str, speak_fn, workers: int, cached_only: bool = False) -> dict:
+def _out_of_time(deadline: float | None, took: list[float]) -> bool:
+    """Whether a take started now would likely end after the deadline (judged by the takes so far)."""
+    if deadline is None:
+        return False
+    return time.monotonic() + (max(took) if took else 0.0) > deadline
+
+
+def _narrate(p: paths.ChapterPaths, spec: dict, provider: str, speak_fn, workers: int, cached_only: bool = False,
+             deadline: float | None = None) -> dict:
     voice = voices.voice_for(provider, spec)
     vd = p.voice
     vd.mkdir(parents=True, exist_ok=True)
@@ -173,13 +186,29 @@ def _narrate(p: paths.ChapterPaths, spec: dict, provider: str, speak_fn, workers
     if jobs and provider == "elevenlabs" and speak_fn is None:
         keys.get("ELEVENLABS_API_KEY")  # fail early with the friendly message
     fn = speak_fn or (lambda say, v, f: _take(provider, say, v, f))
-    done = 0
-    ex = cf.ThreadPoolExecutor(workers if provider == "elevenlabs" else 1)  # the free voices dislike parallel calls
+
+    def timed(say, v, f) -> float:
+        t0 = time.monotonic()
+        fn(say, v, f)
+        return time.monotonic() - t0
+
+    done, took = 0, []
+    parallel = workers if provider == "elevenlabs" else 1  # the free voices dislike parallel calls
+    ex = cf.ThreadPoolExecutor(parallel)
+    queue, running = list(jobs), set()
     try:
-        for fu in cf.as_completed([ex.submit(fn, say, voice, f) for say, f in jobs]):
-            fu.result()
-            done += 1
-            print(f"  voiced {done}/{len(jobs)}", flush=True)
+        while queue or running:
+            # a take starts only while it would likely end in time; the first one always starts
+            while queue and len(running) < parallel and (not (done or running) or not _out_of_time(deadline, took)):
+                say, f = queue.pop(0)
+                running.add(ex.submit(timed, say, voice, f))
+            if not running:
+                break
+            finished, running = cf.wait(running, return_when=cf.FIRST_COMPLETED)
+            for fu in finished:
+                took.append(fu.result())
+                done += 1
+                print(f"  voiced {done}/{len(jobs)}", flush=True)
     except (net.ApiError, voices.VoiceUnavailable) as e:
         ex.shutdown(wait=True, cancel_futures=True)  # don't keep spending on scenes still in the queue
         if isinstance(e, voices.VoiceUnavailable):
@@ -188,6 +217,10 @@ def _narrate(p: paths.ChapterPaths, spec: dict, provider: str, speak_fn, workers
         raise UserError(narration_error(e, saved, len(jobs))) from None
     finally:
         ex.shutdown(wait=True)
+    if queue:
+        (p.build / "timing.js").unlink(missing_ok=True)  # an older narration's timing no longer matches the script
+        raise NotFinished(f"Narration isn't finished: {done} of {len(jobs)} new scenes recorded so far, {len(queue)} "
+                          "left. Run the same narrate command again to record the rest (recorded scenes are kept).")
     takes = {sid: (tools.duration(f), _words(f), f.name) for sid, f in files.items()}
     for sid, say in silent.items():
         dur = voices.reading_time(say)
