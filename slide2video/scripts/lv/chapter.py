@@ -210,7 +210,8 @@ def extract(work: Path, n: int) -> tuple[Path, list[Path]]:
     # the pictures of its slides, of the deck's other parts (a slide master's logo), and for a PDF the pages themselves
     pictures, refused = media_files(deck_dir / "media",
                                     [f for part in [*(deck[s] for s in keep), *other] for f in _images(part)])
-    pictures += [deck_dir / "pages" / f"p{s:03d}.png" for s in keep]
+    pages = (deck_dir / "pages").resolve()
+    pictures += [p for p in (deck_dir / "pages" / f"p{s:03d}.png" for s in keep) if p.resolve().is_relative_to(pages)]
     for old in deck_dir.glob(f"{name}-contact-*.jpg"):
         old.unlink()
     sheets = contact_sheets([p for p in dict.fromkeys(pictures) if p.is_file()], deck_dir, prefix=f"{name}-contact")
