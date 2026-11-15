@@ -102,6 +102,7 @@ def test_clips_are_on_and_priced_from_config(monkeypatch, tmp_path, capsys):
 
 def test_the_make_skill_offers_clips_again():
     from pathlib import Path
-    make = (Path(__file__).parents[1] / "slide2video/skills/make/SKILL.md").read_text(encoding="utf-8")
+    from conftest import make_skill_text
+    make = make_skill_text()
     assert "AI clips are off" not in make
     assert "LV clip " in make and "--clips <K>" in make and "A clip is 10 seconds" in make

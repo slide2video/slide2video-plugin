@@ -186,7 +186,8 @@ def test_a_place_is_given_back_only_when_the_clip_cant_have_been_billed(monkeypa
 
 def test_site_mode_never_asks_about_clips_and_follows_the_turn():
     from pathlib import Path
-    make = (Path(__file__).parents[1] / "slide2video/skills/make/SKILL.md").read_text(encoding="utf-8")
+    from conftest import make_skill_text
+    make = make_skill_text()
     site = make.split("## Site mode", 1)[1]
     rule = " ".join(site.split("- **Clips:**", 1)[1].split("\n- **", 1)[0].split())
     for needed in ("`clips`", "never ask about clips", "`mode` but no `clips`", "plan at most that many", "`estimate --clips`",
