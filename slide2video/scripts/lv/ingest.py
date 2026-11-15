@@ -38,6 +38,8 @@ def ingest(deck: Path, work: Path) -> Path:
     images = sorted(media.iterdir())
     sheets = contact_sheets(images, out)
     print(f"{len(slides)} slides, {len(images)} unique images, {len(sheets)} contact sheet(s) → {out}")
+    if sheets:
+        print("contact sheets: " + ", ".join(s.name for s in sheets))
     return out
 
 
@@ -212,7 +214,7 @@ def _markdown(name: str, slides: list[dict]) -> str:
     return "\n".join(out)
 
 
-def contact_sheets(files: list[Path], out: Path, cols: int = 5, rows: int = 4) -> list[Path]:
+def contact_sheets(files: list[Path], out: Path, cols: int = 5, rows: int = 4, prefix: str = "contact") -> list[Path]:
     from PIL import Image, ImageDraw, ImageOps
     tiles = []
     for f in files:
@@ -235,7 +237,7 @@ def contact_sheets(files: list[Path], out: Path, cols: int = 5, rows: int = 4) -
             else:
                 d.rectangle([x, y, x + 300, y + 225], outline="gray")
             d.text((x, y + 230), f"{name}  {size}", fill="black")
-        p = out / f"contact-{s + 1:02d}.jpg"
+        p = out / f"{prefix}-{s + 1:02d}.jpg"
         sheet.save(p, quality=85)
         sheets.append(p)
     return sheets
