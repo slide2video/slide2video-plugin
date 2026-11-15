@@ -148,3 +148,29 @@ def test_cli_prints_the_file_and_pictures(lesson, capsys):
 def test_ingest_names_its_contact_sheets(tmp_path, capsys):
     ingest.ingest(REPO / "examples" / "water-cycle.pptx", tmp_path / "work")
     assert "contact sheets: contact-01.jpg" in capsys.readouterr().out
+
+
+def test_extract_uses_only_ingests_own_image_names(lesson, tmp_path, monkeypatch):
+    """slides.md is text: an Images: line naming a path outside media/ never reaches the contact sheet."""
+    deck = lesson / "deck"
+    outside = tmp_path / "secret.png"
+    outside.write_bytes((deck / "media" / sorted(p.name for p in (deck / "media").iterdir())[0]).read_bytes())
+    names = ["../../secret.png", str(outside), "..\\..\\secret.png", "s001-1.png/../../../secret.png",
+             "media/../../secret.png", "~/secret.png", "s001-1.png\x00.png", "C:secret.png"]
+    try:
+        (deck / "media" / "s009-1.png").symlink_to(outside)      # the right form, but a link out of media/
+        names.append("s009-1.png")
+    except OSError:                                              # Windows without the right to make links
+        pass
+    md = read_text(deck / "slides.md").replace("## Slide 2:", "Images: " + ", ".join(names) + "\n\n## Slide 2:", 1)
+    write_text(deck / "slides.md", md)
+    pictures, refused = chapter.media_files(deck / "media", names + ["s001-1.png"])
+    assert refused == names and [p.name for p in pictures] == ["s001-1.png"]
+    seen = []
+    real = chapter.contact_sheets
+    monkeypatch.setattr(chapter, "contact_sheets", lambda files, *a, **k: seen.extend(files) or real(files, *a, **k))
+    out, _ = chapter.extract(lesson, 1)
+    media = (deck / "media").resolve()
+    assert seen and all(p.resolve().is_relative_to(media) or p.parent.name == "pages" for p in seen)
+    assert outside not in [p.resolve() for p in seen]
+    assert f"Not on the contact sheet ({len(names)})" in read_text(out)

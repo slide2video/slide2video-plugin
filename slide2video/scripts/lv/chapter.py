@@ -145,9 +145,28 @@ def _deck_parts(slides_md: str) -> tuple[list[str], dict[int, str], list[str]]:
     return head, slides, other
 
 
+# the names ingest gives the images it saves in media/: s004-2.png (a .pptx slide), p004-1.jpeg (a PDF page), or a
+# word and a number (e.g. an image not on any slide); never a folder, a dot before the extension, or another separator
+_MEDIA_NAME = re.compile(r"(?:[sp]\d{3,}-\d+|[a-z]+-\d+)\.[a-z0-9]{1,5}")
+
+
 def _images(section: str) -> list[str]:
     return [name.strip() for line in section.splitlines() if line.startswith("Images: ")
             for name in line[len("Images: "):].split(",") if name.strip()]
+
+
+def media_files(media: Path, names: list[str]) -> tuple[list[Path], list[str]]:
+    """The image files in `media` the names stand for, and the names refused. slides.md is text anyone can edit, so a
+    name is used only when it has the form ingest writes and its file, links followed, is inside `media`."""
+    root = media.resolve()
+    ok, refused = [], []
+    for name in dict.fromkeys(names):
+        f = media / name
+        if _MEDIA_NAME.fullmatch(name) and f.resolve().is_relative_to(root):
+            ok.append(f)
+        else:
+            refused.append(name)
+    return ok, refused
 
 
 def _span(nums: list[int]) -> str:
@@ -189,7 +208,8 @@ def extract(work: Path, n: int) -> tuple[Path, list[Path]]:
     extra = [s for s in extra if s in deck]
     name = f"chapter-{n}"
     # the pictures of its slides, of the deck's other parts (a slide master's logo), and for a PDF the pages themselves
-    pictures = [deck_dir / "media" / f for part in [*(deck[s] for s in keep), *other] for f in _images(part)]
+    pictures, refused = media_files(deck_dir / "media",
+                                    [f for part in [*(deck[s] for s in keep), *other] for f in _images(part)])
     pictures += [deck_dir / "pages" / f"p{s:03d}.png" for s in keep]
     for old in deck_dir.glob(f"{name}-contact-*.jpg"):
         old.unlink()
@@ -201,7 +221,9 @@ def extract(work: Path, n: int) -> tuple[Path, list[Path]]:
              + f". The whole deck ({len(deck)} slides) is `slides.md`, next to this file: open a slide there only when "
              "this chapter needs one that isn't here."
              + (f" This chapter's pictures: {', '.join(s.name for s in sheets)}." if sheets else
-                " These slides have no pictures."),
+                " These slides have no pictures.")
+             + (f" Not on the contact sheet ({len(refused)}): image names that aren't files `ingest` saved in "
+                "`media/`." if refused else ""),
              ""]
     lines += [deck[s] + "\n" for s in keep]
     lines += [t + "\n" for t in other]
