@@ -185,10 +185,10 @@ def test_status_names_the_version_and_an_available_update(paired, capsys, monkey
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out
     assert f"(this device: Test Mac, slide2video {lv.__version__})." in out and "newer" not in out
-    paired.latest = "2.9.0"
+    paired.latest = "2.10.0"
     assert cli.main(["worker", "--status"]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[1] == ("A newer slide2video (2.9.0) is available. To update: run /plugin update slide2video, "
+    assert out[1] == ("A newer slide2video (2.10.0) is available. To update: run /plugin update slide2video, "
                       "then close and reopen Claude Code, then run /slide2video:serve.")
     paired.latest = "1.0.0"
     assert cli.main(["worker", "--status"]) == 0
