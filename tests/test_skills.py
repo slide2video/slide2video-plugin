@@ -360,12 +360,16 @@ def test_site_mode_plan_card_copies_quantities():
 def test_the_deck_numbers_are_never_changed():
     guide = (PLUGIN / "skills/make/references/guide.md").read_text(encoding="utf-8")
     rules = guide.split("## Numbers from the deck", 1)[1].split("\n## ", 1)[0]
-    for phrase in ("exactly as in `WORK/deck/slides.md`", "same kind of chart", "every category and every series",
+    for phrase in ("exactly as in the deck's text", "the chapter file `LV chapter` wrote", "word for word",
+                   "`WORK/deck/slides.md`", "same kind of chart", "every category and every series",
                    "never leave a deck chart out", "never shown or said", "0.58 → 58%", "Before `stills`"):
         assert phrase in rules, phrase
     _, text = frontmatter("make")
     step6 = text.split("## 6. Reference chapter", 1)[1].split("## 7.", 1)[0]
     assert "Numbers from the deck" in step6
+    assert step6.index('LV chapter "WORK" 1') < step6.index("1. Write `script.json`")    # the chapter file comes first
+    plan = text.split("## 4. Plan and approval gate", 1)[1].split("## 5.", 1)[0]
+    assert "`Slides: 4-14`" in plan and "`estimate` refuses" in plan
     brief = text.split("## 3. Content brief", 1)[1].split("## 4.", 1)[0]
     assert "chart" in brief and "values" in brief
 
