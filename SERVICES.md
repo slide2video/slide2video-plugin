@@ -1,5 +1,8 @@
 # External services
 
+> **Update rule:** any change that adds, removes, or re-keys an external
+> service must update this file in the same commit/PR.
+
 | Service | Used by | Key | Who pays |
 |---|---|---|---|
 | ElevenLabs text-to-speech (`api.elevenlabs.io`) | `lv/narrate.py`, `lv/keys.py` | `ELEVENLABS_API_KEY`, supplied by each user in `~/.slide2video/keys.env` | the user |
